@@ -86,6 +86,154 @@ export type Database = {
         Update: { message?: string };
         Relationships: [];
       };
+      google_business_connections: {
+        Row: {
+          id: string;
+          business_id: string;
+          google_account_id: string;
+          google_location_id: string | null;
+          location_name: string | null;
+          /** AES-256-GCM encrypted (see lib/google-token-crypto.ts). */
+          access_token: string;
+          /** AES-256-GCM encrypted. */
+          refresh_token: string;
+          token_expires_at: string | null;
+          /** Space-separated scopes Google granted (migration 0020); null for older rows. */
+          granted_scopes: string | null;
+          status: 'pending_location' | 'active' | 'needs_reconnect';
+          rating_alert_threshold: number;
+          initial_sync_done: boolean;
+          last_sync_error: string | null;
+          connected_at: string;
+          last_sync_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          google_account_id: string;
+          google_location_id?: string | null;
+          location_name?: string | null;
+          access_token: string;
+          refresh_token: string;
+          token_expires_at?: string | null;
+          granted_scopes?: string | null;
+          status?: 'pending_location' | 'active' | 'needs_reconnect';
+          rating_alert_threshold?: number;
+          initial_sync_done?: boolean;
+          last_sync_error?: string | null;
+          connected_at?: string;
+          last_sync_at?: string | null;
+        };
+        Update: {
+          google_account_id?: string;
+          google_location_id?: string | null;
+          location_name?: string | null;
+          access_token?: string;
+          refresh_token?: string;
+          token_expires_at?: string | null;
+          granted_scopes?: string | null;
+          status?: 'pending_location' | 'active' | 'needs_reconnect';
+          rating_alert_threshold?: number;
+          initial_sync_done?: boolean;
+          last_sync_error?: string | null;
+          connected_at?: string;
+          last_sync_at?: string | null;
+        };
+        Relationships: [];
+      };
+      google_reviews: {
+        Row: {
+          id: string;
+          business_id: string;
+          google_review_id: string;
+          reviewer_name: string;
+          reviewer_photo_url: string | null;
+          rating: number;
+          comment: string | null;
+          review_date: string;
+          update_time: string;
+          reply_text: string | null;
+          reply_update_time: string | null;
+          synced_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          google_review_id: string;
+          reviewer_name?: string;
+          reviewer_photo_url?: string | null;
+          rating: number;
+          comment?: string | null;
+          review_date: string;
+          update_time: string;
+          reply_text?: string | null;
+          reply_update_time?: string | null;
+          synced_at?: string;
+        };
+        Update: {
+          reviewer_name?: string;
+          reviewer_photo_url?: string | null;
+          rating?: number;
+          comment?: string | null;
+          review_date?: string;
+          update_time?: string;
+          reply_text?: string | null;
+          reply_update_time?: string | null;
+          synced_at?: string;
+        };
+        Relationships: [];
+      };
+      review_metrics_daily: {
+        Row: {
+          id: string;
+          business_id: string;
+          date: string;
+          total_reviews: number;
+          average_rating: number;
+          reviews_gained_today: number;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          date: string;
+          total_reviews?: number;
+          average_rating?: number;
+          reviews_gained_today?: number;
+        };
+        Update: {
+          total_reviews?: number;
+          average_rating?: number;
+          reviews_gained_today?: number;
+        };
+        Relationships: [];
+      };
+      review_alerts: {
+        Row: {
+          id: string;
+          business_id: string;
+          type: 'new_review' | 'new_one_star' | 'low_rating' | 'rating_decrease';
+          title: string;
+          message: string;
+          google_review_id: string | null;
+          dedupe_key: string;
+          is_read: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          type: 'new_review' | 'new_one_star' | 'low_rating' | 'rating_decrease';
+          title: string;
+          message: string;
+          google_review_id?: string | null;
+          dedupe_key: string;
+          is_read?: boolean;
+        };
+        Update: {
+          is_read?: boolean;
+        };
+        Relationships: [];
+      };
       business_members: {
         Row: {
           id: string;
@@ -645,3 +793,7 @@ export type Referral = Database['public']['Tables']['referrals']['Row'];
 export type ImportJob = Database['public']['Tables']['import_jobs']['Row'];
 export type ReviewRequest = Database['public']['Tables']['review_requests']['Row'];
 export type ClickEvent = Database['public']['Tables']['click_events']['Row'];
+export type GoogleBusinessConnection = Database['public']['Tables']['google_business_connections']['Row'];
+export type GoogleReview = Database['public']['Tables']['google_reviews']['Row'];
+export type ReviewMetricsDaily = Database['public']['Tables']['review_metrics_daily']['Row'];
+export type ReviewAlert = Database['public']['Tables']['review_alerts']['Row'];

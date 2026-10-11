@@ -31,12 +31,18 @@ export default async function AppLayout({
   // count must never break the shell, so errors just fall back to zero.
   // The schema check runs once per server process (not per render) and never
   // blocks or breaks the shell if it fails; it shares the same wait as the count.
-  const [{ count: newFeedbackCount }] = await Promise.all([
+  const [{ count: newFeedbackCount }, { count: unreadReviewAlerts }] = await Promise.all([
     supabase
       .from('private_feedback')
       .select('id', { count: 'exact', head: true })
       .eq('business_id', business.id)
       .eq('status', 'new'),
+    // Unread Google review alerts (0 if the table doesn't exist yet).
+    supabase
+      .from('review_alerts')
+      .select('id', { count: 'exact', head: true })
+      .eq('business_id', business.id)
+      .eq('is_read', false),
     ensureSchemaValidated(supabase).catch((e) => {
       console.error('[Schema Validation] Error during validation:', e);
     }),
@@ -51,6 +57,7 @@ export default async function AppLayout({
               businessName={business.name ?? ''}
               businessLogoUrl={business.brand_logo_url}
               feedbackCount={newFeedbackCount ?? 0}
+              reviewAlertCount={unreadReviewAlerts ?? 0}
             />
 
             <AppContentShell>

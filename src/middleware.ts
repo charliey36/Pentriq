@@ -50,10 +50,10 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/send-review-requests') ||
     pathname.startsWith('/api/send-messages') ||
     pathname.startsWith('/api/scan-customer-lifecycle') ||
-    pathname.startsWith('/api/ai-test') ||
+    pathname.startsWith('/api/sync-google-reviews') ||
     pathname.startsWith('/email-assets/') ||
     pathname.startsWith('/auth/callback');
-  const isPublicPage = pathname.startsWith('/feedback/') || pathname.startsWith('/book/') || pathname === '/r' || pathname.startsWith('/r/') || pathname === '/review-unavailable' || ['/privacy', '/terms', '/cookies', '/ai-test'].includes(pathname);
+  const isPublicPage = pathname.startsWith('/feedback/') || pathname.startsWith('/book/') || pathname === '/r' || pathname.startsWith('/r/') || pathname === '/review-unavailable' || ['/privacy', '/terms', '/cookies'].includes(pathname);
 
   if (!user && !isAuthPage && !isPublicApiRoute && !isPublicPage && pathname !== '/') {
     const redirectUrl = new URL('/login', request.url);

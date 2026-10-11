@@ -171,6 +171,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
       },
       nav('go-dashboard', 'Dashboard', '/dashboard', 'dashboard', 'home overview'),
       nav('go-analytics', 'Analytics', '/analytics', 'chart', 'reports rebooking revenue health'),
+      nav('go-reviews', 'Reviews Analytics', '/reviews', 'star', 'google reviews ratings replies alerts'),
       nav('go-customers', 'Customers', '/customers', 'users', 'contacts people'),
       nav('go-segments', 'Segments', '/segments', 'funnel', 'audiences'),
       nav('go-referrals', 'Referrals', '/referrals', 'userPlus', 'codes'),

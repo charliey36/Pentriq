@@ -8,6 +8,7 @@ const tabs = [
   { href: '/settings/services', label: 'Services' },
   { href: '/settings/loyalty', label: 'Loyalty program' },
   { href: '/settings/email', label: 'Email' },
+  { href: '/settings/integrations', label: 'Integrations' },
   { href: '/settings/billing', label: 'Billing' },
 ];
 

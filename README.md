@@ -176,7 +176,7 @@ fallback — not left out, but not fake either:
      [`supabase/migrations/0004_business_logo_storage.sql`](./supabase/migrations/0004_business_logo_storage.sql)
      (creates the public `business-logos` Storage bucket and its RLS
      policies, used by the profile picture uploader in Settings).
-   - **Migrations 0005–0018 are also required** for the current app. Apply
+   - **Migrations 0005–0020 are also required** for the current app. Apply
      every file in `supabase/migrations/` in numeric order. In particular,
      [`0017_ensure_business_settings_columns.sql`](./supabase/migrations/0017_ensure_business_settings_columns.sql)
      guarantees the columns the Settings page saves
@@ -216,6 +216,9 @@ cp .env.example .env.local
 | `EMAIL_FROM` | Verified sender address (or `onboarding@resend.dev` for a demo) |
 | `NEXT_PUBLIC_APP_URL` | Public URL of this app, used to build tracking/unsubscribe/feedback/booking links (e.g. `http://localhost:3000` locally) |
 | `CRON_SECRET` | Random secret required to call any `/api/*` scheduled-job endpoint |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional — OAuth client for the Google Business Profile integration (see section 9) |
+| `GOOGLE_TOKEN_ENCRYPTION_KEY` | Required with the above — 32-byte key (`openssl rand -base64 32`) used to encrypt stored Google tokens. **Server-only; losing it means users must reconnect.** |
+| `GOOGLE_REDIRECT_URI` | Optional — defaults to `NEXT_PUBLIC_APP_URL` + `/api/google-business/callback` |
 | `ADMIN_EMAIL` | If your logged-in email matches this, your dashboard also shows every registered business. Comma-separate multiple emails for more than one admin. |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` | Optional — enables real SMS/WhatsApp sending once implemented in `lib/messaging.ts` (see Integration points above). Without these, SMS/WhatsApp sends are logged, not delivered. |
 | `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` | Optional — enables real AI-drafted message copy once implemented in `lib/ai.ts`. Without these, drafting falls back to templates. |
@@ -270,6 +273,7 @@ schedulers must hit these endpoints on an interval. All are protected by
 | `GET /api/send-review-requests` | Legacy single-send review request flow (the original `review_requests` table) | Every 5 min |
 | `GET /api/send-messages` | Processes the generalized `messages` table — review sequence follow-ups, rebooking reminders, win-back, birthday, referral, loyalty messages | Every 5 min |
 | `GET /api/scan-customer-lifecycle` | Daily scan: enrolls due customers into rebooking reminders, lapsed customers into win-back, birthday matches into birthday campaigns | Daily |
+| `GET /api/sync-google-reviews` | Syncs Google reviews for every connected business, stores the daily snapshot and raises alerts (section 9) | Every 6 hours |
 
 Locally:
 
@@ -277,8 +281,8 @@ Locally:
 curl "http://localhost:3000/api/send-messages?secret=YOUR_CRON_SECRET"
 ```
 
-In production, use [Vercel Cron](./vercel.json) (update the `secret` query
-param to match your real `CRON_SECRET` before deploying) or any external
+In production, use [Vercel Cron](./vercel.json) (set `CRON_SECRET` in Vercel and it
+sends `Authorization: Bearer <CRON_SECRET>` automatically; no secret goes in `vercel.json`) or any external
 scheduler (e.g. [cron-job.org](https://cron-job.org/), a GitHub Actions
 scheduled workflow) hitting the same URLs.
 
@@ -317,8 +321,9 @@ scheduled workflow) hitting the same URLs.
   step, recent clicks). CTR = counted clicks ÷ delivered emails × 100.
   - *Delivered* currently equals *Sent* (accepted by Resend): no delivery
     webhook is wired up. *Opened* is not tracked and shown as such.
-    *Reviews received* counts `review_confirmed` events — Pentriq cannot read
-    reviews back from Google.
+    *Reviews received* counts `review_confirmed` events. Real Google review
+    data comes from the Google Business Profile integration (section 9) and is
+    shown on the **Reviews Analytics** page.
 - `/feedback/[messageId]` is the public private-feedback landing page
   linked from every review request.
 - `/api/unsubscribe/[customerId]` stops all future emails to a customer.
@@ -329,6 +334,114 @@ If you log in with the email set as `ADMIN_EMAIL`, your dashboard also
 shows a table of every business that has signed up. Comma-separate
 multiple addresses to grant more than one account admin access.
 
+## 9. Google Business Profile (Reviews Analytics)
+
+Users connect their Google account with OAuth (no review URL is typed anywhere),
+pick a location, and Pentriq imports and tracks the location's reviews.
+
+**User flow:** Settings → Integrations → *Connect Google Business* → Google
+consent → choose a location → *Save location & import reviews* (the initial
+sync runs immediately) → **Reviews Analytics** in the sidebar.
+
+### One-time setup
+
+1. In [Google Cloud Console](https://console.cloud.google.com/) create a project
+   and an **OAuth 2.0 Client ID** of type *Web application*. Add
+   `{NEXT_PUBLIC_APP_URL}/api/google-business/callback` as an authorised
+   redirect URI (and `http://localhost:3000/api/google-business/callback` for
+   local dev). Configure the OAuth consent screen with the scope
+   `https://www.googleapis.com/auth/business.manage`.
+2. Enable the Business Profile APIs on the project: *My Business Account
+   Management API*, *My Business Business Information API* and the legacy
+   *Google My Business API* (v4 — the only API that exposes reviews).
+   **Google gates these behind an access request**
+   ([prerequisites](https://developers.google.com/my-business/content/prereqs));
+   until the project is approved, calls fail with 403/429 and Pentriq shows
+   "Google rejected the Business Profile API request".
+3. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and
+   `GOOGLE_TOKEN_ENCRYPTION_KEY` (see the env table) and apply migrations
+   [`0019_google_business_profile.sql`](./supabase/migrations/0019_google_business_profile.sql) and
+   [`0020_google_granted_scopes.sql`](./supabase/migrations/0020_google_granted_scopes.sql).
+   **Local development:** the OAuth callback must return to the origin that started the flow. If
+   `NEXT_PUBLIC_APP_URL` in `.env.local` is your production URL, also set
+   `GOOGLE_REDIRECT_URI=http://localhost:3000/api/google-business/callback` and register that exact URI
+   in Google Cloud Console (the connect route refuses to start in development when they differ).
+4. Make sure `CRON_SECRET` is set. `vercel.json` schedules
+   `/api/sync-google-reviews` every 6 hours (`0 */6 * * *`). **Vercel's Hobby
+   plan only allows daily crons** — on Hobby, deployment will reject that
+   schedule; use Pro or an external scheduler hitting the endpoint instead.
+5. **While the OAuth consent screen is in *Testing*, Google expires refresh tokens after 7 days**, so syncing
+   breaks weekly. Publish the app (Audience → *In production*) for long-lived tokens; `business.manage` is a
+   sensitive scope, so public users will see an "unverified app" warning until Google verifies the app.
+
+**Troubleshooting.** Run `node --env-file=.env.local scripts/check-google-oauth.mjs`: it validates the env
+vars, the client ID/secret, which redirect URIs Google has registered, and the database tables, without
+needing a login. OAuth failures are logged as `[google-oauth] {json}` lines (no tokens, codes or secrets) in
+your terminal / Vercel logs; the `event` field says where it failed (`state_check_failed`,
+`token_exchange_failed`, `scope_missing`, `accounts_list_failed`, `token_refresh_failed`, `api_call_failed`).
+
+### How it works
+
+| Piece | Where |
+| --- | --- |
+| OAuth start / callback (CSRF `state` in an httpOnly cookie) | [`src/app/api/google-business/`](./src/app/api/google-business) |
+| Location picker, sync now, disconnect, alert threshold | [`src/app/(app)/settings/integrations/`](./src/app/(app)/settings/integrations) |
+| Google API client (accounts, locations, reviews, replies) | [`src/lib/google-business.ts`](./src/lib/google-business.ts) |
+| Token encryption (AES-256-GCM) | [`src/lib/google-token-crypto.ts`](./src/lib/google-token-crypto.ts) |
+| Sync engine (fetch → insert/update → stats → snapshot → alerts) | [`src/lib/google-review-sync.ts`](./src/lib/google-review-sync.ts) |
+| Pure analytics (cards, series, insights, filters) | [`src/lib/google-review-analytics.ts`](./src/lib/google-review-analytics.ts) |
+| Alert rules | [`src/lib/google-review-alerts.ts`](./src/lib/google-review-alerts.ts) |
+| Scheduled job | [`src/app/api/sync-google-reviews/route.ts`](./src/app/api/sync-google-reviews/route.ts) |
+| Reviews Analytics page (Recharts) | [`src/app/(app)/reviews/`](./src/app/(app)/reviews) |
+
+**Tables** (migration 0019): `google_business_connections` (one per business;
+OAuth tokens encrypted; RLS on with **no policies**, so only the server's
+service role can read it), `google_reviews`, `review_metrics_daily` (one
+snapshot per day: total, average, gained) and `review_alerts`. Reviews,
+metrics and alerts are readable by business members through RLS; all writes
+happen server-side.
+
+**Sync behaviour.** The first sync pages through every review, prunes any that
+no longer exist on Google, and backfills daily snapshots from review dates so
+charts have history immediately. Later syncs (every 6 hours, or *Sync now*)
+fetch reviews ordered by `updateTime` and stop once a page predates the last
+sync (with a day of overlap), inserting new reviews and updating edited ones
+and replies. Today's snapshot uses Google's own `averageRating` /
+`totalReviewCount`. Dates are bucketed in Europe/London.
+
+**Replies.** Replying posts to Google first and only then stores the text, so
+the database never shows a reply that isn't live. Later syncs pull replies back
+from Google, so edits made on Google also appear. Replies are limited to 4,096
+characters.
+
+**Alerts** (in-app, shown on the Reviews Analytics page with an unread badge in
+the sidebar; 1-star, low-rating and month-over-month alerts are also emailed to
+the owner):
+
+1. New review (summarised into one alert when more than 5 arrive at once)
+2. New 1-star review
+3. Average rating crosses below the threshold (default 4.0, set in Settings →
+   Integrations) — fires on the crossing, not on every sync
+4. Average rating lower than at the end of last month — at most once per month
+
+The first (historical) import never raises alerts. Alerts are de-duplicated by
+`(business_id, dedupe_key)`, so re-running a sync is safe.
+
+**Rating Change** = current overall average − overall average at the end of the
+previous calendar month. The date filter (7/30/90 days, 12 months, custom)
+scopes the rating-trend chart, rating distribution and review list; the
+summary cards and monthly insights always describe the current month, and the
+growth chart has its own period switcher (this month / 3 months / 12 months).
+
+**Disconnecting** revokes the token at Google and deletes the connection and
+all data synced from it (reviews, snapshots, alerts). Changing location replaces
+the previous location's data.
+
+**Limitations.** Requires approved Business Profile API access (see setup).
+Reviews deleted on Google are only removed locally by a full re-import
+(disconnect and reconnect, or change location). Review replies can be created
+and edited from Pentriq but not deleted.
+
 ## Deploying to Vercel
 
 1. Push this repo to GitHub/GitLab/Bitbucket.
@@ -336,8 +449,8 @@ multiple addresses to grant more than one account admin access.
 3. Add all variables from `.env.example` in Project Settings → Environment
    Variables.
 4. Set `NEXT_PUBLIC_APP_URL` to your Vercel deployment URL.
-5. Deploy. Update the `secret` in `vercel.json` so Vercel Cron can
-   authenticate against all three scheduled-job endpoints.
+5. Deploy. Make sure `CRON_SECRET` is set so Vercel Cron can authenticate against the
+   scheduled-job endpoints.
 
 ## Project structure
 
@@ -351,11 +464,14 @@ src/
       referrals/                Generate + redeem referral codes
       feedback-inbox/           Private feedback inbox (acknowledge/resolve)
       analytics/                Rebooking rate, revenue attribution, health tiers
+      reviews/                  Google reviews analytics: cards, Recharts charts, replies, alerts
       settings/                 Business settings, services catalog, loyalty program
     api/
       send-review-requests/     Legacy single-send scheduled job
       send-messages/            Generalized multi-purpose/multi-channel scheduled job
       scan-customer-lifecycle/  Daily rebooking/win-back/birthday enrollment scan
+      google-business/          OAuth connect + callback for Google Business Profile
+      sync-google-reviews/      Scheduled Google review sync (every 6 hours)
       track/[id]/               Legacy click tracking + redirect
       track-message/[id]/       Generalized click tracking + redirect + journey exit
       unsubscribe/[customerId]/ Public unsubscribe endpoint
@@ -401,6 +517,6 @@ Dockerfile, docker-compose.yml, docker/certs/  Optional Docker setup
 - Customer health scoring is a simple, explainable recency/frequency/
   monetary heuristic, not a trained predictive model — deliberately, so
   the business owner can see *why* a customer is scored the way they are.
-- No automated test suite yet.
+- Automated tests cover the pure logic, click tracking, imports and the Google review integration (`npm test`); there are no end-to-end browser tests.
 - CSV import caps at 2,000 rows / 2MB per file.
 - The scheduled job endpoints each process at most 50 due rows per run.

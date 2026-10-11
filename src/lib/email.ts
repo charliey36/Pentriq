@@ -120,3 +120,24 @@ export async function sendNotificationEmail(to: string, kind: NotificationKind, 
   const { error } = await getResendClient().emails.send({ from: `${APP_NAME} <${from}>`, to, subject, html });
   if (error) throw new Error(typeof error === 'string' ? error : error.message);
 }
+
+/**
+ * Emails the business owner about a Google review alert (1-star review, rating
+ * below threshold, month-over-month drop). Logged instead of sent when
+ * RESEND_API_KEY is unset, like the other account notifications.
+ */
+export async function sendReviewAlertEmail(to: string, businessName: string, alert: { title: string; message: string }) {
+  const app = getAppUrl();
+  const subject = `${alert.title} \u2014 ${businessName}`;
+  const html = layout(
+    `<p style="font-weight:600">${escapeHtml(alert.title)}</p><p>${escapeHtml(alert.message)}</p>` +
+      `<p style="margin:24px 0"><a href="${app}/reviews" style="background:#188038;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;display:inline-block">View Reviews Analytics</a></p>`
+  );
+  if (!process.env.RESEND_API_KEY) {
+    console.log(`[email stub] to=${to} subject="${subject}"`);
+    return;
+  }
+  const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
+  const { error } = await getResendClient().emails.send({ from: `${APP_NAME} <${from}>`, to, subject, html });
+  if (error) throw new Error(typeof error === 'string' ? error : error.message);
+}

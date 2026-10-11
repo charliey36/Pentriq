@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { isCronAuthorized } from '@/lib/cron-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendMessage, resolveChannel } from '@/lib/messaging';
 import { renderMessage } from '@/lib/templates';
@@ -41,11 +42,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const providedSecret =
-    request.nextUrl.searchParams.get('secret') ??
-    request.headers.get('authorization')?.replace('Bearer ', '');
-
-  if (providedSecret !== expectedSecret) {
+  if (!isCronAuthorized(request, expectedSecret)) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
   }
 

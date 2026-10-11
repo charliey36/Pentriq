@@ -1,6 +1,7 @@
 import { notifyOwner } from '@/lib/notifications';
 import { isRebookingEligible } from '@/lib/eligibility';
 import { NextResponse, type NextRequest } from 'next/server';
+import { isCronAuthorized } from '@/lib/cron-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { enrollCustomerInJourney } from '@/lib/journeys';
 import { computeRebookingStatus } from '@/lib/visits';
@@ -23,11 +24,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Server misconfigured: CRON_SECRET is not set.' }, { status: 500 });
   }
 
-  const providedSecret =
-    request.nextUrl.searchParams.get('secret') ??
-    request.headers.get('authorization')?.replace('Bearer ', '');
-
-  if (providedSecret !== expectedSecret) {
+  if (!isCronAuthorized(request, expectedSecret)) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
   }
 

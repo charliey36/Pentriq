@@ -8,8 +8,8 @@ type NavItem = {
   href: string;
   label: string;
   icon: IconName;
-  /** Shows the unread feedback count next to the label. */
-  badge?: 'feedback';
+  /** Shows an unread count next to the label. */
+  badge?: 'feedback' | 'reviews';
 };
 
 export const navGroups: { label: string; items: NavItem[] }[] = [
@@ -18,6 +18,7 @@ export const navGroups: { label: string; items: NavItem[] }[] = [
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
       { href: '/analytics', label: 'Analytics', icon: 'chart' },
+      { href: '/reviews', label: 'Reviews Analytics', icon: 'star', badge: 'reviews' },
     ],
   },
   {
@@ -49,7 +50,7 @@ export function isActivePath(pathname: string, href: string) {
  * pill, a glowing edge marker and a colored icon; everything else stays
  * quiet until hovered.
  */
-export function SidebarNav({ feedbackCount = 0 }: { feedbackCount?: number }) {
+export function SidebarNav({ feedbackCount = 0, reviewAlertCount = 0 }: { feedbackCount?: number; reviewAlertCount?: number }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -76,7 +77,7 @@ export function SidebarNav({ feedbackCount = 0 }: { feedbackCount?: number }) {
           <ul className="space-y-1">
             {group.items.map((item) => {
               const active = item.href === activeHref;
-              const badgeCount = item.badge === 'feedback' ? feedbackCount : 0;
+              const badgeCount = item.badge === 'feedback' ? feedbackCount : item.badge === 'reviews' ? reviewAlertCount : 0;
 
               return (
                 <li key={item.href}>

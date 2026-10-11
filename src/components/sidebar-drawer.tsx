@@ -25,10 +25,12 @@ export function SidebarDrawer({
   businessName,
   businessLogoUrl,
   feedbackCount,
+  reviewAlertCount = 0,
 }: {
   businessName: string;
   businessLogoUrl: string | null;
   feedbackCount: number;
+  reviewAlertCount?: number;
 }) {
   const { isOpen, ready, close } = useSidebar();
   const pathname = usePathname();
@@ -95,7 +97,7 @@ export function SidebarDrawer({
           <SidebarSearch />
         </div>
 
-        <SidebarNav feedbackCount={feedbackCount} />
+        <SidebarNav feedbackCount={feedbackCount} reviewAlertCount={reviewAlertCount} />
       </aside>
     </>
   );
