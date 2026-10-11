@@ -101,6 +101,9 @@ describe('syncConnection: initial import', () => {
     expect(snaps[snaps.length - 1]).toMatchObject({ total_reviews: 3, average_rating: 3.5, reviews_gained_today: 0 });
 
     expect(db.rows('review_alerts')).toHaveLength(0);
+    // Audit trail + monthly roll-up are written after a successful sync.
+    expect(db.rows('google_sync_jobs')).toEqual([expect.objectContaining({ business_id: BUSINESS, trigger: 'initial', status: 'succeeded', fetched: 3, inserted: 3 })]);
+    expect(db.rows('review_metrics').map((m) => m.period)).toEqual(['2026-09', '2026-10']);
     expect(db.rows('google_business_connections')[0]).toMatchObject({
       initial_sync_done: true,
       last_sync_error: null,
