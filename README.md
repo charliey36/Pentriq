@@ -273,7 +273,7 @@ schedulers must hit these endpoints on an interval. All are protected by
 | `GET /api/send-review-requests` | Legacy single-send review request flow (the original `review_requests` table) | Every 5 min |
 | `GET /api/send-messages` | Processes the generalized `messages` table — review sequence follow-ups, rebooking reminders, win-back, birthday, referral, loyalty messages | Every 5 min |
 | `GET /api/scan-customer-lifecycle` | Daily scan: enrolls due customers into rebooking reminders, lapsed customers into win-back, birthday matches into birthday campaigns | Daily |
-| `GET /api/sync-google-reviews` | Syncs Google reviews for every connected business, stores the daily snapshot and raises alerts (section 9) | Every 6 hours |
+| `GET /api/sync-google-reviews` | Syncs Google reviews for every connected business, stores the daily snapshot and raises alerts (section 9) | Daily on Vercel Hobby (every 6 hours on Pro or an external scheduler) |
 
 Locally:
 
@@ -367,9 +367,12 @@ sync runs immediately) → **Reviews Analytics** in the sidebar.
    `GOOGLE_REDIRECT_URI=http://localhost:3000/api/google-business/callback` and register that exact URI
    in Google Cloud Console (the connect route refuses to start in development when they differ).
 4. Make sure `CRON_SECRET` is set. `vercel.json` schedules
-   `/api/sync-google-reviews` every 6 hours (`0 */6 * * *`). **Vercel's Hobby
-   plan only allows daily crons** — on Hobby, deployment will reject that
-   schedule; use Pro or an external scheduler hitting the endpoint instead.
+   `/api/sync-google-reviews` once a day (`0 6 * * *`), because **Vercel's Hobby plan
+   only allows daily crons** and rejects the deployment otherwise. For the intended
+   6-hour freshness, either upgrade to Pro and change the schedule to `0 */6 * * *`, or
+   leave Vercel's daily run and add an external scheduler (e.g. cron-job.org) that calls
+   `GET /api/sync-google-reviews` every 6 hours with the header `Authorization: Bearer <CRON_SECRET>`.
+   Users can also press *Sync now* at any time.
 5. **While the OAuth consent screen is in *Testing*, Google expires refresh tokens after 7 days**, so syncing
    breaks weekly. Publish the app (Audience → *In production*) for long-lived tokens; `business.manage` is a
    sensitive scope, so public users will see an "unverified app" warning until Google verifies the app.
@@ -403,7 +406,7 @@ happen server-side.
 
 **Sync behaviour.** The first sync pages through every review, prunes any that
 no longer exist on Google, and backfills daily snapshots from review dates so
-charts have history immediately. Later syncs (every 6 hours, or *Sync now*)
+charts have history immediately. Later syncs (scheduled, or *Sync now*)
 fetch reviews ordered by `updateTime` and stop once a page predates the last
 sync (with a day of overlap), inserting new reviews and updating edited ones
 and replies. Today's snapshot uses Google's own `averageRating` /
@@ -471,7 +474,7 @@ src/
       send-messages/            Generalized multi-purpose/multi-channel scheduled job
       scan-customer-lifecycle/  Daily rebooking/win-back/birthday enrollment scan
       google-business/          OAuth connect + callback for Google Business Profile
-      sync-google-reviews/      Scheduled Google review sync (every 6 hours)
+      sync-google-reviews/      Scheduled Google review sync (daily; see section 9)
       track/[id]/               Legacy click tracking + redirect
       track-message/[id]/       Generalized click tracking + redirect + journey exit
       unsubscribe/[customerId]/ Public unsubscribe endpoint

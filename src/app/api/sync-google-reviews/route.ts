@@ -6,7 +6,8 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 /**
- * Scheduled job (every 6 hours, see vercel.json): synchronises Google reviews
+ * Scheduled job (daily in vercel.json because Vercel Hobby only allows daily crons;
+ * call it every 6 hours from Vercel Pro or an external scheduler): synchronises Google reviews
  * for every connected business — fetches new/modified reviews, recalculates
  * statistics, stores the daily snapshot and raises alerts. Protected by
  * CRON_SECRET like the other scheduled endpoints (`?secret=` or

@@ -162,7 +162,7 @@ export function GooglePanel({
           </p>
           <p className="mt-1 text-xs text-ink-3">
             {connection?.last_sync_at ? `Last synced ${formatUKDateTime(new Date(connection.last_sync_at))}` : 'Not synced yet'} &middot;
-            syncs automatically every 6 hours
+            syncs automatically once a day, or use Sync now
           </p>
         </div>
         <Link href="/reviews" className="btn btn-secondary btn-sm">

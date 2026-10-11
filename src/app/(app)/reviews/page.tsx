@@ -165,7 +165,7 @@ export default async function ReviewsAnalyticsPage({
       <p className="-mt-4 mb-6 text-xs text-ink-3">
         {connection.location_name ?? 'Google location'} &middot;{' '}
         {connection.last_sync_at ? `last synced ${formatUKDateTime(new Date(connection.last_sync_at))}` : 'not synced yet'} &middot;
-        refreshes every 6 hours
+        synced automatically once a day, or use Sync now
       </p>
 
       {connection.status === 'needs_reconnect' && (
