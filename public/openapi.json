@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.3",
   "info": { "title": "Pentriq Integrations API", "version": "1.0.0" },
-  "servers": [{ "url": "https://pentriq-blond.vercel.app" }],
+  "servers": [{ "url": "https://pentriq.cloud" }],
   "components": {
     "securitySchemes": { "ApiKey": { "type": "apiKey", "in": "header", "name": "x-api-key" } }
   },

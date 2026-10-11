@@ -3,7 +3,7 @@ import localFont from 'next/font/local';
 import './globals.css';
 import { ThemeProvider, THEME_BOOTSTRAP_SCRIPT } from '@/components/theme-context';
 import { SpotlightProvider } from '@/components/spotlight';
-import { APP_DESCRIPTION, APP_NAME, APP_TITLE } from '@/lib/brand';
+import { APP_DESCRIPTION, APP_NAME, APP_TITLE, getAppUrl } from '@/lib/brand';
 
 /* Inter (variable, latin subset, SIL OFL) is self-hosted so there is no
    build-time or runtime request to Google Fonts. */
@@ -15,6 +15,8 @@ const inter = localFont({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getAppUrl()),
+  alternates: { canonical: '/' },
   title: {
     default: APP_TITLE,
     template: `%s · ${APP_NAME}`,
@@ -25,6 +27,7 @@ export const metadata: Metadata = {
     title: APP_TITLE,
     description: APP_DESCRIPTION,
     siteName: APP_NAME,
+    url: '/',
     type: 'website',
   },
   twitter: {

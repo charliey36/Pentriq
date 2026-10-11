@@ -27,7 +27,7 @@ const HUMAN_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWe
 const HOUR_AGO = new Date(Date.now() - 3_600_000).toISOString();
 
 const req = (path: string) =>
-  new NextRequest(`https://pentriq-blond.vercel.app${path}`, {
+  new NextRequest(`https://pentriq.cloud${path}`, {
     headers: { 'user-agent': HUMAN_UA, 'x-forwarded-for': '203.0.113.7' },
   });
 
@@ -74,7 +74,7 @@ describe('/api/track-message/[messageId] (legacy URL)', () => {
     const res = await trackMessage(req(`/api/track-message/${ID}`), { params: { messageId: ID } });
     expect(res.status).toBeGreaterThanOrEqual(300);
     expect(res.status).toBeLessThan(400);
-    expect(res.headers.get('location')).toBe('https://pentriq-blond.vercel.app/review-unavailable?reason=not-configured');
+    expect(res.headers.get('location')).toBe('https://pentriq.cloud/review-unavailable?reason=not-configured');
     expect(db.rows('interaction_events')).toHaveLength(1);
   });
 

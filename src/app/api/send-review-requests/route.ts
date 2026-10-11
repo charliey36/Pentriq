@@ -1,3 +1,4 @@
+import { sendBlockedReason } from '@/lib/billing';
 import { NextResponse, type NextRequest } from 'next/server';
 import { isCronAuthorized } from '@/lib/cron-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -94,13 +95,23 @@ export async function GET(request: NextRequest) {
           .single(),
         supabase
           .from('businesses')
-          .select('name')
+          .select('name, subscription_status, trial_ends_at, created_at')
           .eq('id', reviewRequest.business_id)
           .single(),
       ]);
 
       if (!customer || !business) {
         throw new Error('Customer or business record not found.');
+      }
+
+      // Subscription required: defer a day instead of failing or starving the batch.
+      if (sendBlockedReason(business)) {
+        await supabase
+          .from('review_requests')
+          .update({ next_attempt_at: new Date(Date.now() + 86_400_000).toISOString() })
+          .eq('id', reviewRequest.id);
+        results.push({ id: reviewRequest.id, status: 'skipped', error: 'Subscription required' });
+        continue;
       }
 
       // Consent check: never send to a customer who has unsubscribed,

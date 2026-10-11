@@ -41,7 +41,7 @@ export const STORAGE_KEYS = {
  * is built from this, so it must be the real public address — never localhost.
  * Override with NEXT_PUBLIC_APP_URL (e.g. for a custom domain or a staging site).
  */
-export const DEFAULT_APP_URL = 'https://pentriq-blond.vercel.app';
+export const DEFAULT_APP_URL = 'https://pentriq.cloud';
 
 export function getAppUrl(): string {
   return (process.env.NEXT_PUBLIC_APP_URL || DEFAULT_APP_URL).trim().replace(/\/+$/, '');
