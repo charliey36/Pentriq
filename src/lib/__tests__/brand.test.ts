@@ -56,10 +56,10 @@ describe('public app URL', () => {
 
   it('defaults to the Pentriq deployment, never localhost', () => {
     delete process.env.NEXT_PUBLIC_APP_URL;
-    expect(DEFAULT_APP_URL).toBe('https://pentriq-blond.vercel.app');
-    expect(getAppUrl()).toBe('https://pentriq-blond.vercel.app');
+    expect(DEFAULT_APP_URL).toBe('https://pentriq.cloud');
+    expect(getAppUrl()).toBe('https://pentriq.cloud');
     process.env.NEXT_PUBLIC_APP_URL = '';
-    expect(getAppUrl()).toBe('https://pentriq-blond.vercel.app');
+    expect(getAppUrl()).toBe('https://pentriq.cloud');
   });
 
   it('honours an override and strips trailing slashes', () => {
@@ -75,8 +75,8 @@ describe('public app URL', () => {
       publicReviewUrl: `${getAppUrl()}/api/track-message/m1`,
       privateFeedbackUrl: `${getAppUrl()}/feedback/m1`,
     });
-    expect(html).toContain('https://pentriq-blond.vercel.app/email-assets/logo-mark.png');
-    expect(html).toContain('https://pentriq-blond.vercel.app/api/track-message/m1');
+    expect(html).toContain('https://pentriq.cloud/email-assets/logo-mark.png');
+    expect(html).toContain('https://pentriq.cloud/api/track-message/m1');
     expect(html).not.toContain('localhost');
   });
 });

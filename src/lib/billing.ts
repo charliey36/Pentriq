@@ -21,7 +21,10 @@ export type BillingState = {
   hasAccess: boolean;
 };
 
-export function getBillingState(b: Business, now = new Date()): BillingState {
+/** The subset of a business row the billing logic needs. */
+export type BillingInput = Pick<Business, 'subscription_status' | 'trial_ends_at' | 'created_at'>;
+
+export function getBillingState(b: BillingInput, now = new Date()): BillingState {
   // Columns come from migration 0005; fall back to a fresh 14-day trial if
   // it hasn't been applied yet so the app keeps working.
   const status = b.subscription_status ?? 'trialing';
@@ -43,5 +46,33 @@ export function getBillingState(b: Business, now = new Date()): BillingState {
   };
 }
 
-/** True once STRIPE_SECRET_KEY and STRIPE_PRICE_ID are set. */
-export const stripeConfigured = () => Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID);
+/** True once STRIPE_SECRET_KEY and a price id (STRIPE_PRICE_IDS / STRIPE_PRICE_ID) are set. */
+export const stripeConfigured = () =>
+  Boolean(process.env.STRIPE_SECRET_KEY && (process.env.STRIPE_PRICE_IDS || process.env.STRIPE_PRICE_ID));
+
+/**
+ * Feature tiers. This is the ONE place that decides what each billing state
+ * may do — call sites use `canUse(business, feature)` / `assertCanSend()`
+ * rather than checking status strings themselves.
+ *
+ *  - free (always available, even after the trial ends / cancellation):
+ *      viewing and exporting data, settings, billing, private feedback inbox,
+ *      reputation tracking, unsubscribe + public feedback pages.
+ *  - trial and paid (hasAccess): everything that sends messages to customers.
+ */
+export type Feature = 'view' | 'send_messages' | 'automation';
+
+const FREE_FEATURES: Feature[] = ['view'];
+
+export function canUse(b: BillingInput, feature: Feature, now = new Date()): boolean {
+  if (FREE_FEATURES.includes(feature)) return true;
+  return getBillingState(b, now).hasAccess;
+}
+
+export const SUBSCRIPTION_REQUIRED_MESSAGE =
+  'Your free trial has ended. Subscribe in Settings → Billing to keep sending messages.';
+
+/** Throws-free guard for send paths: returns an error string when blocked. */
+export function sendBlockedReason(b: BillingInput, now = new Date()): string | null {
+  return canUse(b, 'send_messages', now) ? null : SUBSCRIPTION_REQUIRED_MESSAGE;
+}

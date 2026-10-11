@@ -234,6 +234,18 @@ export type Database = {
         };
         Relationships: [];
       };
+      subscriptions: {
+        Row: { id: string; business_id: string; stripe_customer_id: string | null; stripe_subscription_id: string | null; stripe_price_id: string | null; plan_name: string | null; status: string; current_period_end: string | null; trial_end: string | null; cancel_at_period_end: boolean; created_at: string; updated_at: string };
+        Insert: { id?: string; business_id: string; stripe_customer_id?: string | null; stripe_subscription_id?: string | null; stripe_price_id?: string | null; plan_name?: string | null; status?: string; current_period_end?: string | null; trial_end?: string | null; cancel_at_period_end?: boolean; updated_at?: string };
+        Update: { stripe_customer_id?: string | null; stripe_subscription_id?: string | null; stripe_price_id?: string | null; plan_name?: string | null; status?: string; current_period_end?: string | null; trial_end?: string | null; cancel_at_period_end?: boolean; updated_at?: string };
+        Relationships: [];
+      };
+      stripe_webhook_events: {
+        Row: { id: string; type: string; processed_at: string };
+        Insert: { id: string; type: string };
+        Update: { type?: string };
+        Relationships: [];
+      };
       review_sources: {
         Row: { id: string; business_id: string; source_name: string; source_type: 'manual' | 'google'; connected: boolean; created_at: string };
         Insert: { id?: string; business_id: string; source_name: string; source_type: 'manual' | 'google'; connected?: boolean };
@@ -805,6 +817,7 @@ export type Database = {
   };
 };
 
+export type Subscription = Database['public']['Tables']['subscriptions']['Row'];
 export type Business = Database['public']['Tables']['businesses']['Row'];
 export type BusinessMember = Database['public']['Tables']['business_members']['Row'];
 export type Customer = Database['public']['Tables']['customers']['Row'];

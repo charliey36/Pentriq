@@ -6,6 +6,7 @@ import { renderMessage } from '@/lib/templates';
 import { advanceJourneyEnrollment } from '@/lib/journeys';
 import { senderDisplayName, getAppUrl } from '@/lib/brand';
 import { buildTrackingUrl } from '@/lib/click-tracking';
+import { sendBlockedReason } from '@/lib/billing';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,6 +82,17 @@ export async function GET(request: NextRequest) {
 
       if (!customer || !business) {
         throw new Error('Customer or business record not found.');
+      }
+
+      // Subscription required: leave the row pending and look again tomorrow,
+      // so it neither fails nor starves other businesses' rows in the batch.
+      if (sendBlockedReason(business)) {
+        await supabase
+          .from('messages')
+          .update({ next_attempt_at: new Date(Date.now() + 86_400_000).toISOString() })
+          .eq('id', message.id);
+        skipped += 1;
+        continue;
       }
 
       const channel = resolveChannel(message.channel, customer);

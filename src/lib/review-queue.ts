@@ -6,6 +6,7 @@ import { resolveChannel, sendMessage } from '@/lib/messaging';
 import { isDemoCustomer, simulateDemoEmailSend } from '@/lib/demo-mode';
 import { senderDisplayName, getAppUrl } from '@/lib/brand';
 import { buildTrackingUrl } from '@/lib/click-tracking';
+import { sendBlockedReason } from '@/lib/billing';
 
 /**
  * Sends one queued review request immediately, using the same compliant
@@ -50,7 +51,9 @@ export async function sendQueuedReview(
     return { ok: false, error: 'Business not found.' };
   }
   
-  console.log(`[Send Review] Customer found: ${customer.email}, Business: ${business.name}`);
+  const blocked = sendBlockedReason(business);
+  if (blocked) return { ok: false, error: blocked };
+
   console.log(`[Send Review] Customer found: ${customer.email}, Business: ${business.name}`);
 
   const channel = resolveChannel('email', customer);

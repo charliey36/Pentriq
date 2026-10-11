@@ -32,6 +32,7 @@ import { extractReviewSchedulingLogic, isDuplicateReviewRequest } from '@/lib/re
 import { isDemoCustomer, simulateDemoEmailSend } from '@/lib/demo-mode';
 import { todayIso } from '@/lib/eligibility';
 import { senderDisplayName, getAppUrl } from '@/lib/brand';
+import { sendBlockedReason } from '@/lib/billing';
 
 type Db = SupabaseClient<Database>;
 
@@ -137,6 +138,8 @@ export async function sendManualRebookingReminderFor(
 
   if (!customer) return { ok: false, error: 'Customer not found.' };
   if (!business) return { ok: false, error: 'Business not found.' };
+  const blocked = sendBlockedReason(business);
+  if (blocked) return { ok: false, error: blocked };
   if (customer.unsubscribed_at && customer.unsubscribed_sms_at) {
     return { ok: false, error: 'This customer has opted out of all messages.' };
   }

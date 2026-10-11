@@ -12,7 +12,7 @@ let failures = 0;
 const fail = (m) => { failures += 1; bad(m); };
 
 const SCOPE = 'https://www.googleapis.com/auth/business.manage';
-const appUrl = (env.NEXT_PUBLIC_APP_URL || 'https://pentriq-blond.vercel.app').trim().replace(/\/+$/, '');
+const appUrl = (env.NEXT_PUBLIC_APP_URL || 'https://pentriq.cloud').trim().replace(/\/+$/, '');
 const appRedirect = env.GOOGLE_REDIRECT_URI?.trim() || `${appUrl}/api/google-business/callback`;
 
 console.log('1. Environment');

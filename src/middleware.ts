@@ -51,6 +51,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/send-messages') ||
     pathname.startsWith('/api/scan-customer-lifecycle') ||
     pathname.startsWith('/api/sync-google-reviews') ||
+    pathname.startsWith('/api/stripe/webhook') ||
     pathname.startsWith('/email-assets/') ||
     pathname.startsWith('/auth/callback');
   const isPublicPage = pathname.startsWith('/feedback/') || pathname.startsWith('/book/') || pathname === '/r' || pathname.startsWith('/r/') || pathname === '/review-unavailable' || ['/privacy', '/terms', '/cookies'].includes(pathname);
