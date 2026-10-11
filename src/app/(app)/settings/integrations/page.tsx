@@ -16,6 +16,7 @@ import { describeGoogleError, getGoogleConfig, listAllLocations } from '@/lib/go
 import { isTokenEncryptionConfigured } from '@/lib/google-token-crypto';
 import { getAccessToken } from '@/lib/google-review-sync';
 import { GooglePanel, type GooglePanelState } from './google-panel';
+import { GoogleComingSoon } from './google-coming-soon';
 
 export const metadata: Metadata = { title: 'Integrations' };
 
@@ -49,6 +50,8 @@ export default async function IntegrationsPage({
 
   // Google Business Profile: tokens stay on the server; the panel only gets safe fields.
   const googleConnection = await getPublicConnection(business.id);
+  // Google gates Business Profile API access behind an approval: until GOOGLE_BUSINESS_API_APPROVED=true, new users see "coming soon".
+  const comingSoon = !googleConnection && process.env.GOOGLE_BUSINESS_API_APPROVED !== 'true';
   let googleState: GooglePanelState =
     !getGoogleConfig() || !isTokenEncryptionConfigured()
       ? 'not_configured'
@@ -95,7 +98,7 @@ export default async function IntegrationsPage({
         title="Integrations"
         icon="cog"
         tone="slate"
-        description="Connect Google Business Profile, or let Zapier, Make or your CRM tell Pentriq when a service is completed."
+        description="Connect Google Business Profile, or let your booking tool, CRM or automation platform tell Pentriq when a service is completed."
         tabs={<SettingsTabs />}
       />
       <div className="space-y-6">
@@ -113,12 +116,16 @@ export default async function IntegrationsPage({
               Google account reconnected. Syncing will resume.
             </Notice>
           )}
-          <GooglePanel
-            state={googleState}
-            connection={googleConnection}
-            locations={googleLocations}
-            locationsError={googleLocationsError}
-          />
+          {comingSoon ? (
+            <GoogleComingSoon />
+          ) : (
+            <GooglePanel
+              state={googleState}
+              connection={googleConnection}
+              locations={googleLocations}
+              locationsError={googleLocationsError}
+            />
+          )}
         </SectionCard>
 
         <SectionCard title="Endpoint" description="Customers are created or updated by email, and a service visit is recorded.">
@@ -134,19 +141,18 @@ export default async function IntegrationsPage({
         </SectionCard>
 
         <SectionCard
-          title="Zapier setup"
-          description={<>Google Sheets → Zapier → Pentriq. <Link href="/integrations/docs" className="underline">Full guide</Link></>}
+          title="Connect a booking tool or spreadsheet"
+          description={<>Any tool that can send a webhook works. <Link href="/integrations/docs" className="underline">Full guide</Link></>}
         >
           <ol className="list-decimal space-y-1.5 pl-5 text-sm text-ink-2">
-            <li>Create a Google Sheet with columns: <code>Name, Email, Phone, AmountSpent, ServiceDate</code>.</li>
-            <li>In Zapier, create a Zap: trigger <b>Google Sheets → New Spreadsheet Row</b>.</li>
-            <li>Add action <b>Webhooks by Zapier → POST</b>. URL: the endpoint above. Payload Type: <b>Json</b>.</li>
-            <li>Map the data: customerName ← Name, email ← Email, phone ← Phone, amountSpent ← AmountSpent, serviceDate ← ServiceDate.</li>
-            <li>Under Headers add <code>x-api-key</code> with your API key. Test the Zap, then add a row to your sheet.</li>
+            <li>Send a <b>POST</b> request with a JSON body to the endpoint above: <code>customerName, email, phone, amountSpent, serviceDate</code>.</li>
+            <li>Add the header <code>x-api-key</code> with your API key.</li>
+            <li>Automation platforms (Zapier, Make, n8n and similar) use their <b>Webhook / HTTP POST</b> action: set the payload type to JSON.</li>
+            <li>Press <b>Test Import</b> below, then check Recent events to see it arrive.</li>
           </ol>
         </SectionCard>
 
-        <SectionCard title="Test import" description="Sends a sample customer through the same pipeline as the endpoint, no Zapier needed.">
+        <SectionCard title="Test import" description="Sends a sample customer through the same pipeline as the endpoint, no external tool needed.">
           <ActionButton label="Test Import" />
         </SectionCard>
 

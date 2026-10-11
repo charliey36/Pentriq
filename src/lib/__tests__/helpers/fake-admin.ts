@@ -42,6 +42,11 @@ class FakeQuery implements PromiseLike<any> {
     this.opts = opts;
     return this;
   }
+  insert(rows: Row | Row[]) {
+    this.mode = 'insert' as any;
+    this.payload = Array.isArray(rows) ? rows : [rows];
+    return this;
+  }
   update(patch: Row) {
     this.mode = 'update';
     this.payload = patch;
@@ -106,6 +111,10 @@ class FakeQuery implements PromiseLike<any> {
         }
       }
       return { data: this.returning ? out : null, error: null };
+    }
+    if ((this.mode as string) === 'insert') {
+      for (const r of this.payload as Row[]) this.db.rows(this.table).push({ id: `${this.table}-${this.db.rows(this.table).length + 1}`, ...r });
+      return { data: null, error: null };
     }
     if (this.mode === 'update') {
       const hit = matches();

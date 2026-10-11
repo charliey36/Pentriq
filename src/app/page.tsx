@@ -167,7 +167,7 @@ export default async function HomePage() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-60" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-500" />
               </span>
-              Review requests, rebooking and retention on autopilot
+              AI-powered reputation management
             </p>
 
             <h1 className="mx-auto mt-7 max-w-4xl animate-fade-in-up text-balance text-[42px] font-semibold leading-[1.04] tracking-[-0.045em] text-ink [animation-delay:60ms] sm:text-6xl lg:text-[76px]">
@@ -178,9 +178,9 @@ export default async function HomePage() {
             </h1>
 
             <p className="mx-auto mt-6 max-w-2xl animate-fade-in-up text-pretty text-base leading-7 text-ink-3 [animation-delay:120ms] sm:text-lg sm:leading-8">
-              Pentriq automatically asks for reviews, brings customers back for their next visit, and
-              rewards loyalty &mdash; so your reputation and repeat revenue grow without the manual
-              follow-up.
+              Pentriq is an AI-powered reputation management platform that helps you collect, monitor,
+              analyse and improve customer reviews &mdash; and brings customers back for their next
+              visit &mdash; so your reputation and repeat revenue grow without the manual follow-up.
             </p>
 
             <div className="mt-9 flex animate-fade-in-up flex-wrap items-center justify-center gap-3 [animation-delay:180ms]">

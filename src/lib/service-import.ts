@@ -102,7 +102,7 @@ export async function logIntegrationEvent(
   }
 }
 
-/** Zapier sends every value as a string, so accept "350", "£1,250.50" etc. */
+/** Automation tools often send every value as a string, so accept "350", "£1,250.50" etc. */
 function toAmount(v: unknown): number | null {
   if (v === undefined || v === null || v === '') return 0;
   if (typeof v === 'number') return v;

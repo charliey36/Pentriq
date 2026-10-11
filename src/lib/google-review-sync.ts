@@ -20,6 +20,7 @@ import {
 } from '@/lib/google-review-analytics';
 import { buildAlerts, shouldEmail, type AlertDraft } from '@/lib/google-review-alerts';
 import { logGoogleOAuth } from '@/lib/google-oauth-log';
+import { rebuildMetrics } from '@/lib/reputation-data';
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -173,9 +174,11 @@ async function persistAlerts(admin: Admin, businessId: string, drafts: AlertDraf
 export async function syncConnection(
   admin: Admin,
   conn: GoogleBusinessConnection,
-  now: Date = new Date()
+  now: Date = new Date(),
+  trigger?: 'initial' | 'scheduled' | 'manual'
 ): Promise<SyncResult> {
   const initial = !conn.initial_sync_done;
+  const jobTrigger = trigger ?? (initial ? 'initial' : 'scheduled');
   const result: SyncResult = { businessId: conn.business_id, ok: false, initial, fetched: 0, inserted: 0, updated: 0, alerts: 0 };
 
   if (conn.status === 'needs_reconnect') return { ...result, error: 'Connection needs to be re-authorised.' };
@@ -311,6 +314,8 @@ export async function syncConnection(
       .update({ last_sync_at: syncedAt, last_sync_error: null, initial_sync_done: true, status: 'active' })
       .eq('id', conn.id);
 
+    await rebuildMetrics(admin, conn.business_id).catch((e) => console.error('[google-sync] metrics rebuild failed', e));
+    await recordJob(admin, { ...result, ok: true }, jobTrigger);
     return { ...result, ok: true };
   } catch (err) {
     const message = describeGoogleError(err);
@@ -325,7 +330,26 @@ export async function syncConnection(
     if (!(err instanceof GoogleApiError && err.isAuthRevoked)) {
       await admin.from('google_business_connections').update({ last_sync_error: message.slice(0, 500) }).eq('id', conn.id);
     }
+    await recordJob(admin, { ...result, error: message }, jobTrigger);
     return { ...result, error: message };
+  }
+}
+
+/** Audit trail: one row per sync run. Never fails the sync. */
+async function recordJob(admin: Admin, r: SyncResult, trigger: 'initial' | 'scheduled' | 'manual') {
+  try {
+    await admin.from('google_sync_jobs').insert({
+      business_id: r.businessId,
+      trigger,
+      status: r.ok ? 'succeeded' : 'failed',
+      fetched: r.fetched,
+      inserted: r.inserted,
+      updated: r.updated,
+      alerts: r.alerts,
+      error: r.error?.slice(0, 500) ?? null,
+    });
+  } catch {
+    /* table may not exist until migration 0021 is applied */
   }
 }
 

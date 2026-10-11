@@ -43,7 +43,7 @@ x-api-key: YOUR_API_KEY`}</Code>
         <P>
           Required: <code>customerName</code>, <code>email</code>, <code>serviceDate</code> (YYYY-MM-DD or DD/MM/YYYY, not
           in the future). Optional: <code>phone</code>, <code>amountSpent</code> (0 or more; text like &quot;350&quot; or
-          &quot;£350.00&quot; is accepted, which is what Zapier sends).
+          &quot;£350.00&quot; is accepted, which is what most automation tools send).
         </P>
 
         <H>Responses</H>
@@ -62,12 +62,12 @@ x-api-key: YOUR_API_KEY`}</Code>
 }`}</Code>
         <P>A missing or wrong API key returns 401.</P>
 
-        <H>Zapier: Google Sheets to Pentriq</H>
+        <H>Example: Google Sheets with an automation tool</H>
         <P>1. Create a Google Sheet with these columns in row 1:</P>
         <Code>{`Name | Email | Phone | AmountSpent | ServiceDate
 John Smith | john@email.com | 07123456789 | 350 | 2026-10-08`}</Code>
-        <P>2. In Zapier, create a Zap with trigger <b>Google Sheets → New Spreadsheet Row</b> and pick your sheet.</P>
-        <P>3. Add the action <b>Webhooks by Zapier → POST</b> and set:</P>
+        <P>2. In your automation tool (Zapier, Make, n8n), create a workflow triggered by <b>Google Sheets → New Spreadsheet Row</b> and pick your sheet.</P>
+        <P>3. Add a <b>Webhook / HTTP POST</b> action and set:</P>
         <Code>{`URL:           ${base}/api/integrations/service-completed
 Payload Type:  Json
 Data:          customerName → Name
@@ -77,7 +77,7 @@ Data:          customerName → Name
                serviceDate  → ServiceDate
 Headers:       x-api-key    → YOUR_API_KEY`}</Code>
         <P>4. Test the action, then add a row to your sheet. Check Settings → Integrations → Recent events to see it arrive.</P>
-        <P>The same setup works for Microsoft Bookings, Jobber, ServiceM8, HubSpot and other tools Zapier supports: only the trigger changes.</P>
+        <P>The same setup works for Microsoft Bookings, Jobber, ServiceM8, HubSpot and any other tool that can send a webhook: only the trigger changes.</P>
       </main>
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-6">

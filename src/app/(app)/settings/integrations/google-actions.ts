@@ -7,6 +7,7 @@ import { getConnectionWithTokens } from '@/lib/google-connection';
 import { decryptToken } from '@/lib/google-token-crypto';
 import { describeGoogleError, listAllLocations, revokeToken } from '@/lib/google-business';
 import { getAccessToken, syncConnection } from '@/lib/google-review-sync';
+import { rebuildMetrics, setSource } from '@/lib/reputation-data';
 
 export type ActionResult = { ok: boolean; message: string };
 
@@ -71,6 +72,11 @@ export async function selectGoogleLocation(value: string): Promise<ActionResult>
     .single();
   if (updateError || !updated) return { ok: false, message: 'Could not save the location. Please try again.' };
 
+  await setSource(admin, business.id, 'google', 'Google Business Profile', true);
+  await admin.from('google_business_locations').upsert(
+    { business_id: business.id, google_account_id: accountId, google_location_id: locationId, title: chosen.title, address: chosen.address },
+    { onConflict: 'business_id,google_account_id,google_location_id' }
+  );
   const result = await syncConnection(admin, updated);
   refresh();
   return result.ok
@@ -96,7 +102,7 @@ export async function syncGoogleNow(): Promise<ActionResult> {
   if (conn.last_sync_at && Date.now() - Date.parse(conn.last_sync_at) < MIN_SYNC_GAP_MS) {
     return { ok: false, message: 'Synced moments ago. Try again in a few seconds.' };
   }
-  const result = await syncConnection(createAdminClient(), conn);
+  const result = await syncConnection(createAdminClient(), conn, new Date(), 'manual');
   refresh();
   return result.ok
     ? { ok: true, message: `Sync complete: ${result.inserted} new, ${result.updated} updated.` }
@@ -134,8 +140,11 @@ export async function disconnectGoogle(): Promise<ActionResult> {
   await admin.from('google_reviews').delete().eq('business_id', business.id);
   await admin.from('review_metrics_daily').delete().eq('business_id', business.id);
   await admin.from('review_alerts').delete().eq('business_id', business.id);
+  await admin.from('google_business_locations').delete().eq('business_id', business.id);
   const { error } = await admin.from('google_business_connections').delete().eq('business_id', business.id);
   if (error) return { ok: false, message: 'Could not disconnect. Please try again.' };
+  await setSource(admin, business.id, 'google', 'Google Business Profile', false);
+  await rebuildMetrics(admin, business.id).catch(() => undefined); // falls back to manual snapshots
 
   refresh();
   return { ok: true, message: 'Google Business Profile disconnected.' };

@@ -62,12 +62,13 @@ ok(`scope=${SCOPE}`);
 ok('access_type=offline (refresh token)');
 ok('prompt=consent (refresh token on every connect)');
 
-console.log('\n5. Database (migrations 0019 / 0020)');
+console.log('\n5. Database (migrations 0019 / 0020 / 0021)');
 if (env.NEXT_PUBLIC_SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY) {
   const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
-  for (const t of ['google_business_connections', 'google_reviews', 'review_metrics_daily', 'review_alerts']) {
-    const { count, error } = await db.from(t).select('*', { count: 'exact', head: true });
-    error ? fail(`${t}: ${error.message}`) : ok(`${t}: ${count} rows`);
+  // (HEAD requests don't report a missing table, so read a row instead.)
+  for (const t of ['google_business_connections', 'google_reviews', 'review_metrics_daily', 'review_alerts', 'manual_review_snapshots', 'review_sources', 'review_metrics', 'google_business_locations', 'google_sync_jobs']) {
+    const { data, error } = await db.from(t).select('id').limit(1);
+    error ? fail(`${t}: ${error.message}${t.match(/manual_|review_sources|review_metrics$|_locations|_jobs/) ? ' (apply migration 0021)' : ''}`) : ok(`${t}: exists`);
   }
   const { error } = await db.from('google_business_connections').select('granted_scopes').limit(1);
   error ? warn('granted_scopes column missing: apply supabase/migrations/0020_google_granted_scopes.sql') : ok('granted_scopes column present');

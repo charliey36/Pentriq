@@ -234,6 +234,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      review_sources: {
+        Row: { id: string; business_id: string; source_name: string; source_type: 'manual' | 'google'; connected: boolean; created_at: string };
+        Insert: { id?: string; business_id: string; source_name: string; source_type: 'manual' | 'google'; connected?: boolean };
+        Update: { source_name?: string; connected?: boolean };
+        Relationships: [];
+      };
+      manual_review_snapshots: {
+        Row: { id: string; business_id: string; snapshot_date: string; review_count: number; average_rating: number; created_at: string };
+        Insert: { id?: string; business_id: string; snapshot_date: string; review_count: number; average_rating: number };
+        Update: { snapshot_date?: string; review_count?: number; average_rating?: number };
+        Relationships: [];
+      };
+      review_metrics: {
+        Row: { id: string; business_id: string; period: string; reviews_gained: number; rating_change: number; average_rating: number; review_count: number; calculated_at: string };
+        Insert: { id?: string; business_id: string; period: string; reviews_gained?: number; rating_change?: number; average_rating?: number; review_count?: number; calculated_at?: string };
+        Update: { reviews_gained?: number; rating_change?: number; average_rating?: number; review_count?: number; calculated_at?: string };
+        Relationships: [];
+      };
+      google_business_locations: {
+        Row: { id: string; business_id: string; google_account_id: string; google_location_id: string; title: string; address: string | null; created_at: string };
+        Insert: { id?: string; business_id: string; google_account_id: string; google_location_id: string; title: string; address?: string | null };
+        Update: { title?: string; address?: string | null };
+        Relationships: [];
+      };
+      google_sync_jobs: {
+        Row: { id: string; business_id: string; trigger: 'initial' | 'scheduled' | 'manual'; status: 'succeeded' | 'failed'; fetched: number; inserted: number; updated: number; alerts: number; error: string | null; created_at: string };
+        Insert: { id?: string; business_id: string; trigger: 'initial' | 'scheduled' | 'manual'; status: 'succeeded' | 'failed'; fetched?: number; inserted?: number; updated?: number; alerts?: number; error?: string | null };
+        Update: { error?: string | null };
+        Relationships: [];
+      };
       business_members: {
         Row: {
           id: string;
@@ -797,3 +827,6 @@ export type GoogleBusinessConnection = Database['public']['Tables']['google_busi
 export type GoogleReview = Database['public']['Tables']['google_reviews']['Row'];
 export type ReviewMetricsDaily = Database['public']['Tables']['review_metrics_daily']['Row'];
 export type ReviewAlert = Database['public']['Tables']['review_alerts']['Row'];
+export type ReviewSource = Database['public']['Tables']['review_sources']['Row'];
+export type ManualReviewSnapshot = Database['public']['Tables']['manual_review_snapshots']['Row'];
+export type ReviewMetric = Database['public']['Tables']['review_metrics']['Row'];

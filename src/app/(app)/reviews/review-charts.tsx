@@ -237,3 +237,60 @@ export function RatingDistributionChart({ rows }: { rows: DistributionRow[] }) {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Monthly reviews gained + review velocity trend
+// ---------------------------------------------------------------------------
+
+type MonthDatum = { month: string; gained: number; velocity: number | null };
+const monthLabel = (m: string) => new Intl.DateTimeFormat('en-GB', { month: 'short', year: '2-digit', timeZone: 'UTC' }).format(new Date(`${m}-01T00:00:00Z`));
+
+export function MonthlyGainedChart({ data }: { data: MonthDatum[] }) {
+  return (
+    <div className="h-56 text-ink-4 sm:h-64" role="img" aria-label={`Reviews gained per month: ${data.map((d) => `${monthLabel(d.month)} ${d.gained}`).join(', ')}`}>
+      {data.length === 0 ? (
+        <EmptyChart>Monthly totals appear once you have snapshots.</EmptyChart>
+      ) : (
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+            <CartesianGrid stroke="currentColor" strokeOpacity={0.15} vertical={false} />
+            <XAxis dataKey="month" tickFormatter={monthLabel} tick={AXIS_TICK} tickLine={false} axisLine={false} minTickGap={12} />
+            <YAxis allowDecimals={false} tick={AXIS_TICK} tickLine={false} axisLine={false} width={44} />
+            <Tooltip
+              cursor={{ fill: 'currentColor', fillOpacity: 0.06 }}
+              content={(props) => (
+                <ChartTooltip {...(props as TooltipProps)} formatLabel={monthLabel} render={(p) => <p><span className="font-semibold text-ink">{String(p.gained)}</span> reviews gained</p>} />
+              )}
+            />
+            <Bar dataKey="gained" fill={BRAND} radius={[6, 6, 0, 0]} maxBarSize={36} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
+
+export function VelocityTrendChart({ data }: { data: MonthDatum[] }) {
+  const points = data.filter((d) => d.velocity !== null);
+  return (
+    <div className="h-56 text-ink-4 sm:h-64" role="img" aria-label="Month-over-month change in review pace">
+      {points.length === 0 ? (
+        <EmptyChart>Velocity needs at least two months of snapshots.</EmptyChart>
+      ) : (
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
+            <CartesianGrid stroke="currentColor" strokeOpacity={0.15} vertical={false} />
+            <XAxis dataKey="month" tickFormatter={monthLabel} tick={AXIS_TICK} tickLine={false} axisLine={false} minTickGap={12} />
+            <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} width={48} tickFormatter={(v: number) => `${v}%`} />
+            <Tooltip
+              content={(props) => (
+                <ChartTooltip {...(props as TooltipProps)} formatLabel={monthLabel} render={(p) => <p><span className="font-semibold text-ink">{p.velocity === null ? '\u2014' : `${Number(p.velocity) > 0 ? '+' : ''}${p.velocity}%`}</span> vs previous month</p>} />
+              )}
+            />
+            <Line type="monotone" dataKey="velocity" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} connectNulls={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}

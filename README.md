@@ -1,6 +1,6 @@
 # Pentriq
 
-Pentriq is a collaborative software project currently in development, designed to help service-based businesses automate customer reviews, retention and rebooking workflows.
+Pentriq is an AI-powered reputation management platform helping businesses collect, monitor, analyse and improve customer reviews, with retention and rebooking workflows built in.
 
 Built with:
 
@@ -176,7 +176,7 @@ fallback — not left out, but not fake either:
      [`supabase/migrations/0004_business_logo_storage.sql`](./supabase/migrations/0004_business_logo_storage.sql)
      (creates the public `business-logos` Storage bucket and its RLS
      policies, used by the profile picture uploader in Settings).
-   - **Migrations 0005–0020 are also required** for the current app. Apply
+   - **Migrations 0005–0021 are also required** for the current app. Apply
      every file in `supabase/migrations/` in numeric order. In particular,
      [`0017_ensure_business_settings_columns.sql`](./supabase/migrations/0017_ensure_business_settings_columns.sql)
      guarantees the columns the Settings page saves
@@ -218,6 +218,7 @@ cp .env.example .env.local
 | `CRON_SECRET` | Random secret required to call any `/api/*` scheduled-job endpoint |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional — OAuth client for the Google Business Profile integration (see section 9) |
 | `GOOGLE_TOKEN_ENCRYPTION_KEY` | Required with the above — 32-byte key (`openssl rand -base64 32`) used to encrypt stored Google tokens. **Server-only; losing it means users must reconnect.** |
+| `GOOGLE_BUSINESS_API_APPROVED` | Set to `true` once Google approves Business Profile API access; until then the Google card shows "Integration Coming Soon" |
 | `GOOGLE_REDIRECT_URI` | Optional — defaults to `NEXT_PUBLIC_APP_URL` + `/api/google-business/callback` |
 | `ADMIN_EMAIL` | If your logged-in email matches this, your dashboard also shows every registered business. Comma-separate multiple emails for more than one admin. |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` | Optional — enables real SMS/WhatsApp sending once implemented in `lib/messaging.ts` (see Integration points above). Without these, SMS/WhatsApp sends are logged, not delivered. |
@@ -445,6 +446,26 @@ Reviews deleted on Google are only removed locally by a full re-import
 (disconnect and reconnect, or change location). Review replies can be created
 and edited from Pentriq but not deleted.
 
+## 10. Reputation Tracking (works without Google)
+
+Google's Business Profile API needs Google's approval, so reputation tracking also works manually:
+**Settings → Reputation Tracking** lets an owner record the current review count and average rating on any
+date. Snapshots can be edited, deleted and the analytics rebuilt from the same page.
+
+- **Tables** (migration [`0021_reputation_tracking.sql`](./supabase/migrations/0021_reputation_tracking.sql)):
+  `manual_review_snapshots`, `review_sources`, `review_metrics` (monthly roll-up rebuilt on every change) and,
+  for Google, `google_business_locations` and `google_sync_jobs` (one row per sync run). The existing
+  `review_alerts` table serves every source (a manual rating drop raises a `rating_decrease` alert).
+- **One data shape.** [`reputation-data.ts`](./src/lib/reputation-data.ts) loads either Google's
+  `review_metrics_daily` (once a synced location has data) or the manual snapshots as the same daily series, and
+  [`reputation-metrics.ts`](./src/lib/reputation-metrics.ts) (pure, tested) computes gains, rating change,
+  review velocity (daily pace vs last month), monthly series and the plain-English insights.
+- **Reviews Analytics** (`/reviews`) has Analytics, Reviews, Insights, Alerts and Connections tabs. Individual
+  reviews, the star distribution and replies appear only for Google data.
+- **When Google approval arrives:** set `GOOGLE_BUSINESS_API_APPROVED=true`. Until then the Google card in
+  Settings → Integrations shows "Integration Coming Soon" (an existing connection still shows its controls).
+  Nothing else changes: after the first sync the dashboard switches to the live data automatically.
+
 ## Deploying to Vercel
 
 1. Push this repo to GitHub/GitLab/Bitbucket.
@@ -467,7 +488,7 @@ src/
       referrals/                Generate + redeem referral codes
       feedback-inbox/           Private feedback inbox (acknowledge/resolve)
       analytics/                Rebooking rate, revenue attribution, health tiers
-      reviews/                  Google reviews analytics: cards, Recharts charts, replies, alerts
+      reviews/                  Reviews Analytics: tabs, cards, Recharts charts, insights, alerts (manual or Google data)
       settings/                 Business settings, services catalog, loyalty program
     api/
       send-review-requests/     Legacy single-send scheduled job

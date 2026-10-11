@@ -20,10 +20,10 @@ export const APP_NAME = 'Pentriq';
 export const APP_NAME_LEAD = 'Pentr';
 export const APP_NAME_ACCENT = 'iq';
 
-export const APP_TAGLINE = 'Reviews, rebookings and referrals on autopilot';
+export const APP_TAGLINE = 'AI-powered reputation management';
 export const APP_TITLE = `${APP_NAME} — ${APP_TAGLINE}`;
 export const APP_DESCRIPTION =
-  'Automate review requests, rebooking reminders and customer retention for service businesses. Compliant by design, with a private feedback channel on every request.';
+  'An AI-powered reputation management platform helping businesses collect, monitor, analyse and improve customer reviews. Automate review requests, track ratings and growth, and bring customers back, with a private feedback channel on every request.';
 
 /** Prefix for browser storage keys and similar machine identifiers (lowercase, no spaces). */
 export const APP_SLUG = 'pentriq';
