@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Logo } from '@/components/logo';
 import { ThemeToggleButton } from '@/components/theme-toggle-button';
+import { HeaderAccount, MobileAccountLinks } from '@/components/marketing/header-account';
 
 export const NAV_LINKS: [string, string][] = [
   ['Features', '/#features'],
@@ -30,12 +31,7 @@ export function SiteHeader() {
 
         <div className="flex items-center gap-1.5">
           <ThemeToggleButton />
-          <Link href="/login" className="btn btn-ghost btn-sm hidden sm:inline-flex">
-            Log in
-          </Link>
-          <Link href="/signup" className="btn btn-primary btn-sm">
-            Get started
-          </Link>
+          <HeaderAccount />
           <details className="group relative md:hidden">
             <summary
               aria-label="Open menu"
@@ -54,9 +50,7 @@ export function SiteHeader() {
                   {label}
                 </Link>
               ))}
-              <Link href="/login" className={`block ${link}`}>
-                Log in
-              </Link>
+              <MobileAccountLinks />
             </nav>
           </details>
         </div>
