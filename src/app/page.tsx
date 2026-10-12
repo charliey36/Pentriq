@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { LegalLinks } from '@/components/legal-links';
 import { redirect } from 'next/navigation';
@@ -7,6 +8,10 @@ import { ThemeToggleButton } from '@/components/theme-toggle-button';
 import { Icon, type IconName } from '@/components/ui/icons';
 import { toneStyle, type Tone } from '@/components/ui/tones';
 import { ProductPreview } from '@/components/marketing/product-preview';
+
+export const metadata: Metadata = {
+  alternates: { canonical: '/' },
+};
 
 const features: { title: string; description: string; icon: IconName; tone: Tone }[] = [
   {

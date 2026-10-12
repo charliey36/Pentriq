@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
 import { LegalPage, CONTACT_EMAIL } from '@/components/legal-page';
 
-export const metadata: Metadata = { title: 'Cookie Policy' };
+export const metadata: Metadata = {
+  title: 'Cookie Policy',
+  description: 'How Pentriq uses cookies and similar technologies.',
+  alternates: { canonical: '/cookies' },
+};
 
 export default function CookiesPage() {
   return (

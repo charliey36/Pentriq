@@ -3,7 +3,11 @@ import Link from 'next/link';
 import { AuthForm } from '@/components/auth-form';
 import { AuthShell } from '@/components/auth-shell';
 
-export const metadata: Metadata = { title: 'Create your account' };
+export const metadata: Metadata = {
+  title: 'Create your account',
+  description: 'Create a Pentriq account and start a 14-day free trial. Automate review requests and bring customers back.',
+  alternates: { canonical: '/signup' },
+};
 
 export default function SignupPage() {
   return (
