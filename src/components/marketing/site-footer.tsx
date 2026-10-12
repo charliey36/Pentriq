@@ -69,6 +69,23 @@ export function SiteFooter() {
           <p className="text-[13px] text-ink-3">&copy; {new Date().getFullYear()} {ORG.name}. All rights reserved.</p>
           <LegalLinks />
         </div>
+        <div className="mt-6 flex justify-center sm:justify-start">
+          <a
+            href="https://launchbuff.com/products/pentriq-m2o3ww"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Featured on LaunchBuff"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://launchbuff.com/badge-featured-dark.svg"
+              alt="Featured on LaunchBuff"
+              width="256"
+              height="80"
+              className="h-auto w-32 opacity-90 transition-opacity hover:opacity-100"
+            />
+          </a>
+        </div>
       </div>
     </footer>
   );
