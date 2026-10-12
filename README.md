@@ -176,8 +176,13 @@ fallback — not left out, but not fake either:
      [`supabase/migrations/0004_business_logo_storage.sql`](./supabase/migrations/0004_business_logo_storage.sql)
      (creates the public `business-logos` Storage bucket and its RLS
      policies, used by the profile picture uploader in Settings).
-   - **Migrations 0005–0021 are also required** for the current app. Apply
-     every file in `supabase/migrations/` in numeric order. In particular,
+   - **Migrations 0005–0026 are also required** for the current app. Apply
+     every file in `supabase/migrations/` in numeric order. Recent ones to be
+     aware of: `0023` makes the free trial opt-in (existing accounts are
+     grandfathered), `0024` adds the rate limiter used by the public
+     unsubscribe/feedback/booking endpoints, `0025` records customer
+     consent, and `0026` stops signed-in users editing their own billing
+     fields or deleting their business from the browser. Deploy the code only after applying them. In particular,
      [`0017_ensure_business_settings_columns.sql`](./supabase/migrations/0017_ensure_business_settings_columns.sql)
      guarantees the columns the Settings page saves
      (`review_request_window_days`, `rebooking_reminder_interval_days`,

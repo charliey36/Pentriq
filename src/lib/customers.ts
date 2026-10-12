@@ -66,7 +66,9 @@ export async function bulkImportCustomers(
   supabase: Db,
   business: { id: string; delay_hours: number; review_request_window_days: number },
   rows: BulkImportRow[],
-  autoSend: boolean
+  autoSend: boolean,
+  /** When the owner confirmed they may contact these customers; stored on every NEW customer. */
+  consentConfirmedAt?: string
 ): Promise<BulkImportSummary> {
   console.log(`[CSV Import] Starting import: ${rows.length} rows, autoSend=${autoSend}`);
   const results: BulkImportRowResult[] = [];
@@ -196,6 +198,7 @@ export async function bulkImportCustomers(
             last_service_date: a.latest,
             total_spend: a.total,
             visit_count: a.count,
+            ...(consentConfirmedAt ? { consent_confirmed_at: consentConfirmedAt } : {}),
           };
         })
       )

@@ -17,7 +17,7 @@ export default function PrivacyPage() {
         { heading: 'Customer information', body: ['You upload your own customers’ names, email addresses and phone numbers. You are the controller of that data and we process it on your behalf solely to send review requests and show you results. Every email includes an unsubscribe link, and unsubscribed customers are never contacted again. You must have a lawful basis to contact the customers you add.'] },
         { heading: 'Cookies', body: ['We use essential cookies to keep you signed in. See our Cookie Policy for details.'] },
         { heading: 'Sharing and retention', body: ['We do not sell your data. We use trusted providers to run Pentriq (hosting, database, email delivery and, when enabled, payments). We keep your data while your account is active and delete it when your account is removed.'] },
-        { heading: 'Your rights', body: ['You can ask us to access, correct or delete your data at any time.'] },
+        { heading: 'Your rights', body: ['You can ask us to access, correct or delete your data at any time. You can also do it yourself: Settings → Data & privacy lets you download a copy of everything we hold for your business and permanently delete your account and all of its data. Deleting your account cancels any active subscription; payment records are kept by our payment provider for the period required by law.'] },
         { heading: 'Contact', body: [`Questions about privacy? Email ${CONTACT_EMAIL}.`] },
       ]}
     />

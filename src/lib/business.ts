@@ -2,6 +2,8 @@ import { cache } from 'react';
 import { redirect } from 'next/navigation';
 import { notifyOwner } from '@/lib/notifications';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { provisionBusiness } from '@/lib/provision-business';
 import type { Business } from '@/lib/database.types';
 
 /**
@@ -75,36 +77,30 @@ async function loadBusiness(): Promise<Business> {
     return business;
   }
 
-  // First time this user has hit an authenticated page — create their
-  // business row with defaults, plus the business_members row that grants
-  // them access to it. Next.js can render the (app) layout and the page
-  // inside it concurrently, so two requests can both reach this point for
-  // the same brand-new user at once. Use upsert with onConflict so the
-  // losing request doesn't throw on the unique(owner_id) constraint — it
-  // just gets back the row the other request created.
-  const { data: created, error: createError } = await supabase
-    .from('businesses')
-    .upsert({ owner_id: userData.user.id }, { onConflict: 'owner_id', ignoreDuplicates: false })
-    .select('*')
-    .single();
+  // First time this user has hit an authenticated page. Provision their
+  // business, owner membership and default journeys with the service role:
+  // row level security gives a brand-new user no way to create their own
+  // membership or to read back a business they are not yet a member of, so
+  // doing this with the user's own session fails (this was the P0 where every
+  // page returned a server error right after signup). The user's identity has
+  // already been verified from their session above.
+  //
+  // Next.js can render the (app) layout and the page inside it concurrently,
+  // so two requests can reach this for the same new user at once;
+  // provisionBusiness is idempotent and the unique(owner_id) constraint picks
+  // the winner.
+  let provisioned;
+  try {
+    provisioned = await provisionBusiness(createAdminClient(), userData.user.id);
+  } catch (e) {
+    console.error('[provision] first-login provisioning failed:', e);
+    throw e;
+  }
 
-  if (createError || !created) {
-  console.error('createError', createError);
-  throw new Error(
-    `Failed to create business: ${createError?.message ?? 'unknown error'}`
-  );
-}
+  // Welcome email only from the request that actually created the business.
+  if (provisioned.created) await notifyOwner('welcome', provisioned.business.id);
 
-  await supabase
-    .from('business_members')
-    .upsert(
-      { business_id: created.id, user_id: userData.user.id, role: 'owner' },
-      { onConflict: 'business_id,user_id', ignoreDuplicates: true }
-    );
-
-  await notifyOwner('welcome', created.id);
-
-  return created;
+  return provisioned.business;
 }
 
 /**

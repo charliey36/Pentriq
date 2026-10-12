@@ -97,7 +97,8 @@ alter table public.customers
   add column if not exists date_of_birth date,
   add column if not exists source text,
   add column if not exists unsubscribed_sms_at timestamptz,
-  add column if not exists archived_at timestamptz;
+  add column if not exists archived_at timestamptz,
+  add column if not exists consent_confirmed_at timestamptz; -- see migration 0025
 
 create index if not exists customers_business_id_idx on public.customers (business_id);
 
@@ -626,7 +627,8 @@ on conflict (business_id, key) do nothing;
 -- Billing columns (see supabase/migrations/0005_billing.sql)
 alter table public.businesses
   add column if not exists subscription_status text not null default 'trialing',
-  add column if not exists trial_ends_at timestamptz not null default (now() + interval '14 days'),
+  add column if not exists trial_ends_at timestamptz, -- NULL until the owner claims the trial (migration 0023)
+  add column if not exists trial_claimed_at timestamptz,
   add column if not exists current_period_end timestamptz,
   add column if not exists stripe_customer_id text,
   add column if not exists stripe_subscription_id text;

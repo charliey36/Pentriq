@@ -1,6 +1,8 @@
 'use server';
 
 import { createAdminClient } from '@/lib/supabase/admin';
+import { RATE_LIMITS, requesterId, withinLimit } from '@/lib/rate-limit';
+import { headers } from 'next/headers';
 
 export type RequestRebookingResult = { error?: string; success?: boolean };
 
@@ -20,7 +22,15 @@ export async function requestRebooking(
   _prev: RequestRebookingResult,
   formData: FormData
 ): Promise<RequestRebookingResult> {
-  const preferredTime = String(formData.get('preferred_time') ?? '').trim();
+  const preferredTime = String(formData.get('preferred_time') ?? '').trim().slice(0, 500);
+
+  const ip = requesterId(headers());
+  if (
+    !(await withinLimit('booking-ip', ip, RATE_LIMITS.bookingIp)) ||
+    !(await withinLimit('booking-target', customerId, RATE_LIMITS.bookingTarget))
+  ) {
+    return { error: 'Too many requests. Please try again later.' };
+  }
 
   const supabase = createAdminClient();
 

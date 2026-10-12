@@ -7,6 +7,7 @@ import { sendQueuedReview } from '@/lib/review-queue';
 import { exitJourneyEnrollment } from '@/lib/journeys';
 import { parseServiceDate } from '@/lib/eligibility';
 import { sendManualReviewRequestFor, sendManualRebookingReminderFor } from '@/lib/manual-sends';
+import { CONSENT_REQUIRED_MESSAGE, hasConsent } from '@/lib/consent';
 
 export type ManualSendResult = { error?: string; success?: boolean; message?: string };
 
@@ -70,9 +71,18 @@ export async function addCustomer(
   const serviceDate = rawDate ? parseServiceDate(rawDate) : null;
   if (rawDate && !serviceDate) return { error: 'Enter a valid last service date.' };
 
+  if (!hasConsent(formData)) return { error: CONSENT_REQUIRED_MESSAGE };
+
   const { data: customer, error: customerError } = await supabase
     .from('customers')
-    .insert({ business_id: business.id, name, email, phone: phone || null, last_service_date: serviceDate })
+    .insert({
+      business_id: business.id,
+      name,
+      email,
+      phone: phone || null,
+      last_service_date: serviceDate,
+      consent_confirmed_at: new Date().toISOString(),
+    })
     .select('*')
     .single();
 

@@ -1,9 +1,10 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 import { requireBusiness, getAuthUser } from '@/lib/business';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getBillingState, stripeConfigured } from '@/lib/billing';
+import { getBillingState, stripeConfigured, TRIAL_DAYS } from '@/lib/billing';
 import { checkoutPriceId, getStripe } from '@/lib/stripe';
 import { getAppUrl } from '@/lib/brand';
 
@@ -11,6 +12,50 @@ export type BillingResult = { error?: string; success?: boolean };
 
 const NOT_CONFIGURED = 'Online payments are not switched on yet. Your free trial is unaffected.';
 const GENERIC_ERROR = 'Something went wrong talking to Stripe. Please try again.';
+
+/**
+ * Claims the 14-day free trial. The trial is opt-in: it never starts at
+ * signup. The update is conditional on `trial_ends_at IS NULL`, so a double
+ * click or two tabs cannot restart or extend it, and a business that has ever
+ * claimed (or subscribed) is refused.
+ */
+export async function claimTrial(): Promise<BillingResult> {
+  const business = await requireBusiness();
+  if (getBillingState(business).status !== 'trial_available') {
+    return { error: 'Your free trial has already been used.' };
+  }
+
+  const now = new Date();
+  const { data, error } = await createAdminClient()
+    .from('businesses')
+    .update({
+      trial_claimed_at: now.toISOString(),
+      trial_ends_at: new Date(now.getTime() + TRIAL_DAYS * 86_400_000).toISOString(),
+      subscription_status: 'trialing',
+    })
+    .eq('id', business.id)
+    .eq('subscription_status', 'trialing')
+    .is('trial_ends_at', null)
+    .select('id');
+
+  if (error) {
+    console.error('[billing] claim trial failed:', error.message);
+    return { error: 'Could not start your trial. Please try again.' };
+  }
+  if (!data?.length) return { error: 'Your free trial has already been used.' };
+
+  // Anything queued before the trial started was deferred by the sender (one day
+  // at a time); make it due now instead of making the owner wait up to 24h.
+  await createAdminClient()
+    .from('messages')
+    .update({ next_attempt_at: now.toISOString() })
+    .eq('business_id', business.id)
+    .in('status', ['queued', 'pending'])
+    .gt('next_attempt_at', now.toISOString());
+
+  revalidatePath('/', 'layout');
+  return { success: true };
+}
 
 /** Returns the business's Stripe customer id, creating the customer on first use. */
 async function ensureStripeCustomer(business: { id: string; name: string; stripe_customer_id: string | null }) {
@@ -47,7 +92,7 @@ export async function startSubscription(): Promise<BillingResult> {
     const appUrl = getAppUrl();
 
     // Stripe requires trial_end to be at least 48h away.
-    const trialEnd = Math.floor(new Date(business.trial_ends_at).getTime() / 1000);
+    const trialEnd = business.trial_ends_at ? Math.floor(new Date(business.trial_ends_at).getTime() / 1000) : 0;
     const carryTrial = state.status === 'trialing' && trialEnd > Math.floor(Date.now() / 1000) + 2 * 86_400;
 
     const session = await getStripe().checkout.sessions.create({

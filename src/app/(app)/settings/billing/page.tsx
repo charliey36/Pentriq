@@ -9,11 +9,12 @@ import { Notice } from '@/components/ui/notice';
 import { createClient } from '@/lib/supabase/server';
 import { BillingButton } from './billing-button';
 import { loadStripeBillingDetails, reconcileCheckout } from './stripe-data';
-import { openBillingPortal, startSubscription, type BillingResult } from './actions';
+import { openBillingPortal, startSubscription, claimTrial, type BillingResult } from './actions';
 
 export const metadata: Metadata = { title: 'Billing' };
 
 const LABELS: Record<string, { text: string; tone: BadgeTone }> = {
+  trial_available: { text: 'Trial not started', tone: 'neutral' },
   trialing: { text: 'Free trial', tone: 'info' },
   trial_expired: { text: 'Trial ended', tone: 'warning' },
   active: { text: 'Active', tone: 'success' },
@@ -80,6 +81,8 @@ export default async function BillingPage({
           </ul>
 
           <p className="mt-5 text-sm text-ink-3">
+            {billing.status === 'trial_available' &&
+              'Your 14-day free trial has not started. Start it when you are ready to send your first review requests — no card needed.'}
             {billing.status === 'trialing' &&
               `${billing.trialDaysLeft} day${billing.trialDaysLeft === 1 ? '' : 's'} left in your free trial.`}
             {billing.status === 'trial_expired' && 'Subscribe to keep sending review requests.'}
@@ -91,7 +94,10 @@ export default async function BillingPage({
             {billing.status === 'canceled' && 'Your subscription has ended. Resubscribe any time.'}
           </p>
 
-          <div className="mt-5">
+          <div className="mt-5 flex flex-wrap items-start gap-3">
+            {billing.status === 'trial_available' && (
+              <BillingButton action={claimTrial as (p: BillingResult, f: FormData) => Promise<BillingResult>} label="Start my 14-day free trial" />
+            )}
             {subscribed ? (
               <BillingButton action={openBillingPortal as (p: BillingResult, f: FormData) => Promise<BillingResult>} label="Manage billing" />
             ) : (

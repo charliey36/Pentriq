@@ -263,10 +263,12 @@ describe('Scenario 2: Manual review send', () => {
         unsubscribed_sms_at: null,
       },
     ],
-    businesses: [{ id: BUSINESS_ID, name: 'Demo Co', google_review_url: 'https://g.page/demo' }],
+    businesses: [{ id: BUSINESS_ID, name: 'Demo Co', google_review_url: 'https://g.page/demo', subscription_status: 'active' }],
   });
 
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it('sends a queued review (demo customer -> simulated) and updates status to "sent"', async () => {
     jest.spyOn(console, 'log').mockImplementation(() => {});
@@ -295,7 +297,7 @@ describe('Scenario 2: Manual review send', () => {
   it('cancels and reports when the customer has unsubscribed', async () => {
     jest.spyOn(console, 'log').mockImplementation(() => {});
     const tables = baseTables();
-    tables.customers[0].unsubscribed_at = '2026-01-01T00:00:00Z';
+    (tables.customers[0] as { unsubscribed_at: string | null }).unsubscribed_at = '2026-01-01T00:00:00Z';
     const supabase = createSupabaseMock(tables);
 
     const res = await sendQueuedReview(supabase, BUSINESS_ID, MESSAGE_ID);
@@ -399,7 +401,7 @@ describe('Scenario 3: Manual rebooking reminder', () => {
       customers: [
         { id: 'cust-1', name: 'Priya', email: 'priya@example.com', phone: null, unsubscribed_at: null, unsubscribed_sms_at: null },
       ],
-      businesses: [{ id: 'biz-1', name: 'Sparkle Salon', google_review_url: null }],
+      businesses: [{ id: 'biz-1', name: 'Sparkle Salon', google_review_url: null, subscription_status: 'active' }],
     });
 
     const res = await sendQueuedReview(supabase, 'biz-1', 'rb-1');

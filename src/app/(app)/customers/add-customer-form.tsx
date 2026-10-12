@@ -7,6 +7,7 @@ import { Notice } from '@/components/ui/notice';
 import { Icon } from '@/components/ui/icons';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { addCustomer, type AddCustomerResult } from './actions';
+import { CONSENT_FIELD, CONSENT_LABEL } from '@/lib/consent';
 
 export function AddCustomerForm({ autoFocus = false }: { autoFocus?: boolean }) {
   const [state, formAction] = useFormState<AddCustomerResult, FormData>(
@@ -87,6 +88,11 @@ export function AddCustomerForm({ autoFocus = false }: { autoFocus?: boolean }) 
       >
         Add customer
       </SubmitButton>
+
+      <label className="flex items-start gap-3 text-sm text-ink-2 sm:col-span-2 lg:col-span-5">
+        <input type="checkbox" name={CONSENT_FIELD} required className="mt-1 h-4 w-4 rounded border-line-strong" />
+        <span>{CONSENT_LABEL}</span>
+      </label>
 
       {state.error && <Notice variant="error" className="sm:col-span-2 lg:col-span-4">{state.error}</Notice>}
     </form>

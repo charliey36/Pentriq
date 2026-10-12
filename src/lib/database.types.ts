@@ -24,7 +24,9 @@ export type Database = {
           brand_logo_url: string | null;
           brand_primary_color: string | null;
           subscription_status: 'trialing' | 'active' | 'past_due' | 'canceled';
-          trial_ends_at: string;
+          /** NULL until the owner claims the free trial (migration 0023). */
+          trial_ends_at: string | null;
+          trial_claimed_at: string | null;
           current_period_end: string | null;
           stripe_customer_id: string | null;
           stripe_subscription_id: string | null;
@@ -54,7 +56,8 @@ export type Database = {
           brand_logo_url?: string | null;
           brand_primary_color?: string | null;
           subscription_status?: 'trialing' | 'active' | 'past_due' | 'canceled';
-          trial_ends_at?: string;
+          trial_ends_at?: string | null;
+          trial_claimed_at?: string | null;
           current_period_end?: string | null;
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
@@ -311,6 +314,8 @@ export type Database = {
           unsubscribed_sms_at: string | null;
           created_at: string;
           archived_at: string | null;
+          /** When the owner confirmed they may contact this customer (migration 0025). NULL for older customers. */
+          consent_confirmed_at: string | null;
         };
         Insert: {
           id?: string;
@@ -326,6 +331,7 @@ export type Database = {
           unsubscribed_at?: string | null;
           unsubscribed_sms_at?: string | null;
           archived_at?: string | null;
+          consent_confirmed_at?: string | null;
         };
         Update: {
           name?: string;

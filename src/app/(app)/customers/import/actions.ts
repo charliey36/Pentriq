@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { requireBusiness } from '@/lib/business';
 import { bulkImportCustomers, mapCsvRowsToCustomers, parseCsv } from '@/lib/customers';
 import type { BulkImportSummary } from '@/lib/customers';
+import { CONSENT_REQUIRED_MESSAGE, hasConsent } from '@/lib/consent';
 
 export type ImportCustomersResult = { error?: string; summary?: BulkImportSummary };
 
@@ -48,6 +49,8 @@ export async function importCustomers(
     return { error: `This file has ${rows.length} rows; the limit is ${MAX_ROWS} per import.` };
   }
 
+  if (!hasConsent(formData)) return { error: CONSENT_REQUIRED_MESSAGE };
+
   let summary: BulkImportSummary;
   try {
     console.log('[CSV Import] Starting import process');
@@ -55,7 +58,8 @@ export async function importCustomers(
       supabase,
       { id: business.id, delay_hours: business.delay_hours, review_request_window_days: business.review_request_window_days ?? 14 },
       rows,
-      formData.get('auto_send') === 'on'
+      formData.get('auto_send') === 'on',
+      new Date().toISOString()
     );
     if (mapWarning) {
       summary.warning = mapWarning;

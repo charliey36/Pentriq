@@ -14,8 +14,15 @@ export const PLAN = {
   ],
 };
 
+export const TRIAL_DAYS = 14;
+
 export type BillingState = {
-  status: 'trialing' | 'trial_expired' | 'active' | 'past_due' | 'canceled';
+  /**
+   * `trial_available` = the owner has not claimed the free trial yet. The trial
+   * is opt-in (Settings → Billing), so a new account cannot send until they
+   * either claim it or subscribe.
+   */
+  status: 'trial_available' | 'trialing' | 'trial_expired' | 'active' | 'past_due' | 'canceled';
   trialDaysLeft: number;
   /** Whether sending/using the product is allowed. */
   hasAccess: boolean;
@@ -25,12 +32,19 @@ export type BillingState = {
 export type BillingInput = Pick<Business, 'subscription_status' | 'trial_ends_at' | 'created_at'>;
 
 export function getBillingState(b: BillingInput, now = new Date()): BillingState {
-  // Columns come from migration 0005; fall back to a fresh 14-day trial if
-  // it hasn't been applied yet so the app keeps working.
   const status = b.subscription_status ?? 'trialing';
+
+  // Trial not claimed yet: after migration 0023 the column exists and is NULL.
+  // (`undefined` means the column is missing because the migration has not been
+  // applied; fall through to the legacy automatic-trial behaviour below so an
+  // un-migrated database keeps working.)
+  if (status === 'trialing' && b.trial_ends_at === null) {
+    return { status: 'trial_available', trialDaysLeft: TRIAL_DAYS, hasAccess: false };
+  }
+
   const trialEnd = b.trial_ends_at
     ? new Date(b.trial_ends_at).getTime()
-    : new Date(b.created_at).getTime() + 14 * 86_400_000;
+    : new Date(b.created_at).getTime() + TRIAL_DAYS * 86_400_000;
   const msLeft = trialEnd - now.getTime();
   const trialDaysLeft = Math.max(0, Math.ceil(msLeft / 86_400_000));
   if (status === 'trialing') {
@@ -72,7 +86,11 @@ export function canUse(b: BillingInput, feature: Feature, now = new Date()): boo
 export const SUBSCRIPTION_REQUIRED_MESSAGE =
   'Your free trial has ended. Subscribe in Settings → Billing to keep sending messages.';
 
+export const TRIAL_NOT_STARTED_MESSAGE =
+  'Start your 14-day free trial (or subscribe) in Settings → Billing to begin sending messages.';
+
 /** Throws-free guard for send paths: returns an error string when blocked. */
 export function sendBlockedReason(b: BillingInput, now = new Date()): string | null {
-  return canUse(b, 'send_messages', now) ? null : SUBSCRIPTION_REQUIRED_MESSAGE;
+  if (canUse(b, 'send_messages', now)) return null;
+  return getBillingState(b, now).status === 'trial_available' ? TRIAL_NOT_STARTED_MESSAGE : SUBSCRIPTION_REQUIRED_MESSAGE;
 }

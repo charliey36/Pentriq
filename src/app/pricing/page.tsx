@@ -12,7 +12,7 @@ export const metadata = pageMetadata({
 });
 
 const faqs = [
-  ['Is there a free trial?', 'Yes. Every new account starts with a 14-day free trial.'],
+  ['Is there a free trial?', 'Yes. Once you have created an account you can start a 14-day free trial from the Billing page whenever you are ready. It does not start automatically, and no card is needed to start it.'],
   ['Can I cancel any time?', 'Yes. You can cancel from the Stripe customer portal on the Billing page, and keep access until the end of the period you have paid for.'],
   ['How do I pay?', 'Payments are handled by Stripe Checkout. Pentriq never sees or stores your card details.'],
   ['What happens if my trial ends?', 'You can still sign in and view your data, but sending review requests and reminders pauses until you subscribe.'],

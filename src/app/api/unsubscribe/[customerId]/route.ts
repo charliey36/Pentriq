@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { RATE_LIMITS, requesterId, withinLimit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +39,13 @@ export async function GET(
     return new NextResponse(html('Invalid unsubscribe link.'), {
       status: 400,
       headers: { 'Content-Type': 'text/html' },
+    });
+  }
+
+  if (!(await withinLimit('unsubscribe-ip', requesterId(request.headers), RATE_LIMITS.unsubscribeIp))) {
+    return new NextResponse(html('Too many requests. Please wait a few minutes and try again.'), {
+      status: 429,
+      headers: { 'Content-Type': 'text/html', 'Retry-After': '600' },
     });
   }
 

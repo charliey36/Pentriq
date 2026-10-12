@@ -6,6 +6,7 @@ import { Icon } from '@/components/ui/icons';
 import { Notice } from '@/components/ui/notice';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { importCustomers, type ImportCustomersResult } from './actions';
+import { CONSENT_FIELD, CONSENT_LABEL } from '@/lib/consent';
 
 const resultTones: Record<string, string> = {
   created: 'text-brand-700 dark:text-brand-300',
@@ -76,6 +77,11 @@ Jane Smith,jane@gmail.com,Leak Repair,2026-10-08`}</pre>
               Sent between 9am and 12pm, only for jobs within your review window. Untick to hold them on the Customers page until you press Send.
             </span>
           </span>
+        </label>
+
+        <label className="flex items-start gap-3 text-sm text-ink-2">
+          <input type="checkbox" name={CONSENT_FIELD} required className="mt-1 h-4 w-4 rounded border-line-strong" />
+          <span>{CONSENT_LABEL}</span>
         </label>
 
         <SubmitButton pendingText="Importing… this can take a few seconds" icon={<Icon name="upload" className="h-4 w-4" />}>

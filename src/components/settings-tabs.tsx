@@ -11,6 +11,7 @@ const tabs = [
   { href: '/settings/reputation', label: 'Reputation' },
   { href: '/settings/integrations', label: 'Integrations' },
   { href: '/settings/billing', label: 'Billing' },
+  { href: '/settings/privacy', label: 'Data & privacy' },
 ];
 
 /** Section navigation shared by the three Settings pages. */

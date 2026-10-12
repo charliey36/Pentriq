@@ -5,10 +5,31 @@ import { mapStripeStatus } from '@/lib/stripe-sync';
 
 const DAY = 86_400_000;
 const now = new Date('2026-06-15T12:00:00Z');
-const biz = (status: 'trialing' | 'active' | 'past_due' | 'canceled', trialOffsetDays: number) => ({
+const biz = (status: 'trialing' | 'active' | 'past_due' | 'canceled', trialOffsetDays: number | null) => ({
   subscription_status: status,
-  trial_ends_at: new Date(now.getTime() + trialOffsetDays * DAY).toISOString(),
+  trial_ends_at: trialOffsetDays === null ? null : new Date(now.getTime() + trialOffsetDays * DAY).toISOString(),
   created_at: new Date(now.getTime() - 5 * DAY).toISOString(),
+});
+
+describe('opt-in trial', () => {
+  it('does not start a trial until it is claimed', () => {
+    const state = getBillingState(biz('trialing', null), now);
+    expect(state.status).toBe('trial_available');
+    expect(state.hasAccess).toBe(false);
+    expect(sendBlockedReason(biz('trialing', null), now)).toMatch(/Start your 14-day free trial/);
+    expect(canUse(biz('trialing', null), 'view', now)).toBe(true);
+  });
+  it('starts counting from the claimed end date', () => {
+    expect(getBillingState(biz('trialing', 14), now)).toMatchObject({ status: 'trialing', trialDaysLeft: 14, hasAccess: true });
+  });
+  it('lets someone who subscribes without claiming send; cancelling does not re-open the trial', () => {
+    expect(sendBlockedReason(biz('active', null), now)).toBeNull();
+    expect(getBillingState(biz('canceled', null), now).status).toBe('canceled');
+  });
+  it('falls back to the legacy automatic trial when the column does not exist yet', () => {
+    const legacy = { subscription_status: 'trialing' as const, created_at: new Date(now.getTime() - 5 * DAY).toISOString() } as never;
+    expect(getBillingState(legacy, now)).toMatchObject({ status: 'trialing', trialDaysLeft: 9 });
+  });
 });
 
 describe('access control', () => {

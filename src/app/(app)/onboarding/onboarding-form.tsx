@@ -4,6 +4,7 @@ import { useFormState } from 'react-dom';
 import { Notice } from '@/components/ui/notice';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { completeOnboarding, type OnboardingResult } from './actions';
+import { CONSENT_FIELD, CONSENT_LABEL } from '@/lib/consent';
 
 export function OnboardingForm({ defaultName, defaultUrl }: { defaultName: string; defaultUrl: string }) {
   const [state, formAction] = useFormState<OnboardingResult, FormData>(completeOnboarding, {});
@@ -30,6 +31,10 @@ export function OnboardingForm({ defaultName, defaultUrl }: { defaultName: strin
           <input id="customer_email" name="customer_email" type="email" required className="input mt-1.5" placeholder="jane@example.com" />
         </div>
       </div>
+      <label className="flex items-start gap-3 text-sm text-ink-2">
+        <input type="checkbox" name={CONSENT_FIELD} required className="mt-1 h-4 w-4 rounded border-line-strong" />
+        <span>{CONSENT_LABEL}</span>
+      </label>
       {state.error && <Notice variant="error">{state.error}</Notice>}
       <SubmitButton pendingText="Sending…">Send my first review request</SubmitButton>
     </form>

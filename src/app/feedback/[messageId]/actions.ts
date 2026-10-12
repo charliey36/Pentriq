@@ -2,6 +2,8 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { exitJourneyEnrollment } from '@/lib/journeys';
+import { RATE_LIMITS, requesterId, withinLimit } from '@/lib/rate-limit';
+import { headers } from 'next/headers';
 
 export type SubmitFeedbackResult = { error?: string; success?: boolean };
 
@@ -30,6 +32,13 @@ export async function submitPrivateFeedback(
 
   if (rating !== null && (!Number.isInteger(rating) || rating < 1 || rating > 5)) {
     return { error: 'Invalid rating.' };
+  }
+
+  if (
+    !(await withinLimit('feedback-ip', requesterId(headers()), RATE_LIMITS.feedbackIp)) ||
+    !(await withinLimit('feedback-target', messageId, RATE_LIMITS.feedbackTarget))
+  ) {
+    return { error: 'Too many submissions. Please try again later.' };
   }
 
   const supabase = createAdminClient();

@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { requireBusiness } from '@/lib/business';
 import { enrollCustomerInJourney } from '@/lib/journeys';
+import { CONSENT_REQUIRED_MESSAGE, hasConsent } from '@/lib/consent';
 
 export type OnboardingResult = { error?: string };
 
@@ -29,6 +30,7 @@ export async function completeOnboarding(_prev: OnboardingResult, fd: FormData):
   }
   if (!customerName) return { error: 'Enter your customer’s name.' };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) return { error: 'Enter a valid customer email.' };
+  if (!hasConsent(fd)) return { error: CONSENT_REQUIRED_MESSAGE };
 
   const { error: bizError } = await supabase
     .from('businesses')
@@ -38,7 +40,13 @@ export async function completeOnboarding(_prev: OnboardingResult, fd: FormData):
 
   const { data: customer, error: custError } = await supabase
     .from('customers')
-    .insert({ business_id: business.id, name: customerName, email: customerEmail, last_service_date: new Date().toISOString().slice(0, 10) })
+    .insert({
+      business_id: business.id,
+      name: customerName,
+      email: customerEmail,
+      last_service_date: new Date().toISOString().slice(0, 10),
+      consent_confirmed_at: new Date().toISOString(),
+    })
     .select('*')
     .single();
   if (custError || !customer) return { error: `Could not add customer: ${custError?.message ?? 'unknown error'}` };
