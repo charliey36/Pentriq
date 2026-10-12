@@ -254,6 +254,26 @@ export default async function HomePage() {
           </div>
         </section>
 
+        {/* Why Pentriq */}
+        <section className="px-4 pb-20 sm:px-6 sm:pb-28 lg:px-8">
+          <div className="mx-auto max-w-6xl">
+            <SectionHeading eyebrow="Benefits" title="Why Pentriq?" />
+            <ul className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-2">
+              {[
+                ['Import customers in minutes', 'Upload existing customer data using a simple CSV file.'],
+                ['Built for local businesses', 'Designed for trades, service businesses and growing companies.'],
+                ['Simple setup', 'Get started quickly without complex configuration.'],
+                ['All in one place', 'Manage customer reviews, feedback and customer records from a single dashboard.'],
+              ].map(([title, text]) => (
+                <li key={title} className="card p-6">
+                  <h3 className="text-[17px] font-semibold tracking-[-0.02em] text-ink">✓ {title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-ink-3">{text}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
         {/* How it works */}
         <section id="how-it-works" className="scroll-mt-20 border-y border-line bg-surface/70 py-20 backdrop-blur sm:py-28">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
