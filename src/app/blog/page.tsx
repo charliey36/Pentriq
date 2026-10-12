@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { BlogShell } from '@/components/blog/blog-shell';
 import { BlogIndex, type BlogCardData } from '@/components/blog/blog-index';
+import { ResourceLinks } from '@/components/marketing/resource-links';
 import { POSTS, SITE_URL, readingMinutes } from '@/lib/blog';
 
 const TITLE = 'Pentriq Blog: Google Reviews & Reputation Management Guides';
@@ -71,6 +72,7 @@ export default function BlogPage() {
       </section>
 
       <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
+        <ResourceLinks current="/blog" />
         <BlogIndex posts={cards} />
 
         <section aria-label="About Pentriq" className="mt-16 rounded-2xl bg-brand-950 p-8 text-white sm:p-10">

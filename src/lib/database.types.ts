@@ -71,6 +71,18 @@ export type Database = {
         };
         Relationships: [];
       };
+      changelog_entries: {
+        Row: { id: string; title: string; description: string; tag: 'New' | 'Improved' | 'Infrastructure'; entry_date: string; published: boolean; published_at: string | null; digest_week: string | null; created_at: string };
+        Insert: { id?: string; title: string; description?: string; tag?: 'New' | 'Improved' | 'Infrastructure'; entry_date?: string; published?: boolean; published_at?: string | null; digest_week?: string | null };
+        Update: { title?: string; description?: string; tag?: 'New' | 'Improved' | 'Infrastructure'; entry_date?: string; published?: boolean; published_at?: string | null; digest_week?: string | null };
+        Relationships: [];
+      };
+      changelog_digests: {
+        Row: { id: string; week_of: string; summary: string; created_at: string };
+        Insert: { id?: string; week_of: string; summary: string };
+        Update: { summary?: string };
+        Relationships: [];
+      };
       api_keys: {
         Row: { id: string; business_id: string; key_hash: string; key_prefix: string; is_active: boolean; created_at: string };
         Insert: { id?: string; business_id: string; key_hash: string; key_prefix: string; is_active?: boolean };

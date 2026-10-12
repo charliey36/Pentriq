@@ -313,7 +313,7 @@ export function renderReviewRequestEmail(params: ReviewEmailParams = {}): Render
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr>
                 <td width="40" valign="middle" style="width:40px;">${logoMarkHtml(logoSrc, 36)}</td>
-                <td valign="middle" style="padding-left:10px;font-family:${FONT};font-size:17px;line-height:24px;font-weight:600;letter-spacing:-0.02em;color:#ffffff;">${APP_NAME_LEAD}<span style="color:${C.brand300};">${APP_NAME_ACCENT}</span></td>
+                <td valign="middle" style="padding-left:10px;font-family:${FONT};font-size:17px;line-height:24px;font-weight:600;letter-spacing:-0.02em;color:#ffffff;">${APP_NAME_LEAD}<span style="color:#ffffff;">${APP_NAME_ACCENT}</span></td>
                 <td align="right" valign="middle" style="font-family:${FONT};font-size:11px;line-height:16px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:${C.brand200};">${escapeHtml(copy.badge)}</td>
               </tr>
             </table>

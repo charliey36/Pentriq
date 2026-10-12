@@ -3,6 +3,7 @@
     { "path": "/api/send-review-requests", "schedule": "0 8 * * *" },
     { "path": "/api/send-messages", "schedule": "0 9 * * *" },
     { "path": "/api/scan-customer-lifecycle", "schedule": "0 3 * * *" },
-    { "path": "/api/sync-google-reviews", "schedule": "0 6 * * *" }
+    { "path": "/api/sync-google-reviews", "schedule": "0 6 * * *" },
+    { "path": "/api/publish-weekly-digest", "schedule": "0 9 * * 1" }
   ]
 }

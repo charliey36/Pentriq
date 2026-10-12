@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { PageFrame } from '@/components/marketing/page-frame';
+import { ResourceLinks } from '@/components/marketing/resource-links';
 import { JsonLd } from '@/components/json-ld';
 import { ROADMAP } from '@/content/roadmap';
 import { breadcrumbLd, pageMetadata } from '@/lib/seo';
@@ -20,6 +21,7 @@ export default function RoadmapPage() {
       wide
     >
       <JsonLd data={breadcrumbLd([{ name: 'Home', url: SITE_URL }, { name: 'Roadmap', url: `${SITE_URL}/roadmap` }])} />
+      <ResourceLinks current="/roadmap" />
       <div className="grid gap-6 lg:grid-cols-3">
         {ROADMAP.map((col) => (
           <section key={col.status} aria-labelledby={`rm-${col.status}`} className="rounded-2xl border border-line bg-surface-subtle/60 p-5">

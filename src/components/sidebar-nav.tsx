@@ -38,6 +38,14 @@ export const navGroups: { label: string; items: NavItem[] }[] = [
       { href: '/how-it-works', label: 'How it works', icon: 'lightbulb' },
     ],
   },
+  {
+    label: 'Resources',
+    items: [
+      { href: '/blog', label: 'Blog', icon: 'mail' },
+      { href: '/roadmap', label: 'Roadmap', icon: 'calendar' },
+      { href: '/changelog', label: 'Changelog', icon: 'sparkles' },
+    ],
+  },
 ];
 
 /** A section is active for its own path and anything nested beneath it. */

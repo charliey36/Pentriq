@@ -1,6 +1,6 @@
 # Stripe setup and test checklist
 
-Pentriq has **one plan** (see `PLAN` in `src/lib/billing.ts`: £29/month, 14-day free trial with no card).
+Pentriq has **one plan** (see `PLAN` in `src/lib/billing.ts`: £19.99/month, 14-day free trial with no card).
 Stripe is wired into the existing Settings → Billing page; nothing about the plan, price or page layout changed.
 
 ## How it fits together
@@ -47,7 +47,7 @@ extend `PLAN`/`planNameForPrice`, and enable plan switching in the portal config
 
 ## Setup
 1. Run `supabase/migrations/0022_stripe_subscriptions.sql` in the Supabase SQL editor.
-2. Stripe (start in **test mode**): Products → create "Pentriq", recurring price £29.00 / month GBP. Copy the `price_…` id into `STRIPE_PRICE_IDS`.
+2. Stripe (start in **test mode**): Products → create "Pentriq", recurring price £19.99 / month GBP. Copy the `price_…` id into `STRIPE_PRICE_IDS`.
 3. Settings → Billing → Customer portal: enable *update payment method*, *cancel subscription*, *invoice history*; **save** (the portal fails until saved once).
 4. Webhooks → add endpoint `{NEXT_PUBLIC_APP_URL}/api/stripe/webhook` with events:
    `checkout.session.completed`, `checkout.session.expired`, `customer.subscription.created`,
@@ -58,7 +58,7 @@ extend `PLAN`/`planNameForPrice`, and enable plan switching in the portal config
 
 ## Test checklist (Stripe test mode)
 - [ ] **Signup / trial start:** new account → Billing shows "Free trial", 14 days left; banner shows countdown.
-- [ ] **Checkout:** click Subscribe → Stripe-hosted page opens with £29/month. Cancel → back on Billing with "Checkout cancelled".
+- [ ] **Checkout:** click Subscribe → Stripe-hosted page opens with £19.99/month. Cancel → back on Billing with "Checkout cancelled".
 - [ ] **Successful payment:** card `4242 4242 4242 4242` → returns to Billing with "subscription is active"; `subscriptions` and `businesses` rows updated; payment method + invoice appear (invoice appears after the trial if one was carried over).
 - [ ] **Failed payment:** subscribe with `4000 0000 0000 0341` (attaches, then fails on charge) or use a test clock to advance; `invoice.payment_failed` → status "Payment failed" (`past_due`); access retained.
 - [ ] **Recovery:** update card in the portal and pay the invoice → `invoice.paid` → status back to Active.
