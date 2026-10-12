@@ -133,6 +133,7 @@ export default async function HomePage() {
               ['Features', '#features'],
               ['How it works', '#how-it-works'],
               ['Compliance', '#compliance'],
+              ['Blog', '/blog'],
             ].map(([label, href]) => (
               <a
                 key={href}

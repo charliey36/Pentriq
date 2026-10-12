@@ -7,7 +7,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        allow: ['/', '/login', '/signup', '/privacy', '/terms', '/cookies'],
+        allow: ['/', '/blog', '/login', '/signup', '/privacy', '/terms', '/cookies'],
         // Authenticated app, APIs and per-customer public pages are not for indexing.
         disallow: ['/api/', '/dashboard', '/customers', '/settings', '/reviews', '/analytics', '/feedback/', '/book/', '/r/', '/auth/'],
       },
