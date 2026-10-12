@@ -1,5 +1,6 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/database.types';
+import { monitoredFetch } from '@/lib/supabase/monitored-fetch';
 
 /**
  * Admin client using the SERVICE ROLE key. Bypasses Row Level Security.
@@ -23,6 +24,7 @@ export function createAdminClient() {
   }
 
   return createSupabaseClient<Database>(url, serviceRoleKey, {
+    global: { fetch: monitoredFetch },
     auth: {
       autoRefreshToken: false,
       persistSession: false,

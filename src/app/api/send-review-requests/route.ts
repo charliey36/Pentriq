@@ -1,5 +1,6 @@
 import { sendBlockedReason } from '@/lib/billing';
 import { reviewLinkBlockedReason, REVIEW_LINK_RETRY_MS } from '@/lib/send-guards';
+import { captureError } from '@/lib/monitoring';
 import { NextResponse, type NextRequest } from 'next/server';
 import { isCronAuthorized } from '@/lib/cron-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -158,6 +159,7 @@ export async function GET(request: NextRequest) {
       await notifyOwner('campaign', reviewRequest.business_id);
       results.push({ id: reviewRequest.id, status: 'sent' });
     } catch (err) {
+      captureError(err, { area: 'cron:send-review-requests', tags: { review_request_id: reviewRequest.id, business_id: reviewRequest.business_id } });
       const message = err instanceof Error ? err.message : 'Unknown error';
       const nextAttempt = reviewRequest.attempts + 1;
       const maxAttempts = reviewRequest.max_attempts;

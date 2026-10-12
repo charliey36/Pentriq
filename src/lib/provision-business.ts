@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/database.types';
+import { captureError } from '@/lib/monitoring';
 
 type Db = SupabaseClient<Database>;
 
@@ -70,7 +71,7 @@ export async function provisionBusiness(admin: Db, userId: string): Promise<Prov
     { onConflict: 'business_id,key', ignoreDuplicates: true }
   );
   // Journeys are recoverable (the sender falls back to a single request); never block sign-in on them.
-  if (journeyError) console.error('[provision] could not create default journeys:', journeyError.message);
+  if (journeyError) captureError(journeyError, { area: 'provision:default-journeys', tags: { business_id: business.id } });
 
   return { business, created };
 }

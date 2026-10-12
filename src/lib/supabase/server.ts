@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import type { Database } from '@/lib/database.types';
+import { monitoredFetch } from '@/lib/supabase/monitored-fetch';
 
 /**
  * Supabase client for use in Server Components, Route Handlers, and Server
@@ -14,6 +15,7 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: { fetch: monitoredFetch },
       cookies: {
         getAll() {
           return cookieStore.getAll();

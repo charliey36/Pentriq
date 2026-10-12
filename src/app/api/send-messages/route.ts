@@ -8,6 +8,7 @@ import { senderDisplayName, getAppUrl } from '@/lib/brand';
 import { buildTrackingUrl } from '@/lib/click-tracking';
 import { sendBlockedReason } from '@/lib/billing';
 import { reviewLinkBlockedReason, REVIEW_LINK_RETRY_MS } from '@/lib/send-guards';
+import { captureError } from '@/lib/monitoring';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,6 +61,7 @@ export async function GET(request: NextRequest) {
     .limit(50);
 
   if (error) {
+    captureError(error, { area: 'cron:send-messages' });
     return NextResponse.json({ error: `Failed to load due messages: ${error.message}` }, { status: 500 });
   }
 
@@ -161,6 +163,7 @@ export async function GET(request: NextRequest) {
 
       sent += 1;
     } catch (err) {
+      captureError(err, { area: 'cron:send-messages', tags: { message_id: message.id, business_id: message.business_id, purpose: message.purpose } });
       const errMessage = err instanceof Error ? err.message : 'Unknown error';
       const nextAttempt = message.attempts + 1;
 

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getStripe } from '@/lib/stripe';
 import { handleStripeEvent } from '@/lib/stripe-sync';
+import { captureError } from '@/lib/monitoring';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -29,17 +30,26 @@ export async function POST(request: NextRequest) {
   }
 
   const db = createAdminClient();
+  // Ids only, so a failing event can be found in Stripe from the Sentry issue.
+  const obj = event.data.object as { id?: string; customer?: string | { id: string } | null; subscription?: string | { id: string } | null };
+  const idOf = (v: unknown) => (typeof v === 'string' ? v : (v as { id?: string } | null)?.id);
+  const stripeTags = {
+    stripe_event_type: event.type,
+    stripe_event_id: event.id,
+    stripe_customer_id: idOf(obj.customer),
+    stripe_subscription_id: idOf(obj.subscription) ?? (event.type.startsWith('customer.subscription.') ? obj.id : undefined),
+  };
   const { error: dupError } = await db.from('stripe_webhook_events').insert({ id: event.id, type: event.type });
   if (dupError) {
     if (dupError.code === '23505') return NextResponse.json({ received: true, duplicate: true });
-    console.error('[stripe] could not record event', dupError.message);
+    captureError(dupError, { area: 'stripe:webhook:record-event', tags: stripeTags });
     return NextResponse.json({ error: 'Could not record event.' }, { status: 500 });
   }
 
   try {
     await handleStripeEvent(event);
   } catch (e) {
-    console.error(`[stripe] ${event.type} (${event.id}) failed:`, e);
+    captureError(e, { area: 'stripe:webhook', tags: stripeTags });
     await db.from('stripe_webhook_events').delete().eq('id', event.id);
     return NextResponse.json({ error: 'Handler failed.' }, { status: 500 });
   }

@@ -1,6 +1,7 @@
 import { getStripe } from '@/lib/stripe';
 import { syncById } from '@/lib/stripe-sync';
 import { stripeConfigured } from '@/lib/billing';
+import { captureError } from '@/lib/monitoring';
 
 export type PaymentMethodSummary = { brand: string; last4: string; expMonth: number; expYear: number } | null;
 export type InvoiceSummary = {
@@ -29,7 +30,7 @@ export async function reconcileCheckout(sessionId: string, businessId: string): 
     await syncById(subId, businessId);
     return true;
   } catch (e) {
-    console.error('[stripe] checkout reconcile failed:', e);
+    captureError(e, { area: 'stripe:checkout-reconcile', tags: { business_id: businessId } });
     return false;
   }
 }
@@ -79,7 +80,7 @@ export async function loadStripeBillingDetails(customerId: string | null): Promi
       })),
     };
   } catch (e) {
-    console.error('[stripe] could not load billing details:', e);
+    captureError(e, { area: 'stripe:billing-details', tags: { stripe_customer_id: customerId } });
     return empty;
   }
 }

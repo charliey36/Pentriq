@@ -1,6 +1,7 @@
 import type Stripe from 'stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getStripe, planNameForPrice } from '@/lib/stripe';
+import { captureError } from '@/lib/monitoring';
 import type { Business } from '@/lib/database.types';
 
 type AppStatus = Business['subscription_status'];
@@ -156,7 +157,11 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
       const invoice = event.data.object as Stripe.Invoice;
       const subId = invoiceSubscriptionId(invoice);
       if (subId) await syncById(subId);
-      console.warn(`[stripe] payment failed for invoice ${invoice.id} (customer ${idOf(invoice.customer)})`);
+      // A failed payment is a business event, not an exception, so report it explicitly.
+      captureError(`Stripe payment failed for invoice ${invoice.id}`, {
+        area: 'stripe:payment-failed',
+        tags: { stripe_event_type: event.type, stripe_customer_id: idOf(invoice.customer), stripe_subscription_id: subId },
+      });
       return;
     }
     case 'checkout.session.expired': {

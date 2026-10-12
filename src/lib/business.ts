@@ -4,6 +4,7 @@ import { notifyOwner } from '@/lib/notifications';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { provisionBusiness } from '@/lib/provision-business';
+import { setErrorContext } from '@/lib/monitoring';
 import type { Business } from '@/lib/database.types';
 
 /**
@@ -52,7 +53,6 @@ async function loadBusiness(): Promise<Business> {
     .returns<{ business_id: string; businesses: Business | null } | null>();
 
   if (membershipError) {
-  console.error('membershipError', membershipError);
   throw new Error(`Failed to load business: ${membershipError.message}`);
 }
 
@@ -69,8 +69,6 @@ async function loadBusiness(): Promise<Business> {
       .single();
 
     if (businessError || !business) {
-  console.error('businessError', businessError);
-  console.error('business', business);
   throw new Error(`Failed to load business: ${businessError?.message ?? 'unknown error'}`);
 }
 
@@ -93,7 +91,7 @@ async function loadBusiness(): Promise<Business> {
   try {
     provisioned = await provisionBusiness(createAdminClient(), userData.user.id);
   } catch (e) {
-    console.error('[provision] first-login provisioning failed:', e);
+    // Re-thrown: Sentry's request hook reports it with the route, so no separate log is needed.
     throw e;
   }
 
@@ -105,9 +103,15 @@ async function loadBusiness(): Promise<Business> {
 
 /**
  * Memoised per request: the layout and the page both call this, and without
- * the cache each call repeats three database round trips.
+ * the cache each call repeats three database round trips. Also tags any error
+ * raised later in this request with the user and business ids (never email or name).
  */
-export const requireBusiness = cache(loadBusiness);
+export const requireBusiness = cache(async (): Promise<Business> => {
+  const business = await loadBusiness();
+  const user = await getAuthUser();
+  if (user) setErrorContext(user.id, business.id);
+  return business;
+});
 
 /**
  * True if the given email is in the ADMIN_EMAIL list. Used to show the "all

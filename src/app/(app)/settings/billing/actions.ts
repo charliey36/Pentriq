@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getBillingState, stripeConfigured, TRIAL_DAYS } from '@/lib/billing';
 import { checkoutPriceId, getStripe } from '@/lib/stripe';
 import { getAppUrl } from '@/lib/brand';
+import { captureError } from '@/lib/monitoring';
 
 export type BillingResult = { error?: string; success?: boolean };
 
@@ -39,7 +40,7 @@ export async function claimTrial(): Promise<BillingResult> {
     .select('id');
 
   if (error) {
-    console.error('[billing] claim trial failed:', error.message);
+    captureError(error, { area: 'billing:claim-trial', tags: { business_id: business.id } });
     return { error: 'Could not start your trial. Please try again.' };
   }
   if (!data?.length) return { error: 'Your free trial has already been used.' };
@@ -111,7 +112,7 @@ export async function startSubscription(): Promise<BillingResult> {
     });
     url = session.url;
   } catch (e) {
-    console.error('[stripe] checkout session failed:', e);
+    captureError(e, { area: 'stripe:checkout-session', tags: { business_id: business.id, stripe_customer_id: business.stripe_customer_id } });
     return { error: GENERIC_ERROR };
   }
   if (!url) return { error: GENERIC_ERROR };
@@ -132,7 +133,7 @@ export async function openBillingPortal(): Promise<BillingResult> {
     });
     url = session.url;
   } catch (e) {
-    console.error('[stripe] portal session failed:', e);
+    captureError(e, { area: 'stripe:customer-portal', tags: { business_id: business.id, stripe_customer_id: business.stripe_customer_id } });
     return {
       error:
         'Could not open the billing portal. If this is a new Stripe account, save your Customer Portal settings in the Stripe dashboard first.',

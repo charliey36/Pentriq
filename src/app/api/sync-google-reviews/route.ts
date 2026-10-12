@@ -1,3 +1,4 @@
+import { captureError } from '@/lib/monitoring';
 import { NextResponse, type NextRequest } from 'next/server';
 import { isCronAuthorized } from '@/lib/cron-auth';
 import { syncAllConnections } from '@/lib/google-review-sync';
@@ -25,6 +26,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const results = await syncAllConnections();
+    // Per-business failures are returned as data, not thrown, so report them explicitly.
+    results.filter((r) => !r.ok).forEach((r) => captureError(r.error ?? 'Google review sync failed', { area: 'cron:sync-google-reviews', tags: { business_id: r.businessId } }));
     return NextResponse.json({
       businesses: results.length,
       succeeded: results.filter((r) => r.ok).length,
@@ -34,6 +37,7 @@ export async function GET(request: NextRequest) {
       alerts: results.reduce((n, r) => n + r.alerts, 0),
     });
   } catch (err) {
+    captureError(err, { area: 'cron:sync-google-reviews' });
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Sync failed.' }, { status: 500 });
   }
 }

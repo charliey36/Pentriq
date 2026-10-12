@@ -5,6 +5,7 @@ import { isCronAuthorized } from '@/lib/cron-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { enrollCustomerInJourney } from '@/lib/journeys';
 import { computeRebookingStatus } from '@/lib/visits';
+import { captureError } from '@/lib/monitoring';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +33,7 @@ export async function GET(request: NextRequest) {
 
   const { data: businesses, error: businessesError } = await supabase.from('businesses').select('id, rebooking_reminder_interval_days, rebooking_reminders_enabled');
   if (businessesError) {
+    captureError(businessesError, { area: 'cron:scan-customer-lifecycle' });
     return NextResponse.json({ error: businessesError.message }, { status: 500 });
   }
 

@@ -227,6 +227,8 @@ cp .env.example .env.local
 | `GOOGLE_REDIRECT_URI` | Optional — defaults to `NEXT_PUBLIC_APP_URL` + `/api/google-business/callback` |
 | `ADMIN_EMAIL` | If your logged-in email matches this, your dashboard also shows every registered business. Comma-separate multiple emails for more than one admin. |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` | Optional — enables real SMS/WhatsApp sending once implemented in `lib/messaging.ts` (see Integration points above). Without these, SMS/WhatsApp sends are logged, not delivered. |
+| `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN` | Optional — Sentry error monitoring (server and browser). Same DSN in both. Blank = off. |
+| `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | Optional, build-time — upload source maps and create a release per deploy (release = Git commit). |
 | `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` | Optional — enables real AI-drafted message copy once implemented in `lib/ai.ts`. Without these, drafting falls back to templates. |
 
 ## 4. Install and run
