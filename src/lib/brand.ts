@@ -36,6 +36,12 @@ export const STORAGE_KEYS = {
 } as const;
 
 /**
+ * Cookie remembering that the dashboard setup guide is collapsed. A cookie (not
+ * localStorage) so the server can render the right state on the first paint.
+ */
+export const SETUP_COLLAPSED_COOKIE = `${APP_SLUG}-setup-collapsed`;
+
+/**
  * Public base URL of the deployed app. Every link we put in customer emails
  * (review tracking, private feedback, unsubscribe, rebooking, hosted logo)
  * is built from this, so it must be the real public address — never localhost.

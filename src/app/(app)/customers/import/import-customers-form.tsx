@@ -10,15 +10,25 @@ import { CONSENT_FIELD, CONSENT_LABEL } from '@/lib/consent';
 
 const resultTones: Record<string, string> = {
   created: 'text-brand-700 dark:text-brand-300',
+  updated: 'text-sky-700 dark:text-sky-300',
+  existing: 'text-ink-3',
   skipped_duplicate: 'text-amber-700 dark:text-amber-300',
+  conflict: 'text-red-700 dark:text-red-300',
   error: 'text-red-700 dark:text-red-300',
 };
 
 const resultLabels: Record<string, string> = {
   created: 'Added',
-  skipped_duplicate: 'Skipped (duplicate)',
+  updated: 'Updated',
+  existing: 'Already a customer',
+  skipped_duplicate: 'Skipped (already recorded)',
+  conflict: 'Needs review',
   error: 'Error',
 };
+
+/** Rows worth listing: everything except plain creates and plain updates, which the counts already cover. */
+const isNotable = (r: ImportCustomersResultRow) => r.status === 'conflict' || r.status === 'error' || r.status === 'skipped_duplicate' || (r.status === 'updated' && Boolean(r.note));
+type ImportCustomersResultRow = NonNullable<ImportCustomersResult['summary']>['results'][number];
 
 export function ImportCustomersForm() {
   const [state, formAction] = useFormState<ImportCustomersResult, FormData>(
@@ -62,7 +72,9 @@ John Smith,john@gmail.com,Boiler Repair,2026-10-08
 Jane Smith,jane@gmail.com,Leak Repair,2026-10-08`}</pre>
           <p className="mt-2">
             Dates can be 2026-10-08 or 08/10/2026. Optional columns: <code className="font-mono">phone</code>,{' '}
-            <code className="font-mono">amount</code>. Rows with the same email, service and date are skipped, so it is safe to upload a file twice.{' '}
+            <code className="font-mono">amount</code>. Customers are matched on email address or phone number (never name): a match updates
+            that customer and adds the new service to their history. If an email and a phone number belong to two different customers, the row is
+            held back for you to review. Uploading the same file twice is safe.{' '}
             <a href="/pentriq-customer-template.csv" download className="font-medium text-brand-700 underline dark:text-brand-300">
               Download sample CSV
             </a>
@@ -95,10 +107,26 @@ Jane Smith,jane@gmail.com,Leak Repair,2026-10-08`}</pre>
         <div className="mt-8 animate-fade-in border-t border-line pt-6">
           <h3 className="text-sm font-semibold text-ink">Import complete</h3>
           <ul className="mt-3 space-y-1.5 text-sm text-ink-2">
-            <li>✅ Imported: <b>{state.summary.created}</b> service{state.summary.created === 1 ? '' : 's'} ({state.summary.newCustomers} new customer{state.summary.newCustomers === 1 ? '' : 's'})</li>
-            <li>⚠️ Skipped duplicates: <b>{state.summary.duplicates}</b></li>
+            <li>✅ Customers created: <b>{state.summary.customersCreated}</b></li>
+            <li>🔄 Customers updated: <b>{state.summary.customersUpdated}</b> <span className="text-ink-3">(matched on email or phone)</span></li>
+            {state.summary.customersUnchanged > 0 && (
+              <li>👤 Already customers, nothing to add: <b>{state.summary.customersUnchanged}</b></li>
+            )}
+            <li>🧾 Service records added: <b>{state.summary.serviceRecordsAdded}</b></li>
+            <li>
+              {state.summary.conflicts > 0 ? '🛑' : '✔️'} Conflict rows: <b>{state.summary.conflicts}</b>
+              {state.summary.conflicts > 0 && <span className="text-ink-3"> (not imported — see below)</span>}
+            </li>
+            <li>⚠️ Already recorded, skipped: <b>{state.summary.duplicates}</b></li>
             <li>❌ Errors: <b>{state.summary.errors}</b></li>
           </ul>
+          {state.summary.conflicts > 0 && (
+            <Notice variant="warning" className="mt-4">
+              {state.summary.conflicts} row{state.summary.conflicts === 1 ? ' was' : 's were'} not imported because the email address belongs to one
+              customer and the phone number to a different one. Nothing was merged. Check those customers, fix the file or merge them yourself, then
+              import the listed rows again.
+            </Notice>
+          )}
           {state.summary.warning && (
             <Notice variant="warning" className="mt-4">
               {state.summary.warning}
@@ -117,7 +145,7 @@ Jane Smith,jane@gmail.com,Leak Repair,2026-10-08`}</pre>
               {state.summary.notQueued} customer{state.summary.notQueued === 1 ? ' was' : 's were'} not queued because their service is older than your review window (Settings) or they were already queued.
             </p>
           )}
-          {state.summary.results.some((r) => r.status !== 'created') && (
+          {state.summary.results.some(isNotable) && (
             <div className="scroll-thin mt-5 max-h-80 overflow-auto rounded-xl border border-line">
               <table className="data-table">
                 <thead className="sticky top-0">
@@ -130,7 +158,7 @@ Jane Smith,jane@gmail.com,Leak Repair,2026-10-08`}</pre>
                 </thead>
                 <tbody>
                   {state.summary.results
-                    .filter((r) => r.status !== 'created')
+                    .filter(isNotable)
                     .map((r) => (
                       <tr key={r.row}>
                         <td className="tabular-nums text-ink-3">{r.row}</td>
@@ -138,7 +166,8 @@ Jane Smith,jane@gmail.com,Leak Repair,2026-10-08`}</pre>
                         <td>{r.email || '\u2014'}</td>
                         <td className={`font-medium ${resultTones[r.status]}`}>
                           {resultLabels[r.status]}
-                          {r.status === 'error' && 'reason' in r ? `: ${r.reason}` : ''}
+                          {'reason' in r ? `: ${r.reason}` : ''}
+                          {r.status === 'updated' && r.note ? `: ${r.note}` : ''}
                         </td>
                       </tr>
                     ))}

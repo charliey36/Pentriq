@@ -264,13 +264,20 @@ describe('CSV Import - mapCsvRowsToCustomers', () => {
       expect(result.error).toContain('email');
     });
 
-    it('should reject missing date', () => {
+    it('accepts a plain name,email list with no date column and says what that means', () => {
       const rows = [
         ['name', 'email'],
         ['Test', 'test@example.com'],
       ];
       const result = mapCsvRowsToCustomers(rows);
-      expect(result.error).toContain('date');
+      expect(result.error).toBeUndefined();
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]).toMatchObject({ name: 'Test', email: 'test@example.com', date: '' });
+      expect(result.warning).toMatch(/without a service record/);
+    });
+
+    it('still requires name and email', () => {
+      expect(mapCsvRowsToCustomers([['date'], ['2026-10-01']]).error).toMatch(/name, email/);
     });
 
     it('should allow missing phone (optional)', () => {

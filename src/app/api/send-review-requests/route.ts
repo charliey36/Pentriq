@@ -1,4 +1,5 @@
 import { sendBlockedReason } from '@/lib/billing';
+import { reviewLinkBlockedReason, REVIEW_LINK_RETRY_MS } from '@/lib/send-guards';
 import { NextResponse, type NextRequest } from 'next/server';
 import { isCronAuthorized } from '@/lib/cron-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -95,7 +96,7 @@ export async function GET(request: NextRequest) {
           .single(),
         supabase
           .from('businesses')
-          .select('name, subscription_status, trial_ends_at, created_at')
+          .select('name, subscription_status, trial_ends_at, created_at, google_review_url')
           .eq('id', reviewRequest.business_id)
           .single(),
       ]);
@@ -111,6 +112,16 @@ export async function GET(request: NextRequest) {
           .update({ next_attempt_at: new Date(Date.now() + 86_400_000).toISOString() })
           .eq('id', reviewRequest.id);
         results.push({ id: reviewRequest.id, status: 'skipped', error: 'Subscription required' });
+        continue;
+      }
+
+      // Review link not set up yet: hold the request and check again soon.
+      if (reviewLinkBlockedReason(business, 'review_request')) {
+        await supabase
+          .from('review_requests')
+          .update({ next_attempt_at: new Date(Date.now() + REVIEW_LINK_RETRY_MS).toISOString() })
+          .eq('id', reviewRequest.id);
+        results.push({ id: reviewRequest.id, status: 'skipped', error: 'Review link not set up' });
         continue;
       }
 

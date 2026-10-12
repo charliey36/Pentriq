@@ -7,6 +7,7 @@ import { advanceJourneyEnrollment } from '@/lib/journeys';
 import { senderDisplayName, getAppUrl } from '@/lib/brand';
 import { buildTrackingUrl } from '@/lib/click-tracking';
 import { sendBlockedReason } from '@/lib/billing';
+import { reviewLinkBlockedReason, REVIEW_LINK_RETRY_MS } from '@/lib/send-guards';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,6 +91,17 @@ export async function GET(request: NextRequest) {
         await supabase
           .from('messages')
           .update({ next_attempt_at: new Date(Date.now() + 86_400_000).toISOString() })
+          .eq('id', message.id);
+        skipped += 1;
+        continue;
+      }
+
+      // Review link not set up yet: hold review requests (not the other message types) and
+      // check again soon, so they go out shortly after the owner adds the link.
+      if (reviewLinkBlockedReason(business, message.purpose)) {
+        await supabase
+          .from('messages')
+          .update({ next_attempt_at: new Date(Date.now() + REVIEW_LINK_RETRY_MS).toISOString() })
           .eq('id', message.id);
         skipped += 1;
         continue;

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/ui/icons';
-import { STORAGE_KEYS } from '@/lib/brand';
+import { STORAGE_KEYS, SETUP_COLLAPSED_COOKIE } from '@/lib/brand';
 import { ProgressRing } from '@/components/ui/progress-ring';
 
 export type SetupStep = {
@@ -16,15 +16,32 @@ export type SetupStep = {
 
 const STORAGE_KEY = STORAGE_KEYS.setupDismissed;
 
+function rememberCollapsed(collapsed: boolean) {
+  try {
+    document.cookie = collapsed
+      ? `${SETUP_COLLAPSED_COOKIE}=1; path=/; max-age=31536000; samesite=lax`
+      : `${SETUP_COLLAPSED_COOKIE}=; path=/; max-age=0; samesite=lax`;
+  } catch {
+    // Cookies unavailable: the guide just won't remember its state.
+  }
+}
+
 /**
- * First-run checklist. While steps remain it shows a progress ring and
- * spotlights the next action. When everything is done it swaps to a short
- * celebration (a check that draws itself) that can be dismissed for good.
+ * First-run guide. Setup is recommended, never required: while steps remain it
+ * shows a progress ring and spotlights the next action, and it can be tucked
+ * away into a one-line bar (the choice is remembered) and reopened any time.
+ * When everything is done it swaps to a short celebration (a check that draws
+ * itself) that can be dismissed for good.
  */
-export function SetupChecklist({ steps }: { steps: SetupStep[] }) {
+export function SetupChecklist({ steps, initiallyCollapsed = false }: { steps: SetupStep[]; initiallyCollapsed?: boolean }) {
   const completed = steps.filter((step) => step.done).length;
   const allDone = completed === steps.length;
   const nextIndex = steps.findIndex((step) => !step.done);
+  const [collapsed, setCollapsed] = useState(initiallyCollapsed);
+  const setCollapsedAndRemember = (value: boolean) => {
+    setCollapsed(value);
+    rememberCollapsed(value);
+  };
 
   // Dismissal is only relevant once complete. Wait for mount so a dismissed
   // card never flashes in from the server render.
@@ -77,6 +94,30 @@ export function SetupChecklist({ steps }: { steps: SetupStep[] }) {
     );
   }
 
+  if (collapsed) {
+    const next = steps[nextIndex];
+    return (
+      <section className="card flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5" aria-label="Setup progress">
+        <ProgressRing percent={(completed / steps.length) * 100} id="setup-mini" size={36} stroke={5}>
+          <span className="text-[11px] font-semibold leading-none text-ink tabular-nums">{completed}/{steps.length}</span>
+        </ProgressRing>
+        <p className="min-w-0 flex-1 text-sm text-ink-2">
+          <span className="font-medium text-ink">Setup {completed}/{steps.length}</span>
+          {next && <span className="text-ink-3"> &middot; Next: {next.title}</span>}
+        </p>
+        {next && (
+          <Link href={next.href} className="btn btn-primary btn-sm">
+            {next.cta}
+            <Icon name="arrowRight" className="h-3.5 w-3.5" strokeWidth={2} />
+          </Link>
+        )}
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setCollapsedAndRemember(false)}>
+          Show steps
+        </button>
+      </section>
+    );
+  }
+
   return (
     <section className="card relative isolate overflow-hidden">
       <div
@@ -92,11 +133,14 @@ export function SetupChecklist({ steps }: { steps: SetupStep[] }) {
             </span>
           </ProgressRing>
           <div>
-            <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-ink">Get set up</h2>
+            <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-ink">Recommended next steps</h2>
             <p className="mt-1 text-[13px] leading-5 text-ink-3">
-              {Math.round((completed / steps.length) * 100)}% complete &middot; {steps.length - completed}{' '}
-              {steps.length - completed === 1 ? 'step' : 'steps'} to start collecting reviews.
+              {completed} of {steps.length} done. Do them in any order, whenever you&apos;re ready &mdash; you can use everything
+              else in Pentriq in the meantime.
             </p>
+            <button type="button" className="btn btn-ghost btn-sm mt-3 -ml-2.5" onClick={() => setCollapsedAndRemember(true)}>
+              Hide for now
+            </button>
           </div>
         </div>
 

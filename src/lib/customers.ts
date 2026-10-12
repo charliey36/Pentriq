@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/database.types';
 import { reviewSendTime } from '@/lib/send-window';
 import { daysSinceService, parseAmount, parseServiceDate } from '@/lib/eligibility';
+import { normalizePhone } from '@/lib/phone';
+import { resolveImportIdentities, type MatchedBy } from '@/lib/import-identity';
 
 type Db = SupabaseClient<Database>;
 
@@ -22,18 +24,33 @@ export type BulkImportRow = {
 };
 
 export type BulkImportRowResult =
+  /** A new customer was created and the service recorded. */
   | { row: number; status: 'created'; name: string; email: string }
+  /** An existing customer (matched on email or phone) was updated and the service recorded. */
+  | { row: number; status: 'updated'; name: string; email: string; matchedBy: MatchedBy; note?: string }
+  /** An existing customer was recognised by a row with no service date; nothing needed changing. */
+  | { row: number; status: 'existing'; name: string; email: string; matchedBy: MatchedBy }
+  /** The same service on the same date is already recorded for this customer. */
   | { row: number; status: 'skipped_duplicate'; name: string; email: string }
+  /** Email and phone point at two different customers: nothing was written; needs a manual decision. */
+  | { row: number; status: 'conflict'; name: string; email: string; reason: string }
   | { row: number; status: 'error'; name: string; email: string; reason: string };
 
 export type BulkImportSummary = {
   totalRows: number;
-  /** Rows imported (each one is a service visit). */
-  created: number;
+  /** Customers that did not exist before this import. */
+  customersCreated: number;
+  /** Existing customers (matched on email or phone) whose record was updated. */
+  customersUpdated: number;
+  /** Existing customers recognised by a row with no service date, so nothing needed changing. */
+  customersUnchanged: number;
+  /** Service records added (one per imported row). */
+  serviceRecordsAdded: number;
+  /** Rows not imported because email and phone belong to two different customers. */
+  conflicts: number;
+  /** Rows skipped because that exact service is already recorded. */
   duplicates: number;
   errors: number;
-  /** Customers that did not exist before this import. */
-  newCustomers: number;
   /** Customers added to the review queue (or scheduled, if auto-send). */
   queued: number;
   /** Imported customers not queued: service older than the review window, or already queued. */
@@ -50,17 +67,37 @@ const chunks = <T,>(items: T[], size: number): T[][] => {
   return out;
 };
 
-type Valid = { row: number; name: string; email: string; service: string; date: string; phone: string | null; amount: number | null };
-type Known = { id: string; total_spend: number; visit_count: number; last_service_date: string | null; unsubscribed_at: string | null };
+type Valid = { row: number; name: string; email: string; service: string; date: string | null; phone: string | null; amount: number | null };
+const KNOWN_COLUMNS = 'id, name, email, phone, total_spend, visit_count, last_service_date, unsubscribed_at';
+type Known = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  total_spend: number;
+  visit_count: number;
+  last_service_date: string | null;
+  unsubscribed_at: string | null;
+};
 
 /**
- * CSV import: every row is a completed service. For each row we find or create
- * the customer (by email), find or create the service, and record a visit.
- * Rows with the same email + service + date as an existing visit (or an earlier
- * row in the file) are skipped, so re-uploading a file is safe. Recent services
- * (inside the review window) put the customer in the review queue; nothing is
- * emailed unless `autoSend` is on. All database work is batched. Throws on
- * unexpected database errors.
+ * CSV import: every row is a completed service for a customer.
+ *
+ * Who a row belongs to is decided by email OR phone (never by name) — see
+ * `resolveImportIdentities`. Per row:
+ *   - no match                      → create the customer + record the service
+ *   - email or phone matches        → update that customer + record the service
+ *       (visit count, lifetime spend and last service date go up; existing
+ *        name/email/phone are kept, a missing phone is filled in; every earlier
+ *        service record is left untouched)
+ *   - email and phone match two
+ *     DIFFERENT customers           → conflict: nothing is written, the row is
+ *                                     reported for manual review
+ *   - identical service already recorded (same customer + service + date)
+ *                                   → skipped, so re-uploading a file is safe
+ * Recent services (inside the review window) put the customer in the review
+ * queue; nothing is emailed unless `autoSend` is on. All database work is
+ * batched. Throws on unexpected database errors.
  */
 export async function bulkImportCustomers(
   supabase: Db,
@@ -70,12 +107,10 @@ export async function bulkImportCustomers(
   /** When the owner confirmed they may contact these customers; stored on every NEW customer. */
   consentConfirmedAt?: string
 ): Promise<BulkImportSummary> {
-  console.log(`[CSV Import] Starting import: ${rows.length} rows, autoSend=${autoSend}`);
   const results: BulkImportRowResult[] = [];
   const fail = (e: { message: string }) => new Error(e.message);
 
-  // 1. Validate rows and drop duplicates inside the file.
-  console.log('[CSV Import] Step 1: Validating rows...');
+  // 1. Validate rows and drop exact duplicates inside the file.
   const valid: Valid[] = [];
   const fileKeys = new Set<string>();
   rows.forEach((r, i) => {
@@ -90,63 +125,79 @@ export async function bulkImportCustomers(
     if (!isValidEmail(email)) return error('Invalid email address.');
     if (!service) return error('Service is required.');
     if (service.length > 120) return error('Service name is too long (max 120 characters).');
-    const date = parseServiceDate(/^\d{4}-\d{2}-\d{2}[T ]/.test(rawDate) ? rawDate.slice(0, 10) : rawDate);
-    if (!date) return error('Invalid date. Use YYYY-MM-DD or DD/MM/YYYY.');
-    if ((daysSinceService(date) ?? 0) < -1) return error('Date cannot be in the future.');
-    const amount = r.amountSpent?.trim() ? parseAmount(r.amountSpent) : null;
-    if (r.amountSpent?.trim() && amount === null) return error('Amount must be a number of 0 or more.');
+    // A blank date is allowed: the customer is added (or matched) with no service record.
+    const date = rawDate ? parseServiceDate(/^\d{4}-\d{2}-\d{2}[T ]/.test(rawDate) ? rawDate.slice(0, 10) : rawDate) : null;
+    if (rawDate && !date) return error('Invalid date. Use YYYY-MM-DD or DD/MM/YYYY.');
+    if (date && (daysSinceService(date) ?? 0) < -1) return error('Date cannot be in the future.');
+    const amount = date && r.amountSpent?.trim() ? parseAmount(r.amountSpent) : null;
+    if (date && r.amountSpent?.trim() && amount === null) return error('Amount must be a number of 0 or more.');
 
-    const key = `${email}|${service.toLowerCase()}|${date}`;
+    const key = `${email}|${service.toLowerCase()}|${date ?? 'no-date'}`;
     if (fileKeys.has(key)) return void results.push({ row, status: 'skipped_duplicate', name, email });
     fileKeys.add(key);
     valid.push({ row, name, email, service, date, phone: r.phone?.trim() || null, amount });
   });
 
-  // 2. Existing customers (by email).
-  console.log('[CSV Import] Step 2: Loading existing customers...');
-  const known = new Map<string, Known>();
+  // 2. Load every existing customer a row could match: by email, and by phone.
+  const known = new Map<string, Known>(); // customer id → customer
   for (const batch of chunks([...new Set(valid.map((v) => v.email))], 100)) {
-    const { data, error } = await supabase
-      .from('customers')
-      .select('id, email, total_spend, visit_count, last_service_date, unsubscribed_at')
-      .eq('business_id', business.id)
-      .in('email', batch);
-    if (error) {
-      console.error('[CSV Import] ERROR loading customers:', error);
-      throw fail(error);
-    }
-    (data ?? []).forEach((c) => known.set(c.email.toLowerCase(), c));
+    const { data, error } = await supabase.from('customers').select(KNOWN_COLUMNS).eq('business_id', business.id).in('email', batch);
+    if (error) throw fail(error);
+    (data ?? []).forEach((c) => known.set(c.id, c));
   }
-  console.log(`[CSV Import] Found ${known.size} existing customers`);
+  // Phones are stored as typed, so they can only be compared after normalising: read this
+  // business's customers that have one and compare in code (fine at small-business scale).
+  if (valid.some((v) => normalizePhone(v.phone))) {
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase
+        .from('customers')
+        .select(KNOWN_COLUMNS)
+        .eq('business_id', business.id)
+        .not('phone', 'is', null)
+        .order('id')
+        .range(from, from + 999);
+      if (error) throw fail(error);
+      (data ?? []).forEach((c) => known.set(c.id, c));
+      if (!data || data.length < 1000) break;
+    }
+  }
 
-  // 3. Services: reuse by name (case-insensitive), create the missing ones.
-  console.log('[CSV Import] Step 3: Processing services...');
+  // 3. Decide who each row belongs to; rows that would merge two different customers become conflicts.
+  const identity = resolveImportIdentities(
+    valid.map(({ row, name, email, phone }) => ({ row, name, email, phone })),
+    [...known.values()].map(({ id, name, email, phone }) => ({ id, name, email, phone }))
+  );
+  const conflictRows = new Set(identity.conflicts.map((c) => c.row));
+  const validByRow = new Map(valid.map((v) => [v.row, v]));
+  for (const c of identity.conflicts) {
+    const v = validByRow.get(c.row)!;
+    results.push({ row: c.row, status: 'conflict', name: v.name, email: v.email, reason: c.reason });
+  }
+  const resolved = valid.filter((v) => !conflictRows.has(v.row));
+  const entityOf = (v: Valid) => identity.entities.get(identity.rowEntity.get(v.row)!)!;
+
+  // Rows with a service date record a service; rows without one only add or match the customer.
+  type Dated = Valid & { date: string };
+  const dated = resolved.filter((v): v is Dated => v.date !== null);
+  const undated = resolved.filter((v) => v.date === null);
+
+  // 4. Services: reuse by name (case-insensitive), create the missing ones.
   const serviceIds = new Map<string, string>();
   const { data: svc, error: svcError } = await supabase.from('services').select('id, name').eq('business_id', business.id);
-  if (svcError) {
-    console.error('[CSV Import] ERROR loading services:', svcError);
-    throw fail(svcError);
-  }
+  if (svcError) throw fail(svcError);
   (svc ?? []).forEach((s) => serviceIds.set(s.name.toLowerCase(), s.id));
   const missing = new Map<string, string>();
-  valid.forEach((v) => !serviceIds.has(v.service.toLowerCase()) && missing.set(v.service.toLowerCase(), v.service));
-  console.log(`[CSV Import] Found ${svc?.length ?? 0} existing services, creating ${missing.size} new ones`);
+  dated.forEach((v) => !serviceIds.has(v.service.toLowerCase()) && missing.set(v.service.toLowerCase(), v.service));
   for (const batch of chunks([...missing.values()], 200)) {
-    const { data, error } = await supabase
-      .from('services')
-      .insert(batch.map((name) => ({ business_id: business.id, name })))
-      .select('id, name');
-    if (error) {
-      console.error('[CSV Import] ERROR creating services:', error);
-      throw fail(error);
-    }
+    const { data, error } = await supabase.from('services').insert(batch.map((name) => ({ business_id: business.id, name }))).select('id, name');
+    if (error) throw fail(error);
     (data ?? []).forEach((s) => serviceIds.set(s.name.toLowerCase(), s.id));
   }
-  console.log('[CSV Import] Services ready');
 
-  // 4. Skip visits that already exist (same customer + service + date).
+  // 5. Skip service records that already exist (same customer + service + date).
+  const existingIds = [...new Set(dated.map((v) => entityOf(v).existingId).filter((id): id is string => Boolean(id)))];
   const visitKeys = new Set<string>();
-  for (const batch of chunks([...known.values()].map((c) => c.id), 100)) {
+  for (const batch of chunks(existingIds, 100)) {
     for (let from = 0; ; from += 1000) {
       const { data, error } = await supabase
         .from('visits')
@@ -159,42 +210,57 @@ export async function bulkImportCustomers(
       if (!data || data.length < 1000) break;
     }
   }
-  const accepted: (Valid & { serviceId: string })[] = [];
-  for (const v of valid) {
+  type Accepted = Dated & { serviceId: string; entityKey: string };
+  const accepted: Accepted[] = [];
+  const seenInFile = new Set<string>();
+  for (const v of dated) {
+    const entity = entityOf(v);
     const serviceId = serviceIds.get(v.service.toLowerCase()) as string;
-    const existing = known.get(v.email);
-    if (existing && visitKeys.has(`${existing.id}|${serviceId}|${v.date}`)) {
-      console.log(`[CSV Import] Skipping duplicate: ${v.email} on ${v.date}`);
+    const fileKey = `${entity.key}|${serviceId}|${v.date}`;
+    const alreadyRecorded = Boolean(entity.existingId) && visitKeys.has(`${entity.existingId}|${serviceId}|${v.date}`);
+    if (alreadyRecorded || seenInFile.has(fileKey)) {
       results.push({ row: v.row, status: 'skipped_duplicate', name: v.name, email: v.email });
-    } else {
-      accepted.push({ ...v, serviceId });
+      continue;
     }
+    seenInFile.add(fileKey);
+    accepted.push({ ...v, serviceId, entityKey: entity.key });
   }
-  console.log(`[CSV Import] ${accepted.length} rows accepted (from ${valid.length} valid)`);
 
-  // 5. Per-customer totals for this import.
-  const agg = new Map<string, { name: string; phone: string | null; count: number; total: number; latest: string }>();
+  // 6. Per-customer totals for this import. Customers matched or added by a dateless row get a
+  // zero entry so they are still created / recognised, but nothing is added to their history.
+  const agg = new Map<string, { count: number; total: number; latest: string | null }>();
   for (const v of accepted) {
-    const a = agg.get(v.email) ?? { name: v.name, phone: v.phone, count: 0, total: 0, latest: v.date };
+    const a = agg.get(v.entityKey) ?? { count: 0, total: 0, latest: v.date };
     a.count += 1;
     a.total += v.amount ?? 0;
-    if (v.date > a.latest) a.latest = v.date;
-    agg.set(v.email, a);
+    if (!a.latest || v.date > a.latest) a.latest = v.date;
+    agg.set(v.entityKey, a);
+  }
+  for (const v of undated) {
+    const key = entityOf(v).key;
+    if (!agg.has(key)) agg.set(key, { count: 0, total: 0, latest: null });
   }
 
-  // 6. Create new customers (with their totals), update existing ones.
-  const newEmails = [...agg.keys()].filter((e) => !known.has(e));
-  for (const batch of chunks(newEmails, 200)) {
+  // 7. Create new customers (with their totals) and update existing ones.
+  const customerIdByKey = new Map<string, string>();
+  const newKeys = [...agg.keys()].filter((k) => !identity.entities.get(k)!.existingId);
+  const existingKeys = [...agg.keys()].filter((k) => identity.entities.get(k)!.existingId);
+  // Only existing customers that actually change are "updated"; the rest were simply recognised.
+  const changedKeys = existingKeys.filter((k) => agg.get(k)!.count > 0 || identity.entities.get(k)!.phoneToFill);
+  existingKeys.forEach((k) => customerIdByKey.set(k, identity.entities.get(k)!.existingId!));
+
+  for (const batch of chunks(newKeys, 200)) {
     const { data, error } = await supabase
       .from('customers')
       .insert(
-        batch.map((email) => {
-          const a = agg.get(email)!;
+        batch.map((k) => {
+          const e = identity.entities.get(k)!;
+          const a = agg.get(k)!;
           return {
             business_id: business.id,
-            name: a.name,
-            email,
-            phone: a.phone,
+            name: e.name,
+            email: e.email,
+            phone: e.phone,
             last_service_date: a.latest,
             total_spend: a.total,
             visit_count: a.count,
@@ -204,63 +270,99 @@ export async function bulkImportCustomers(
       )
       .select('id, email');
     if (error) throw fail(error);
-    (data ?? []).forEach((c) =>
-      known.set(c.email, { id: c.id, total_spend: 0, visit_count: 0, last_service_date: agg.get(c.email)!.latest, unsubscribed_at: null })
-    );
+    const idByEmail = new Map((data ?? []).map((c) => [c.email.toLowerCase(), c.id]));
+    batch.forEach((k) => customerIdByKey.set(k, idByEmail.get(identity.entities.get(k)!.email.toLowerCase())!));
   }
-  for (const batch of chunks([...agg.keys()].filter((e) => !newEmails.includes(e)), 20)) {
+  for (const batch of chunks(changedKeys, 20)) {
     await Promise.all(
-      batch.map(async (email) => {
-        const c = known.get(email)!;
-        const a = agg.get(email)!;
-        const latest = !c.last_service_date || a.latest > c.last_service_date ? a.latest : c.last_service_date;
+      batch.map(async (k) => {
+        const entity = identity.entities.get(k)!;
+        const c = known.get(entity.existingId!)!;
+        const a = agg.get(k)!;
+        const latest = a.latest && (!c.last_service_date || a.latest > c.last_service_date) ? a.latest : c.last_service_date;
         const { error } = await supabase
           .from('customers')
-          .update({ total_spend: Number(c.total_spend) + a.total, visit_count: c.visit_count + a.count, last_service_date: latest })
-          .eq('id', c.id);
+          .update({
+            total_spend: Number(c.total_spend) + a.total,
+            visit_count: c.visit_count + a.count,
+            last_service_date: latest,
+            ...(entity.phoneToFill ? { phone: entity.phoneToFill } : {}),
+          })
+          .eq('id', c.id)
+          .eq('business_id', business.id);
         if (error) throw fail(error);
       })
     );
   }
 
-  // 7. Record the visits (date + amount).
-  console.log('[CSV Import] Step 7: Creating visits...');
+  // 8. Record the service visits (date + amount). Earlier visits are never touched.
   const visitIdByKey = new Map<string, string>();
   for (const batch of chunks(accepted, 200)) {
-    console.log(`[CSV Import] Creating visit batch of ${batch.length}...`);
-    const visitData = batch.map((v) => ({
-      business_id: business.id,
-      customer_id: known.get(v.email)!.id,
-      service_id: v.serviceId,
-      visited_at: `${v.date}T12:00:00Z`,
-      price: v.amount,
-      notes: 'Imported from CSV',
-    }));
-    console.log('[CSV Import] Visit batch data:', JSON.stringify(visitData.slice(0, 1)));
-    
     const { data, error } = await supabase
       .from('visits')
-      .insert(visitData)
+      .insert(
+        batch.map((v) => ({
+          business_id: business.id,
+          customer_id: customerIdByKey.get(v.entityKey)!,
+          service_id: v.serviceId,
+          visited_at: `${v.date}T12:00:00Z`,
+          price: v.amount,
+          notes: 'Imported from CSV',
+        }))
+      )
       .select('id, customer_id, service_id, visited_at');
-    if (error) {
-      console.error('[CSV Import] ERROR creating visits:', error);
-      throw fail(error);
-    }
+    if (error) throw fail(error);
     (data ?? []).forEach((v) => visitIdByKey.set(`${v.customer_id}|${v.service_id}|${v.visited_at.slice(0, 10)}`, v.id));
   }
-  console.log(`[CSV Import] Visits created: ${visitIdByKey.size} entries`);
 
-  // 8. Review queue: one request per customer, for their most recent service, if it is inside the review window.
-  console.log(`[CSV Import] Processing review queue: ${accepted.length} rows accepted`);
-  const latestVisit = new Map<string, (typeof accepted)[number]>();
+  // 9. Row results for everything that was written.
+  for (const v of accepted) {
+    const entity = identity.entities.get(v.entityKey)!;
+    if (!entity.existingId) {
+      results.push({ row: v.row, status: 'created', name: v.name, email: v.email });
+      continue;
+    }
+    const matchedBy = identity.matchedBy.get(v.row);
+    const how: MatchedBy = matchedBy && matchedBy !== 'new' ? matchedBy : 'email';
+    const emailDiffers = v.email !== entity.email.toLowerCase();
+    results.push({
+      row: v.row,
+      status: 'updated',
+      name: v.name,
+      email: v.email,
+      matchedBy: how,
+      ...(emailDiffers ? { note: `Matched on ${how}; the email in your file differs from the one on record (${entity.email}), which was kept.` } : {}),
+    });
+  }
+
+  // Rows without a service date: the customer was added or recognised, but no service was recorded.
+  const reportedUndated = new Set<string>();
+  const hasServiceThisImport = new Set(accepted.map((v) => v.entityKey));
+  for (const v of undated) {
+    const entity = entityOf(v);
+    if (hasServiceThisImport.has(entity.key)) continue; // already reported through its dated row(s)
+    if (reportedUndated.has(entity.key)) {
+      results.push({ row: v.row, status: 'skipped_duplicate', name: v.name, email: v.email });
+      continue;
+    }
+    reportedUndated.add(entity.key);
+    const matchedBy = identity.matchedBy.get(v.row);
+    const how: MatchedBy = matchedBy && matchedBy !== 'new' ? matchedBy : 'email';
+    if (!entity.existingId) results.push({ row: v.row, status: 'created', name: v.name, email: v.email });
+    else if (entity.phoneToFill) results.push({ row: v.row, status: 'updated', name: v.name, email: v.email, matchedBy: how, note: 'Phone number added; no service date, so no service record was added.' });
+    else results.push({ row: v.row, status: 'existing', name: v.name, email: v.email, matchedBy: how });
+  }
+
+  // 10. Review queue: one request per customer, for their most recent service, if it is inside the review window.
+  const latestVisit = new Map<string, Accepted>();
   accepted.forEach((v) => {
-    const cur = latestVisit.get(v.email);
-    if (!cur || v.date > cur.date) latestVisit.set(v.email, v);
+    const id = customerIdByKey.get(v.entityKey)!;
+    const cur = latestVisit.get(id);
+    if (!cur || v.date > cur.date) latestVisit.set(id, v);
   });
-  console.log(`[CSV Import] Latest visits for ${latestVisit.size} customers`);
-  
+
   const alreadyQueued = new Set<string>();
-  for (const batch of chunks([...latestVisit.keys()].map((e) => known.get(e)!.id), 100)) {
+  for (const batch of chunks([...latestVisit.keys()], 100)) {
     const { data, error } = await supabase
       .from('messages')
       .select('customer_id')
@@ -271,18 +373,12 @@ export async function bulkImportCustomers(
     if (error) throw fail(error);
     (data ?? []).forEach((m) => alreadyQueued.add(m.customer_id));
   }
-  console.log(`[CSV Import] Already queued: ${alreadyQueued.size} customers`);
-  
-  const toQueue = [...latestVisit.values()].filter((v) => {
-    const c = known.get(v.email)!;
+
+  const toQueue = [...latestVisit.entries()].filter(([customerId, v]) => {
     const days = daysSinceService(v.date);
-    const passes = !c.unsubscribed_at && !alreadyQueued.has(c.id) && days !== null && days >= 0 && days <= business.review_request_window_days;
-    if (!passes) {
-      console.log(`[CSV Import] Filtering out: ${v.email} - unsubscribed=${!!c.unsubscribed_at}, alreadyQueued=${alreadyQueued.has(c.id)}, days=${days}, window=${business.review_request_window_days}`);
-    }
-    return passes;
+    const unsubscribed = Boolean(known.get(customerId)?.unsubscribed_at);
+    return !unsubscribed && !alreadyQueued.has(customerId) && days !== null && days >= 0 && days <= business.review_request_window_days;
   });
-  console.log(`[CSV Import] To queue: ${toQueue.length} messages`);
 
   // Held = waits in Customers until the owner presses Send. Scheduled = emailed the
   // day after the service between 9am and 12pm, followed by the day-3 / day-7 reminders.
@@ -296,60 +392,42 @@ export async function bulkImportCustomers(
       .eq('is_active', true)
       .maybeSingle();
     journeyId = journey?.id ?? null;
-    console.log(`[CSV Import] autoSend=${autoSend}, journeyId=${journeyId}`);
   }
   for (const batch of chunks(toQueue, 200)) {
-    console.log(`[CSV Import] Creating messages for batch of ${batch.length}`);
-    const customerIds = batch.map((v) => known.get(v.email)!.id);
     const enrollmentByCustomer = new Map<string, string>();
     if (journeyId) {
       const { data, error } = await supabase
         .from('journey_enrollments')
-        .insert(customerIds.map((customer_id) => ({ journey_id: journeyId!, business_id: business.id, customer_id, current_step: 0 })))
+        .insert(batch.map(([customer_id]) => ({ journey_id: journeyId!, business_id: business.id, customer_id, current_step: 0 })))
         .select('id, customer_id');
       if (error) throw fail(error);
       (data ?? []).forEach((e) => enrollmentByCustomer.set(e.customer_id, e.id));
-      console.log(`[CSV Import] Created ${(data ?? []).length} journey enrollments`);
     }
-    const messagePayload = batch.map((v) => {
-      const customerId = known.get(v.email)!.id;
-      return {
-        business_id: business.id,
-        customer_id: customerId,
-        purpose: 'review_request',
-        channel: 'email' as const,
-        status: autoSend ? ('pending' as const) : ('queued' as const),
-        send_at: (autoSend ? reviewSendTime(v.date) : new Date()).toISOString(),
-        journey_enrollment_id: enrollmentByCustomer.get(customerId) ?? null,
-        visit_id: visitIdByKey.get(`${customerId}|${v.serviceId}|${v.date}`) ?? null,
-      };
-    });
-    
-    console.log(`[CSV Import] First message payload:`, JSON.stringify(messagePayload[0]));
-    
+    const messagePayload = batch.map(([customerId, v]) => ({
+      business_id: business.id,
+      customer_id: customerId,
+      purpose: 'review_request',
+      channel: 'email' as const,
+      status: autoSend ? ('pending' as const) : ('queued' as const),
+      send_at: (autoSend ? reviewSendTime(v.date) : new Date()).toISOString(),
+      journey_enrollment_id: enrollmentByCustomer.get(customerId) ?? null,
+      visit_id: visitIdByKey.get(`${customerId}|${v.serviceId}|${v.date}`) ?? null,
+    }));
     const { error } = await supabase.from('messages').insert(messagePayload);
-    if (error) {
-      console.error('[CSV Import] ❌ ERROR inserting messages:', {
-        message: error.message,
-        code: (error as any).code,
-        details: (error as any).details,
-        hint: (error as any).hint,
-        status: (error as any).status,
-      });
-      console.error('[CSV Import] Failed payload:', JSON.stringify(messagePayload[0], null, 2));
-      throw fail(error);
-    }
-    console.log(`[CSV Import] Inserted ${batch.length} review request messages`);
+    if (error) throw fail(error);
   }
-  console.log(`[CSV Import] Complete: queued=${toQueue.length}`);
 
   results.sort((x, y) => x.row - y.row);
+  const count = (status: BulkImportRowResult['status']) => results.filter((r) => r.status === status).length;
   return {
     totalRows: rows.length,
-    created: accepted.length,
-    duplicates: results.filter((r) => r.status === 'skipped_duplicate').length,
-    errors: results.filter((r) => r.status === 'error').length,
-    newCustomers: newEmails.length,
+    customersCreated: newKeys.length,
+    customersUpdated: changedKeys.length,
+    customersUnchanged: existingKeys.length - changedKeys.length,
+    serviceRecordsAdded: accepted.length,
+    conflicts: count('conflict'),
+    duplicates: count('skipped_duplicate'),
+    errors: count('error'),
     queued: toQueue.length,
     notQueued: latestVisit.size - toQueue.length,
     autoSend,
@@ -491,27 +569,25 @@ export function mapCsvRowsToCustomers(rows: string[][]): { rows: BulkImportRow[]
     'dateofservice',
   ]);
 
-  // Check for required columns only (name, email, date)
-  const missing = [
-    nameIndex === -1 && 'name',
-    emailIndex === -1 && 'email',
-    dateIndex === -1 && 'date',
-  ].filter(Boolean);
+  // Only name and email are required. A service date is optional: a plain customer list can be
+  // imported before any jobs exist, and those customers are added without a service record
+  // (and so without a review request) until a dated service is imported or logged.
+  const missing = [nameIndex === -1 && 'name', emailIndex === -1 && 'email'].filter(Boolean);
 
   if (missing.length > 0) {
     const detectedHeaders = originalHeader.join(', ') || '(empty)';
     return {
       rows: [],
       error: `Missing required column${missing.length > 1 ? 's' : ''}: ${missing.join(', ')}. 
-Required: name, email, date
-Optional: service, phone, amount
+Required: name, email
+Optional: date, service, phone, amount
 
 Your headers: ${detectedHeaders}
 
 Supported aliases:
 - NAME: name, customer, fullname, customername, clientname, client
 - EMAIL: email, emailaddress, e-mail
-- DATE: date, servicedate, datecompleted, completeddate, jobdate, visitdate
+- DATE: date, servicedate, datecompleted, completeddate, jobdate, visitdate (optional)
 - SERVICE: service, servicetype, job, jobtype, description, workcompleted (optional)
 - PHONE: phone, phonenumber, mobile, telephone (optional)
 - AMOUNT: amount, amountspent, value, spend, revenue, price, cost, fee (optional)`,
@@ -520,15 +596,14 @@ Supported aliases:
 
   const cell = (r: string[], i: number) => (i >= 0 ? r[i]?.trim() ?? '' : '');
 
-  let warning: string | undefined;
+  const warnings: string[] = [];
+  if (dateIndex === -1) {
+    warnings.push('No date column detected. These customers will be added without a service record, so no review requests are queued until you import or log a dated service.');
+  } else if (serviceIndex === -1) {
+    warnings.push("No service column detected. Imported customers will use 'General Service'.");
+  }
   const result: BulkImportRow[] = rows.slice(1).map((r) => {
-    let service = cell(r, serviceIndex);
-    if (!service && serviceIndex === -1) {
-      service = 'General Service';
-      warning = "No service column detected. Imported customers will use 'General Service'.";
-    } else if (!service) {
-      service = 'General Service';
-    }
+    const service = cell(r, serviceIndex) || 'General Service';
 
     return {
       name: cell(r, nameIndex),
@@ -540,5 +615,5 @@ Supported aliases:
     };
   });
 
-  return { rows: result, warning };
+  return { rows: result, warning: warnings[0] };
 }

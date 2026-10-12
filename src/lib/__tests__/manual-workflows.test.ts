@@ -401,13 +401,29 @@ describe('Scenario 3: Manual rebooking reminder', () => {
       customers: [
         { id: 'cust-1', name: 'Priya', email: 'priya@example.com', phone: null, unsubscribed_at: null, unsubscribed_sms_at: null },
       ],
-      businesses: [{ id: 'biz-1', name: 'Sparkle Salon', google_review_url: null, subscription_status: 'active' }],
+      businesses: [{ id: 'biz-1', name: 'Sparkle Salon', google_review_url: 'https://g.page/r/sparkle', subscription_status: 'active' }],
     });
 
     const res = await sendQueuedReview(supabase, 'biz-1', 'rb-1');
     expect(res.ok).toBe(true);
     expect(supabase.__db.messages[0].status).toBe('sent');
     expect(supabase.__db.messages[0].sent_at).toBeTruthy();
+    jest.restoreAllMocks();
+  });
+
+  it('holds a review request, without sending or failing it, until the business has a review link', async () => {
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    const supabase = createSupabaseMock({
+      messages: [{ id: 'rb-2', business_id: 'biz-1', customer_id: 'cust-1', purpose: 'review_request', status: 'queued', attempts: 0, journey_enrollment_id: null }],
+      customers: [{ id: 'cust-1', name: 'Priya', email: 'priya@example.com', phone: null, unsubscribed_at: null, unsubscribed_sms_at: null }],
+      businesses: [{ id: 'biz-1', name: 'Sparkle Salon', google_review_url: '', subscription_status: 'active' }],
+    });
+
+    const res = await sendQueuedReview(supabase, 'biz-1', 'rb-2');
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/review link/i);
+    expect(supabase.__db.messages[0].status).toBe('queued'); // still waiting, not failed or cancelled
+    expect(supabase.__db.messages[0].sent_at).toBeUndefined();
     jest.restoreAllMocks();
   });
 });

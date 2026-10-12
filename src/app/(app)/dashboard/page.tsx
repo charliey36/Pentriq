@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { getAuthUser, isAdminEmail, requireBusiness } from '@/lib/business';
+import { getBillingState } from '@/lib/billing';
+import { SETUP_COLLAPSED_COOKIE } from '@/lib/brand';
 import { createClient } from '@/lib/supabase/server';
 import { bucketDaily, splitPeriods } from '@/lib/trends';
 import {
@@ -136,10 +138,12 @@ export default async function DashboardPage() {
   ]);
 
   const hasReviewUrl = Boolean(business.google_review_url);
+  const setupCollapsed = cookies().get(SETUP_COLLAPSED_COOKIE)?.value === '1';
 
   const customerTotal = customersCount.count ?? 0;
-  // Brand-new business: go straight to the one-form setup.
-  if (!hasReviewUrl && customerTotal === 0) redirect('/onboarding');
+  // Setup is recommended, never required: a brand-new business lands on the dashboard (and sees
+  // the setup guide below) instead of being sent to a form, so it can import customers, set up
+  // its review link or just look around first.
   // Requests sent from the Review queue / import pipeline live in `messages`.
   const [queueSent, queuePending] = await Promise.all(
     (['sent', 'pending'] as const).map((status) =>
@@ -168,34 +172,36 @@ export default async function DashboardPage() {
   const clicksTrend = buildTrend(clickTimestamps);
 
   const hasProfile = Boolean(business.name) && business.name !== 'My Business';
+  const trialStarted = getBillingState(business).status !== 'trial_available';
+  // Recommended next steps, in the order most businesses want to do them. None is required.
   const setupSteps: SetupStep[] = [
     {
-      done: hasProfile,
-      title: 'Complete your business profile',
-      description: 'Your business name appears on every review request.',
-      href: '/settings',
-      cta: 'Add name',
+      done: trialStarted,
+      title: 'Start free trial',
+      description: 'Your 14-day trial begins when you start it. No card needed.',
+      href: '/settings/billing',
+      cta: 'Start trial',
     },
     {
-      done: customerTotal > 0,
-      title: 'Add your first customer',
-      description: 'Add them one by one, or import a CSV of existing customers.',
-      href: '/customers?add=1',
-      cta: 'Add customer',
-    },
-    {
-      done: hasReviewUrl,
-      title: 'Configure your review link',
-      description: 'So every review request sends customers to your Google reviews.',
+      done: hasReviewUrl && hasProfile,
+      title: 'Add Google review link',
+      description: 'Add your business name and review link so requests send customers to your Google reviews. Review requests are held until this is done.',
       href: '/settings',
       cta: 'Open settings',
     },
     {
+      done: customerTotal > 0,
+      title: 'Import customers',
+      description: 'Upload a CSV of your existing customers, or add them one by one.',
+      href: '/customers/import',
+      cta: 'Import customers',
+    },
+    {
       done: sent > 0,
-      title: 'Send your first campaign',
-      description: `Requests go out automatically ${business.delay_hours}h after a customer is added.`,
-      href: '/how-it-works',
-      cta: 'See how it works',
+      title: 'Send first review request',
+      description: customerTotal === 0 ? 'Add a customer and send them a request in one quick form.' : 'Pick a customer and send their first request, or let Pentriq send them automatically.',
+      href: customerTotal === 0 ? '/onboarding' : '/customers',
+      cta: customerTotal === 0 ? 'Send first request' : 'Choose a customer',
     },
   ];
   // Persist completion so the onboarding card can be hidden for good.
@@ -353,13 +359,13 @@ export default async function DashboardPage() {
       <div className="reveal" style={{ '--i': 1 } as React.CSSProperties}>
         {!business.onboarding_completed_at && (
           <>
-            {customerTotal === 0 && sent === 0 && (
+            {customerTotal === 0 && sent === 0 && !setupCollapsed && (
               <div className="mb-4">
                 <h2 className="text-lg font-semibold text-ink">Welcome to Pentriq</h2>
-                <p className="text-sm text-ink-3">Complete the onboarding steps below to get started.</p>
+                <p className="text-sm text-ink-3">Here&apos;s what we recommend, in any order. Look around first if you like.</p>
               </div>
             )}
-            <SetupChecklist steps={setupSteps} />
+            <SetupChecklist steps={setupSteps} initiallyCollapsed={setupCollapsed} />
           </>
         )}
       </div>
