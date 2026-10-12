@@ -5,7 +5,7 @@ import { breadcrumbLd, pageMetadata } from '@/lib/seo';
 import { ORG, ORG_LOCATION, SITE_URL } from '@/lib/site';
 
 export const metadata = pageMetadata({
-  title: 'About Pentriq',
+  title: 'About us',
   description: 'Pentriq helps service businesses collect honest Google reviews, hear private feedback and bring customers back. Based in Poole, Dorset, UK.',
   path: '/about',
 });

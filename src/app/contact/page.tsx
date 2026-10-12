@@ -5,7 +5,7 @@ import { breadcrumbLd, pageMetadata } from '@/lib/seo';
 import { ORG, ORG_LOCATION, SITE_URL } from '@/lib/site';
 
 export const metadata = pageMetadata({
-  title: 'Contact Pentriq',
+  title: 'Contact us',
   description: 'Get in touch with the Pentriq team for support, billing questions or feedback. Email hello@pentriq.cloud. Based in Poole, Dorset, UK.',
   path: '/contact',
 });
