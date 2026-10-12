@@ -26,6 +26,8 @@ export type BlogCategory = (typeof BLOG_CATEGORIES)[number];
 
 export type BlogPost = {
   slug: string;
+  /** Shown in the featured sections of the blog index and home page. */
+  featured?: boolean;
   /** On-page H1. */
   title: string;
   /** <title> tag (kept under ~60 characters). */

@@ -5,7 +5,7 @@ import { POSTS } from '@/lib/blog';
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = getAppUrl();
   const now = new Date();
-  const pages: MetadataRoute.Sitemap = ['/', '/login', '/signup', '/privacy', '/terms', '/cookies'].map((path) => ({
+  const pages: MetadataRoute.Sitemap = ['/', '/pricing', '/about', '/contact', '/changelog', '/roadmap', '/login', '/signup', '/privacy', '/terms', '/cookies'].map((path) => ({
     url: `${base}${path === '/' ? '' : path}`,
     lastModified: now,
   }));

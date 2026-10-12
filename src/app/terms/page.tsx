@@ -1,11 +1,12 @@
+import { pageMetadata } from '@/lib/seo';
 import type { Metadata } from 'next';
 import { LegalPage, CONTACT_EMAIL } from '@/components/legal-page';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Terms of Service',
-  description: 'The terms that apply when you use Pentriq.',
-  alternates: { canonical: '/terms' },
-};
+  description: 'The terms that apply when you use Pentriq, including billing, acceptable use and review compliance.',
+  path: '/terms',
+});
 
 export default function TermsPage() {
   return (

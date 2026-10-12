@@ -2,6 +2,7 @@ import type { BlogPost } from '@/lib/blog-types';
 
 export const post: BlogPost = {
   slug: 'how-to-get-more-google-reviews',
+  featured: true,
   title: 'How to Get More Google Reviews for Your Business in 2026',
   seoTitle: 'How to Get More Google Reviews in 2026 | Pentriq',
   seoDescription:
@@ -74,7 +75,7 @@ export const post: BlogPost = {
     {
       t: 'callout',
       title: 'Why Pentriq never gates requests',
-      text: 'Every review request sent through Pentriq includes the public review link and an unconditional private feedback option, never shown or hidden based on predicted sentiment. It is built that way deliberately so that the way you collect reviews stays compliant.',
+      text: 'Every review request sent through [Pentriq](/) includes the public review link and an unconditional private feedback option, never shown or hidden based on predicted sentiment. It is built that way deliberately so that the way you collect reviews stays compliant.',
     },
 
     { t: 'h2', text: 'The best time to ask for a review', id: 'best-time-to-ask' },
@@ -101,7 +102,7 @@ export const post: BlogPost = {
     },
     {
       t: 'p',
-      text: 'Equally important: stop the sequence the moment the customer clicks through or submits feedback. Nothing is more annoying than receiving a “gentle reminder” about a review you have already written. Pentriq’s three-step sequence works exactly this way: initial request, day-three reminder, day-seven final reminder, and it stops automatically as soon as the customer responds.',
+      text: 'Equally important: stop the sequence the moment the customer clicks through or submits feedback. Nothing is more annoying than receiving a “gentle reminder” about a review you have already written. [Pentriq’s three-step sequence](/#how-it-works) works exactly this way: initial request, day-three reminder, day-seven final reminder, and it stops automatically as soon as the customer responds.',
     },
     {
       t: 'h3',
@@ -258,7 +259,7 @@ export const post: BlogPost = {
     },
     {
       t: 'p',
-      text: 'Pentriq does this for you. Review requests are tracked from send to click, reminders stop automatically when a customer responds, and bots and link scanners are filtered out so your numbers are honest. The Reviews Analytics area shows review growth and rating change over time, using snapshots you record or data from a connected Google Business Profile where available. You can see how it works on the [Pentriq features page](/#features).',
+      text: 'Pentriq does this for you. Review requests are tracked from send to click, reminders stop automatically when a customer responds, and bots and link scanners are filtered out so your numbers are honest. The Reviews Analytics area shows review growth and rating change over time, using snapshots you record or data from a connected Google Business Profile where available. You can see how it works on the [Pentriq features page](/#features), and the plan is a single simple price on the [pricing page](/pricing), with a [14-day free trial](/signup) to test it on your own customers.',
     },
 
     { t: 'h2', text: 'Measuring review growth', id: 'measuring-growth' },
@@ -271,7 +272,7 @@ export const post: BlogPost = {
       items: [
         '**Request-to-click rate** = clicks ÷ requests sent. This measures how persuasive your message and timing are.',
         '**Click-to-review rate** = new reviews ÷ clicks. If this is low, the problem is friction after the click, such as a broken link or a sign-in barrier.',
-        '**Review velocity** = new reviews per month. Compare this month with last month and with the same month last year.',
+        '**Review velocity** = new reviews per month. Compare this month with last month and with the same month last year. Not sure what to aim for? See [how many Google reviews a business needs](/blog/how-many-google-reviews-does-a-business-need).',
         '**Rating change** = current average rating minus the average at the end of last month. A small drop deserves attention before it becomes a trend.',
         '**Response rate and response time.** The share of reviews you reply to, and how quickly.',
       ],
@@ -287,7 +288,7 @@ export const post: BlogPost = {
       t: 'ol',
       items: [
         '**Week 1: Fix the foundations.** Verify and complete your Business Profile, find your direct review link, and test it on a phone.',
-        '**Week 2: Write your messages.** Adapt the examples above into an initial request and two short reminders in your own voice.',
+        '**Week 2: Write your messages.** Adapt the examples above (or our longer set of [review request templates](/blog/google-review-request-templates)) into an initial request and two short reminders in your own voice.',
         '**Week 3: Start asking consistently.** Add a request step to every completed job, appointment or order, and place a QR code where customers can see it.',
         '**Week 4: Review and refine.** Check your click and review rates, reply to every review you have received, and adjust timing for the next month.',
       ],

@@ -1,11 +1,12 @@
+import { pageMetadata } from '@/lib/seo';
 import type { Metadata } from 'next';
 import { LegalPage, CONTACT_EMAIL } from '@/components/legal-page';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Privacy Policy',
-  description: 'How Pentriq collects, uses and protects your data.',
-  alternates: { canonical: '/privacy' },
-};
+  description: 'How Pentriq collects, uses and protects your data, including customer information you upload.',
+  path: '/privacy',
+});
 
 export default function PrivacyPage() {
   return (

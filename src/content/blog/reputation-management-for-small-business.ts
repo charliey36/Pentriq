@@ -2,6 +2,7 @@ import type { BlogPost } from '@/lib/blog-types';
 
 export const post: BlogPost = {
   slug: 'reputation-management-for-small-business',
+  featured: true,
   title: 'Reputation Management for Small Businesses: A Practical Guide',
   seoTitle: 'Reputation Management for Small Business | Pentriq',
   seoDescription:
@@ -93,7 +94,7 @@ export const post: BlogPost = {
     },
     {
       t: 'p',
-      text: 'It is the trend line that tells you the most. A rating that slips from 4.7 to 4.5 over three months is a signal to investigate, long before the average looks alarming. Pentriq’s Reviews Analytics keeps this history for you: review count and rating over time, the change since the end of last month, and in-app alerts for things like new one-star reviews or an average rating that falls below your chosen threshold.',
+      text: 'It is the trend line that tells you the most. A rating that slips from 4.7 to 4.5 over three months is a signal to investigate, long before the average looks alarming. [Pentriq’s Reviews Analytics](/#features) keeps this history for you: review count and rating over time, the change since the end of last month, and in-app alerts for things like new one-star reviews or an average rating that falls below your chosen threshold.',
     },
 
     { t: 'h2', text: 'Responding to reviews', id: 'responding' },
@@ -219,7 +220,7 @@ export const post: BlogPost = {
     },
     {
       t: 'p',
-      text: 'You can assemble these in a spreadsheet, but it takes discipline. Pentriq brings click tracking, a request-to-review funnel, review growth and rating change into one dashboard, so you spend your time acting on the data instead of collecting it. See the [feature overview](/#features) for what is included.',
+      text: 'You can assemble these in a spreadsheet, but it takes discipline. [Pentriq](/) brings click tracking, a request-to-review funnel, review growth and rating change into one dashboard, so you spend your time acting on the data instead of collecting it. You can [try it free for 14 days](/signup). See the [feature overview](/#features) for what is included, and the [pricing](/pricing) for the single plan.',
     },
 
     { t: 'h2', text: 'Building a long-term reputation strategy', id: 'long-term-strategy' },
@@ -267,7 +268,7 @@ export const post: BlogPost = {
     },
     {
       t: 'p',
-      text: 'Reputation management is not about spin. It is about listening to customers, answering them honestly, and getting a little better every month. Do that consistently and the public record of your business will start to reflect the quality you already deliver.',
+      text: 'Choosing a tool? Read our [buyer’s guide to reputation management software](/blog/best-reputation-management-software-for-small-businesses), and for the toughest replies see [how to respond to negative Google reviews](/blog/how-to-respond-to-negative-google-reviews). Reputation management is not about spin. It is about listening to customers, answering them honestly, and getting a little better every month. Do that consistently and the public record of your business will start to reflect the quality you already deliver.',
     },
   ],
 };

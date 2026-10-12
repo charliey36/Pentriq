@@ -1,4 +1,9 @@
 import type { Metadata } from 'next';
+import { SiteHeader } from '@/components/marketing/site-header';
+import { SiteFooter } from '@/components/marketing/site-footer';
+import { pageMetadata } from '@/lib/seo';
+import { APP_DESCRIPTION, APP_TITLE } from '@/lib/brand';
+import { featuredPosts } from '@/lib/blog';
 import Link from 'next/link';
 import { LegalLinks } from '@/components/legal-links';
 import { redirect } from 'next/navigation';
@@ -9,9 +14,12 @@ import { Icon, type IconName } from '@/components/ui/icons';
 import { toneStyle, type Tone } from '@/components/ui/tones';
 import { ProductPreview } from '@/components/marketing/product-preview';
 
-export const metadata: Metadata = {
-  alternates: { canonical: '/' },
-};
+export const metadata: Metadata = pageMetadata({
+  title: APP_TITLE,
+  description: APP_DESCRIPTION,
+  path: '/',
+  absoluteTitle: true,
+});
 
 const features: { title: string; description: string; icon: IconName; tone: Tone }[] = [
   {
@@ -122,40 +130,7 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen overflow-x-clip">
-      <header className="glass sticky top-0 z-30 border-b border-line/80">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/" aria-label="Pentriq home" className="rounded-md">
-            <Logo />
-          </Link>
-
-          <nav aria-label="Primary" className="hidden items-center gap-1 md:flex">
-            {[
-              ['Features', '#features'],
-              ['How it works', '#how-it-works'],
-              ['Compliance', '#compliance'],
-              ['Blog', '/blog'],
-            ].map(([label, href]) => (
-              <a
-                key={href}
-                href={href}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-ink-3 transition-colors hover:bg-surface-muted/70 hover:text-ink"
-              >
-                {label}
-              </a>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-1.5">
-            <ThemeToggleButton />
-            <Link href="/login" className="btn btn-ghost btn-sm">
-              Log in
-            </Link>
-            <Link href="/signup" className="btn btn-primary btn-sm">
-              Get started
-            </Link>
-          </div>
-        </div>
-      </header>
+      <SiteHeader />
 
       <main>
         {/* Hero */}
@@ -341,6 +316,27 @@ export default async function HomePage() {
           </div>
         </section>
 
+        {/* From the blog */}
+        <section aria-labelledby="home-blog" className="border-t border-line px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
+          <div className="mx-auto max-w-6xl">
+            <SectionHeading eyebrow="From the blog" title="Guides to grow your reputation" description="Practical, policy-safe advice on Google reviews, your Business Profile and customer feedback." />
+            <ul id="home-blog" className="mt-12 grid gap-5 md:grid-cols-3">
+              {featuredPosts(3).map((p) => (
+                <li key={p.slug}>
+                  <Link href={`/blog/${p.slug}`} className="card card-interactive block h-full p-6">
+                    <span className="eyebrow text-brand-700 dark:text-brand-400">{p.category}</span>
+                    <span className="mt-3 block text-lg font-semibold tracking-[-0.02em] text-ink">{p.title}</span>
+                    <span className="mt-2 block text-sm leading-6 text-ink-3">{p.excerpt}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-8 text-center">
+              <Link href="/blog" className="btn btn-secondary btn-md">Read all articles</Link>
+            </p>
+          </div>
+        </section>
+
         {/* Final CTA */}
         <section className="px-4 pb-20 sm:px-6 sm:pb-28 lg:px-8">
           <div
@@ -379,21 +375,7 @@ export default async function HomePage() {
         </section>
       </main>
 
-      <footer className="border-t border-line bg-surface/70 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-8 sm:flex-row sm:px-6 lg:px-8">
-          <Logo />
-          <p className="text-[13px] text-ink-3">&copy; {new Date().getFullYear()} Pentriq. All rights reserved.</p>
-          <nav aria-label="Footer" className="flex items-center gap-5 text-[13px] font-medium text-ink-3">
-            <Link href="/login" className="transition-colors hover:text-ink">
-              Log in
-            </Link>
-            <Link href="/signup" className="transition-colors hover:text-ink">
-              Sign up
-            </Link>
-          </nav>
-          <LegalLinks />
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

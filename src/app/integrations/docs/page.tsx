@@ -1,10 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { pageMetadata } from '@/lib/seo';
 import { Logo } from '@/components/logo';
 import { LegalLinks } from '@/components/legal-links';
 import { getAppUrl } from '@/lib/brand';
 
-export const metadata: Metadata = { title: 'Integration docs' };
+export const metadata: Metadata = pageMetadata({
+  title: 'Integration docs',
+  description: 'Send customers and visits into Pentriq from your booking or CRM tools with the Pentriq integration API.',
+  path: '/integrations/docs',
+});
 
 const Code = ({ children }: { children: string }) => (
   <pre className="mt-3 overflow-x-auto rounded-lg bg-surface-muted p-4 text-xs leading-5 text-ink-2">{children}</pre>

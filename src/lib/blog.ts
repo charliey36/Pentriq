@@ -1,24 +1,34 @@
 import type { BlogPost } from '@/lib/blog-types';
-import { DEFAULT_APP_URL } from '@/lib/brand';
+import { SITE_URL } from '@/lib/site';
 import { post as getMoreReviews } from '@/content/blog/how-to-get-more-google-reviews';
 import { post as profileGuide } from '@/content/blog/google-business-profile-guide';
 import { post as reputation } from '@/content/blog/reputation-management-for-small-business';
+import { post as respondNegative } from '@/content/blog/how-to-respond-to-negative-google-reviews';
+import { post as templates } from '@/content/blog/google-review-request-templates';
+import { post as verification } from '@/content/blog/google-business-profile-verification-guide';
+import { post as howMany } from '@/content/blog/how-many-google-reviews-does-a-business-need';
+import { post as software } from '@/content/blog/best-reputation-management-software-for-small-businesses';
 
-/** Canonical origin for every blog URL and structured-data field. */
-export const SITE_URL = DEFAULT_APP_URL;
+export { SITE_URL };
 
 /** Newest first. Add new articles here. */
-export const POSTS: BlogPost[] = [getMoreReviews, profileGuide, reputation].sort((a, b) =>
-  b.datePublished.localeCompare(a.datePublished)
+export const POSTS: BlogPost[] = [getMoreReviews, profileGuide, reputation, respondNegative, templates, verification, howMany, software].sort(
+  (a, b) => b.datePublished.localeCompare(a.datePublished) || Number(!!b.featured) - Number(!!a.featured)
 );
 
 export const getPost = (slug: string) => POSTS.find((p) => p.slug === slug);
 
 export const postUrl = (slug: string) => `${SITE_URL}/blog/${slug}`;
 
-export function relatedPosts(post: BlogPost): BlogPost[] {
-  return post.related.map(getPost).filter((p): p is BlogPost => Boolean(p));
+/** Curated related posts first, then same-category posts, then the newest others (3 total). */
+export function relatedPosts(post: BlogPost, limit = 3): BlogPost[] {
+  const picked = post.related.map(getPost).filter((p): p is BlogPost => Boolean(p));
+  const rest = POSTS.filter((p) => p.slug !== post.slug && !picked.includes(p));
+  rest.sort((a, b) => Number(b.category === post.category) - Number(a.category === post.category));
+  return [...picked, ...rest].slice(0, limit);
 }
+
+export const featuredPosts = (limit = 3) => POSTS.filter((p) => p.featured).slice(0, limit);
 
 /** Plain text of an article body (markup stripped) for word counts. */
 export function plainText(post: BlogPost): string {

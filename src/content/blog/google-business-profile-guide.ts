@@ -2,6 +2,7 @@ import type { BlogPost } from '@/lib/blog-types';
 
 export const post: BlogPost = {
   slug: 'google-business-profile-guide',
+  featured: true,
   title: 'The Complete Google Business Profile Guide for Small Businesses',
   seoTitle: 'Google Business Profile Guide for Small Business | Pentriq',
   seoDescription:
@@ -266,7 +267,7 @@ export const post: BlogPost = {
     },
     {
       t: 'p',
-      text: 'Alongside Google’s own data, track your review count and average rating over time. A slow decline in rating or a long gap since your last review is an early warning that deserves attention. Tools like [Pentriq’s Reviews Analytics](/#features) record review count and rating over time, show rating change compared with the end of last month, and highlight review velocity, so trends are obvious at a glance rather than buried in a spreadsheet.',
+      text: 'Alongside Google’s own data (and [Pentriq’s dashboard](/#features), which also tracks request clicks), track your review count and average rating over time. A slow decline in rating or a long gap since your last review is an early warning that deserves attention. Tools like [Pentriq’s Reviews Analytics](/#features) record review count and rating over time, show rating change compared with the end of last month, and highlight review velocity, so trends are obvious at a glance rather than buried in a spreadsheet.',
     },
 
     { t: 'h2', text: 'A monthly maintenance checklist', id: 'checklist' },
@@ -284,7 +285,7 @@ export const post: BlogPost = {
     },
     {
       t: 'p',
-      text: 'A Google Business Profile is not a set-and-forget asset. The businesses that benefit most are those that treat it as a living shop window: accurate, current and full of genuine evidence that customers are happy. Spend an hour setting it up properly, ten minutes a week keeping it fresh, and let a consistent review process do the rest.',
+      text: 'A Google Business Profile is not a set-and-forget asset. The businesses that benefit most are those that treat it as a living shop window: accurate, current and full of genuine evidence that customers are happy. Not yet verified? Our [verification guide](/blog/google-business-profile-verification-guide) walks through every method. Spend an hour setting it up properly, ten minutes a week keeping it fresh, and let a consistent review process do the rest. Pentriq’s [single plan](/pricing) is built for exactly that routine, and you can [start a free trial](/signup) to try it.',
     },
   ],
 };

@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { JsonLd } from '@/components/json-ld';
 import { BlogShell } from '@/components/blog/blog-shell';
 import { ArticleBody, headingsOf } from '@/components/blog/article-body';
 import { Badge } from '@/components/ui/badge';
+import { articleLd, breadcrumbLd } from '@/lib/seo';
 import { POSTS, SITE_URL, formatDate, getPost, postUrl, readingMinutes, relatedPosts, wordCount } from '@/lib/blog';
 
 type Props = { params: { slug: string } };
@@ -47,48 +49,29 @@ export default function BlogPostPage({ params }: Props) {
 
   const url = postUrl(post.slug);
   const headings = headingsOf(post.body);
-  const related = relatedPosts(post);
+  const related = relatedPosts(post, 3);
 
   const jsonLd = [
-    {
-      '@context': 'https://schema.org',
-      '@type': 'BlogPosting',
-      '@id': `${url}#article`,
-      mainEntityOfPage: { '@type': 'WebPage', '@id': url },
-      headline: post.title,
+    articleLd({
+      url,
+      title: post.title,
       description: post.seoDescription,
-      image: [`${url}/opengraph-image`],
       datePublished: post.datePublished,
       dateModified: post.dateModified,
-      articleSection: post.category,
-      keywords: post.keywords.join(', '),
+      section: post.category,
+      keywords: post.keywords,
       wordCount: wordCount(post),
-      inLanguage: 'en-GB',
-      author: { '@type': 'Organization', name: 'The Pentriq Team', url: SITE_URL },
-      publisher: {
-        '@type': 'Organization',
-        name: 'Pentriq',
-        url: SITE_URL,
-        logo: { '@type': 'ImageObject', url: `${SITE_URL}/email-assets/logo-mark.png` },
-      },
-    },
-    {
-      '@context': 'https://schema.org',
-      '@type': 'BreadcrumbList',
-      itemListElement: [
-        { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
-        { '@type': 'ListItem', position: 2, name: 'Blog', item: `${SITE_URL}/blog` },
-        { '@type': 'ListItem', position: 3, name: post.title, item: url },
-      ],
-    },
+    }),
+    breadcrumbLd([
+      { name: 'Home', url: SITE_URL },
+      { name: 'Blog', url: `${SITE_URL}/blog` },
+      { name: post.title, url },
+    ]),
   ];
 
   return (
     <BlogShell>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
-      />
+      <JsonLd data={jsonLd} />
 
       <article>
         <header className="border-b border-line bg-surface/60">
@@ -175,7 +158,7 @@ export default function BlogPostPage({ params }: Props) {
           {related.length > 0 && (
             <section aria-label="Keep reading" className="mt-12">
               <h2 className="text-lg font-semibold text-ink">Keep reading</h2>
-              <ul className="mt-3 grid gap-4 sm:grid-cols-2">
+              <ul className="mt-3 grid gap-4 sm:grid-cols-3">
                 {related.map((r) => (
                   <li key={r.slug}>
                     <Link href={`/blog/${r.slug}`} className="card card-interactive block h-full p-5">

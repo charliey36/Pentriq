@@ -1,14 +1,15 @@
+import { pageMetadata } from '@/lib/seo';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { AuthForm } from '@/components/auth-form';
 import { Notice } from '@/components/ui/notice';
 import { AuthShell } from '@/components/auth-shell';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Log in',
   description: 'Log in to Pentriq to manage review requests, rebooking reminders and customer feedback.',
-  alternates: { canonical: '/login' },
-};
+  path: '/login',
+});
 
 export default function LoginPage({ searchParams }: { searchParams: { reset?: string } }) {
   return (

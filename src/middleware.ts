@@ -56,7 +56,7 @@ export async function middleware(request: NextRequest) {
     pathname === '/sitemap.xml' ||
     pathname.startsWith('/email-assets/') ||
     pathname.startsWith('/auth/callback');
-  const isPublicPage = pathname === '/blog' || pathname.startsWith('/blog/') || pathname.startsWith('/feedback/') || pathname.startsWith('/book/') || pathname === '/r' || pathname.startsWith('/r/') || pathname === '/review-unavailable' || ['/privacy', '/terms', '/cookies'].includes(pathname);
+  const isPublicPage = pathname === '/blog' || pathname.startsWith('/blog/') || pathname.startsWith('/feedback/') || pathname.startsWith('/book/') || pathname === '/r' || pathname.startsWith('/r/') || pathname === '/review-unavailable' || ['/privacy', '/terms', '/cookies', '/about', '/contact', '/pricing', '/changelog', '/roadmap'].includes(pathname);
 
   if (!user && !isAuthPage && !isPublicApiRoute && !isPublicPage && pathname !== '/') {
     const redirectUrl = new URL('/login', request.url);

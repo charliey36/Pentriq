@@ -31,6 +31,7 @@ export default function BlogPage() {
     date: p.datePublished,
     minutes: readingMinutes(p),
     keywords: p.keywords,
+    featured: p.featured,
   }));
 
   const jsonLd = {

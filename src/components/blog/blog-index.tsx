@@ -13,6 +13,7 @@ export type BlogCardData = {
   date: string;
   minutes: number;
   keywords: string[];
+  featured?: boolean;
 };
 
 const ALL = 'All' as const;
@@ -62,7 +63,10 @@ export function BlogIndex({ posts }: { posts: BlogCardData[] }) {
     });
   }, [posts, query, category]);
 
-  const [featured, ...rest] = posts;
+  const featuredAll = posts.filter((p) => p.featured);
+  const [featured, ...moreFeatured] = featuredAll.length ? featuredAll : posts.slice(0, 1);
+  const shown = new Set([featured, ...moreFeatured].filter(Boolean).map((p) => p.slug));
+  const rest = posts.filter((p) => !shown.has(p.slug));
   const counts = useMemo(
     () => Object.fromEntries(BLOG_CATEGORIES.map((c) => [c, posts.filter((p) => p.category === c).length])),
     [posts]
@@ -73,6 +77,21 @@ export function BlogIndex({ posts }: { posts: BlogCardData[] }) {
       {!filtering && featured && (
         <section aria-label="Featured article" className="mb-10">
           <Card post={featured} featured />
+        </section>
+      )}
+
+      {!filtering && moreFeatured.length > 0 && (
+        <section aria-labelledby="featured-guides" className="mb-12">
+          <h2 id="featured-guides" className="text-lg font-semibold text-ink">Featured guides</h2>
+          <ul className="mt-4 grid gap-5 md:grid-cols-2">
+            {moreFeatured.map((p) => (
+              <li key={p.slug} className="flex">
+                <div className="flex w-full">
+                  <Card post={p} />
+                </div>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
@@ -116,12 +135,12 @@ export function BlogIndex({ posts }: { posts: BlogCardData[] }) {
       </div>
 
       <p className="mt-6 text-sm text-ink-4" aria-live="polite">
-        {filtering ? `${results.length} article${results.length === 1 ? '' : 's'} found` : 'All articles'}
+        {filtering ? `${results.length} article${results.length === 1 ? '' : 's'} found` : 'More articles'}
       </p>
 
-      {results.length > 0 ? (
+      {(filtering ? results : rest).length > 0 ? (
         <ul className="mt-3 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {(filtering ? results : rest.length ? rest : results).map((p) => (
+          {(filtering ? results : rest).map((p) => (
             <li key={p.slug} className="flex">
               <div className="flex w-full">
                 <Card post={p} />

@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { Logo } from '@/components/logo';
-import { LegalLinks } from '@/components/legal-links';
+import { ORG } from '@/lib/site';
+import { SiteFooter } from '@/components/marketing/site-footer';
 
-export const CONTACT_EMAIL = 'charlieyoults123@gmail.com'; // TODO: replace with your real address
+export const CONTACT_EMAIL = ORG.email;
 
 /** Static legal page frame. Content is placeholder text: have it reviewed before launch. */
 export function LegalPage({
@@ -29,12 +30,7 @@ export function LegalPage({
           </section>
         ))}
       </main>
-      <footer className="border-t border-line">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-6">
-          <p className="text-[13px] text-ink-3">&copy; {new Date().getFullYear()} Pentriq</p>
-          <LegalLinks />
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

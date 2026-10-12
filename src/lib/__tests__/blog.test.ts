@@ -3,12 +3,8 @@ import { POSTS, SITE_URL, getPost, postUrl, wordCount } from '@/lib/blog';
 import { BLOG_CATEGORIES } from '@/lib/blog-types';
 
 describe('blog content', () => {
-  it('has the three launch articles with unique slugs', () => {
-    expect(POSTS.map((p) => p.slug).sort()).toEqual([
-      'google-business-profile-guide',
-      'how-to-get-more-google-reviews',
-      'reputation-management-for-small-business',
-    ]);
+  it('has eight articles with unique slugs', () => {
+    expect(POSTS).toHaveLength(8);
     expect(new Set(POSTS.map((p) => p.slug)).size).toBe(POSTS.length);
   });
 
@@ -31,9 +27,11 @@ describe('blog content', () => {
 
   it('links every article to Pentriq and to another article', () => {
     for (const p of POSTS) {
-      const text = JSON.stringify(p.body);
+      const text = JSON.stringify(p.body) + p.cta.href;
       expect(text).toMatch(/\]\(\/blog\//);
       expect(text).toMatch(/\]\(\/#features\)/);
+      expect(text).toMatch(/\]\(\/pricing\)/);
+      expect(text).toMatch(/\]\(\/signup\)|\/signup$/);
     }
   });
 });

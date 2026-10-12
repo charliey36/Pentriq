@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { AuthShell } from '@/components/auth-shell';
 import { ResetPasswordForm } from '@/components/password-reset-forms';
 
-export const metadata: Metadata = { title: 'Set new password' };
+export const metadata: Metadata = { title: 'Set new password', robots: { index: false, follow: false } };
 
 export default function ResetPasswordPage() {
   return (

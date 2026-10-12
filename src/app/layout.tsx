@@ -3,6 +3,8 @@ import localFont from 'next/font/local';
 import './globals.css';
 import { ThemeProvider, THEME_BOOTSTRAP_SCRIPT } from '@/components/theme-context';
 import { SpotlightProvider } from '@/components/spotlight';
+import { JsonLd } from '@/components/json-ld';
+import { organizationLd, websiteLd } from '@/lib/seo';
 import { APP_DESCRIPTION, APP_NAME, APP_TITLE, getAppUrl } from '@/lib/brand';
 
 /* Inter (variable, latin subset, SIL OFL) is self-hosted so there is no
@@ -57,6 +59,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
       </head>
       <body>
+        <JsonLd data={[organizationLd(), websiteLd()]} />
         <ThemeProvider>
           <SpotlightProvider />
           {children}
