@@ -17,6 +17,7 @@ const inter = localFont({
 export const metadata: Metadata = {
   metadataBase: new URL(getAppUrl()),
   alternates: { canonical: '/' },
+  verification: { google: 'YOflWQv8bKlrDezkUcS4FPJm-KO-M39FJGtVnTgo5_0' },
   title: {
     default: APP_TITLE,
     template: `%s · ${APP_NAME}`,
