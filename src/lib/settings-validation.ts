@@ -7,6 +7,7 @@
  *   rebooking_reminder_interval_days, rebooking_reminders_enabled
  */
 import { isSafeHttpUrl } from '@/lib/email-templates/review-destinations';
+import { validateBookingUrl } from '@/lib/booking-url';
 
 export const SETTINGS_LIMITS = {
   nameMaxLength: 120,
@@ -21,6 +22,7 @@ export type SettingsValues = {
   review_request_window_days: number;
   rebooking_reminder_interval_days: number;
   rebooking_reminders_enabled: boolean;
+  booking_url: string | null;
 };
 
 export type SettingsParseResult =
@@ -56,6 +58,10 @@ export function parseSettingsForm(formData: FormData): SettingsParseResult {
     }
   }
 
+  const bookingUrl = String(formData.get('booking_url') ?? '').trim();
+  const bookingError = validateBookingUrl(bookingUrl);
+  if (bookingError) return { ok: false, field: 'booking_url', error: bookingError };
+
   const { reviewWindowDays: w, rebookingIntervalDays: r } = SETTINGS_LIMITS;
   const windowDays = parseDays(formData.get('review_request_window_days'), w.min, w.max);
   if (windowDays === null) {
@@ -83,6 +89,7 @@ export function parseSettingsForm(formData: FormData): SettingsParseResult {
       review_request_window_days: windowDays,
       rebooking_reminder_interval_days: rebookDays,
       rebooking_reminders_enabled: formData.get('rebooking_reminders_enabled') === 'on',
+      booking_url: bookingUrl || null,
     },
   };
 }

@@ -1,4 +1,5 @@
 import type { ErrorEvent } from '@sentry/nextjs';
+import { isExpectedEmailValidationError } from '@/lib/test-email';
 
 /**
  * Shared Sentry options for the server, edge and browser runtimes.
@@ -13,8 +14,18 @@ export const sentryOptions = (dsn: string | undefined) => ({
   tracesSampleRate: 0,
   // Never attach IPs, cookies or request bodies (customer names/emails flow through forms).
   sendDefaultPii: false,
-  beforeSend: scrub,
+  beforeSend: filterAndScrub,
 });
+
+/** Drops known, expected errors (Resend test-domain rejections); scrubs everything else. */
+export function filterAndScrub(event: ErrorEvent): ErrorEvent | null {
+  const messages = [
+    event.message,
+    ...(event.exception?.values ?? []).map((v) => v.value),
+  ];
+  if (messages.some((m) => isExpectedEmailValidationError(m))) return null;
+  return scrub(event);
+}
 
 /** Strip query strings (cron endpoints accept ?secret=…) and any cookies/body that slipped in. */
 export function scrub(event: ErrorEvent): ErrorEvent {

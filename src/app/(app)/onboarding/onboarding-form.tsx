@@ -6,7 +6,7 @@ import { SubmitButton } from '@/components/ui/submit-button';
 import { completeOnboarding, type OnboardingResult } from './actions';
 import { CONSENT_FIELD, CONSENT_LABEL } from '@/lib/consent';
 
-export function OnboardingForm({ defaultName, defaultUrl }: { defaultName: string; defaultUrl: string }) {
+export function OnboardingForm({ defaultName, defaultUrl, defaultBookingUrl = '' }: { defaultName: string; defaultUrl: string; defaultBookingUrl?: string }) {
   const [state, formAction] = useFormState<OnboardingResult, FormData>(completeOnboarding, {});
   return (
     <form action={formAction} className="card mt-6 space-y-5 p-6">
@@ -20,6 +20,11 @@ export function OnboardingForm({ defaultName, defaultUrl }: { defaultName: strin
         <p className="mt-1.5 text-xs text-ink-4">
           Find it in Google Business Profile → “Get more reviews” → copy link.
         </p>
+      </div>
+      <div>
+        <label htmlFor="booking_url" className="label">Booking URL <span className="font-normal text-ink-4">(optional)</span></label>
+        <input id="booking_url" name="booking_url" type="url" defaultValue={defaultBookingUrl} className="input mt-1.5" placeholder="https://business.com/book" />
+        <p className="mt-1.5 text-xs text-ink-4">The page customers should be directed to when booking appointments.</p>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>

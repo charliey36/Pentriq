@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/database.types';
 import { advanceJourneyEnrollment } from '@/lib/journeys';
 import { renderMessage } from '@/lib/templates';
+import { rebookingLink } from '@/lib/booking-url';
 import { resolveChannel, sendMessage } from '@/lib/messaging';
 import { isDemoCustomer, simulateDemoEmailSend } from '@/lib/demo-mode';
 import { senderDisplayName, getAppUrl } from '@/lib/brand';
@@ -80,7 +81,7 @@ export async function sendQueuedReview(
       publicReviewUrl: business.google_review_url ? buildTrackingUrl(appUrl, message, { source: 'review-queue', kind: 'message' }) : undefined,
       privateFeedbackUrl: `${appUrl}/feedback/${message.id}`,
       unsubscribeUrl: `${appUrl}/api/unsubscribe/${customer.id}`,
-      rebookingUrl: `${appUrl}/book/${customer.id}`,
+      rebookingUrl: rebookingLink(business, customer.id, appUrl),
     });
     
     console.log(`[Send Review] Message rendered, subject: "${rendered.subject}"`);

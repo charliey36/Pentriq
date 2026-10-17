@@ -3,6 +3,7 @@ import { isCronAuthorized } from '@/lib/cron-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendMessage, resolveChannel } from '@/lib/messaging';
 import { renderMessage } from '@/lib/templates';
+import { rebookingLink } from '@/lib/booking-url';
 import { advanceJourneyEnrollment } from '@/lib/journeys';
 import { senderDisplayName, getAppUrl } from '@/lib/brand';
 import { buildTrackingUrl } from '@/lib/click-tracking';
@@ -137,7 +138,7 @@ export async function GET(request: NextRequest) {
         publicReviewUrl: trackingUrl,
         privateFeedbackUrl,
         unsubscribeUrl,
-        rebookingUrl: `${appUrl}/book/${customer.id}`,
+        rebookingUrl: rebookingLink(business, customer.id, appUrl),
       });
 
       await sendMessage(

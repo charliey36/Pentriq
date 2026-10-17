@@ -19,6 +19,7 @@
 import { Resend } from 'resend';
 import { escapeHtml } from '@/lib/html';
 import { transformResendError } from '@/lib/email-sandbox';
+import { isBlockedTestEmail, TEST_EMAIL_ERROR_MESSAGE } from '@/lib/test-email';
 
 export type MessageChannel = 'email' | 'sms' | 'whatsapp';
 
@@ -44,6 +45,12 @@ function getResendClient() {
 async function sendEmail(params: SendMessageParams, fromLabel: string) {
   if (!params.to.email) {
     throw new MessageSendError('Cannot send an email message: no email address on file.');
+  }
+
+  // Reserved testing domains are always rejected by Resend; skip the call (still logged locally).
+  if (isBlockedTestEmail(params.to.email)) {
+    console.warn(`[Email Send] Blocked testing domain, not sending to ${params.to.email}`);
+    throw new MessageSendError(TEST_EMAIL_ERROR_MESSAGE);
   }
 
   const resend = getResendClient();

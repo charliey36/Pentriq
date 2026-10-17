@@ -107,7 +107,7 @@ export function renderMessage(
         const button = ctx.rebookingUrl
           ? `<div style="text-align: center; margin: 32px 0;">
               <a href="${ctx.rebookingUrl}" style="background-color: #4f46e5; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-size: 15px; font-weight: 600; display: inline-block;">
-                Book my next visit
+                Book Your Next Appointment
               </a>
             </div>`
           : '';

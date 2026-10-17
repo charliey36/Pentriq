@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { requireBusiness } from '@/lib/business';
 import { enrollCustomerInJourney } from '@/lib/journeys';
 import { CONSENT_REQUIRED_MESSAGE, hasConsent } from '@/lib/consent';
+import { validateBookingUrl } from '@/lib/booking-url';
 
 export type OnboardingResult = { error?: string };
 
@@ -19,6 +20,7 @@ export async function completeOnboarding(_prev: OnboardingResult, fd: FormData):
   const name = String(fd.get('name') ?? '').trim();
   const url = String(fd.get('google_review_url') ?? '').trim();
   const customerName = String(fd.get('customer_name') ?? '').trim();
+  const bookingUrl = String(fd.get('booking_url') ?? '').trim();
   const customerEmail = String(fd.get('customer_email') ?? '').trim().toLowerCase();
 
   if (!name) return { error: 'Enter your business name.' };
@@ -29,12 +31,14 @@ export async function completeOnboarding(_prev: OnboardingResult, fd: FormData):
     return { error: 'Paste your full Google review link (starting with https://).' };
   }
   if (!customerName) return { error: 'Enter your customer’s name.' };
+  const bookingError = validateBookingUrl(bookingUrl);
+  if (bookingError) return { error: bookingError };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) return { error: 'Enter a valid customer email.' };
   if (!hasConsent(fd)) return { error: CONSENT_REQUIRED_MESSAGE };
 
   const { error: bizError } = await supabase
     .from('businesses')
-    .update({ name, google_review_url: url })
+    .update({ name, google_review_url: url, booking_url: bookingUrl || null, ...(bookingUrl ? { booking_url_updated_at: new Date().toISOString() } : {}) })
     .eq('id', business.id);
   if (bizError) return { error: `Could not save your business: ${bizError.message}` };
 

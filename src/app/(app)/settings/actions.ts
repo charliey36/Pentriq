@@ -27,7 +27,12 @@ export async function saveSettings(
     // otherwise look like a successful save.
     const { data, error } = await supabase
       .from('businesses')
-      .update(parsed.values)
+      .update({
+        ...parsed.values,
+        ...((parsed.values.booking_url ?? null) !== (business.booking_url ?? null)
+          ? { booking_url_updated_at: new Date().toISOString() }
+          : {}),
+      })
       .eq('id', business.id)
       .select('id');
 

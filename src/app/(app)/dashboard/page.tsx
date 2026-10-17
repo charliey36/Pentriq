@@ -19,6 +19,7 @@ import { StatCard, type StatTrend } from '@/components/ui/stat-card';
 import { SectionCard } from '@/components/ui/section-card';
 import { Badge, requestStatusTone } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
+import { Notice } from '@/components/ui/notice';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon, type IconName } from '@/components/ui/icons';
 import { CountUp } from '@/components/ui/count-up';
@@ -355,6 +356,14 @@ export default async function DashboardPage() {
           </div>
         </div>
       </section>
+
+      {!business.booking_url && (
+        <Notice variant="warning">
+          Add your booking link so customers can book directly from rebooking emails. Rebooking emails are less effective
+          without one.{' '}
+          <Link href="/settings" className="font-medium underline">Add Booking URL</Link>
+        </Notice>
+      )}
 
       <div className="reveal" style={{ '--i': 1 } as React.CSSProperties}>
         {!business.onboarding_completed_at && (

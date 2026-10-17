@@ -25,7 +25,7 @@ export default async function OnboardingPage() {
           <BillingButton action={claimTrial as (p: BillingResult, f: FormData) => Promise<BillingResult>} label="Start my 14-day free trial" />
         </div>
       )}
-      <OnboardingForm defaultName={business.name === 'My Business' ? '' : business.name} defaultUrl={business.google_review_url} />
+      <OnboardingForm defaultName={business.name === 'My Business' ? '' : business.name} defaultUrl={business.google_review_url} defaultBookingUrl={business.booking_url ?? ''} />
 
       <div className="mt-6 flex flex-col items-center gap-2 border-t border-line pt-6 text-center">
         <Link href="/dashboard" className="btn btn-secondary">

@@ -33,6 +33,8 @@ export type Database = {
           review_request_window_days: number;
           rebooking_reminder_interval_days: number;
           rebooking_reminders_enabled: boolean;
+          booking_url: string | null;
+          booking_url_updated_at: string | null;
           onboarding_completed_at: string | null;
           welcome_email_sent_at: string | null;
           campaign_email_sent_at: string | null;
@@ -64,6 +66,8 @@ export type Database = {
           review_request_window_days?: number;
           rebooking_reminder_interval_days?: number;
           rebooking_reminders_enabled?: boolean;
+          booking_url?: string | null;
+          booking_url_updated_at?: string | null;
           onboarding_completed_at?: string | null;
           welcome_email_sent_at?: string | null;
           campaign_email_sent_at?: string | null;

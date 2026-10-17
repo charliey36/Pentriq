@@ -61,6 +61,46 @@ export function SettingsForm({ business }: { business: Business }) {
       </SectionCard>
 
       <SectionCard
+        title="Booking URL"
+        description="The page customers should be directed to when booking appointments."
+      >
+        <div className="max-w-lg space-y-3">
+          <p className="text-sm font-medium text-ink">
+            {business.booking_url ? '✅ Booking URL configured' : '⚠ Booking URL missing'}
+          </p>
+          {!business.booking_url && (
+            <Notice variant="warning">Add your booking link so customers can book directly from rebooking emails.</Notice>
+          )}
+          <div>
+            <label htmlFor="booking_url" className="label">
+              Booking URL <span className="font-normal text-ink-4">(recommended)</span>
+            </label>
+            <input
+              id="booking_url"
+              name="booking_url"
+              type="url"
+              defaultValue={business.booking_url ?? ''}
+              className="input mt-1.5"
+              placeholder="https://business.com/book"
+            />
+            <p className="field-hint">
+              e.g. https://business.com/book, https://booking.squareup.com/..., https://bookings.gettimely.com/...,
+              https://business.cliniko.com/bookings
+            </p>
+          </div>
+          {business.booking_url && (
+            <dl className="text-[13px] text-ink-3">
+              <div>Current: <span className="break-all text-ink-2">{business.booking_url}</span></div>
+              <div>Validation: ✅ Valid web address</div>
+              {business.booking_url_updated_at && (
+                <div>Last updated: {new Date(business.booking_url_updated_at).toLocaleDateString('en-GB')}</div>
+              )}
+            </dl>
+          )}
+        </div>
+      </SectionCard>
+
+      <SectionCard
         title="Service timing"
         description="Review requests are emailed the day after a service, and all customer emails go out between 9am and 12pm UK time."
       >

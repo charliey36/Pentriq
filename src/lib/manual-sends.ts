@@ -27,6 +27,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/database.types';
 import { resolveChannel, sendMessage } from '@/lib/messaging';
 import { renderMessage } from '@/lib/templates';
+import { rebookingLink } from '@/lib/booking-url';
 import { sendQueuedReview } from '@/lib/review-queue';
 import { extractReviewSchedulingLogic, isDuplicateReviewRequest } from '@/lib/review-scheduling';
 import { isDemoCustomer, simulateDemoEmailSend } from '@/lib/demo-mode';
@@ -172,7 +173,7 @@ export async function sendManualRebookingReminderFor(
     const rendered = renderMessage('rebooking_reminder', channel, {
       businessName: business.name,
       customerName: customer.name,
-      rebookingUrl: `${appUrl}/book/${customer.id}`,
+      rebookingUrl: rebookingLink(business, customer.id, appUrl),
       unsubscribeUrl: `${appUrl}/api/unsubscribe/${customer.id}`,
     });
 

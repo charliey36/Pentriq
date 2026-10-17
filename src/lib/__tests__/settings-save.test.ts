@@ -66,6 +66,7 @@ describe('parseSettingsForm (invalid values)', () => {
         review_request_window_days: 14,
         rebooking_reminder_interval_days: 90,
         rebooking_reminders_enabled: true,
+        booking_url: null,
       },
     });
   });
@@ -138,6 +139,7 @@ describe('saveSettings action', () => {
       review_request_window_days: 21,
       rebooking_reminder_interval_days: 120,
       rebooking_reminders_enabled: false,
+      booking_url: null,
     });
     expect(revalidatePathMock).toHaveBeenCalledWith('/settings');
   });
