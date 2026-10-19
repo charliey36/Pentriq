@@ -38,6 +38,26 @@ export async function deleteAccount(_prev: DeleteAccountResult, fd: FormData): P
     return { error: `Type ${DELETE_CONFIRMATION} to confirm.` };
   }
 
+  const password = String(fd.get('password') ?? '');
+  if (!password) {
+    return { error: 'Enter your current password to continue.' };
+  }
+  if (!user.email) {
+    return { error: 'We could not verify your account password. Please contact support.' };
+  }
+
+  // Re-authenticate immediately before the destructive operation. This uses
+  // Supabase Auth rather than trusting the existing session alone, so a
+  // stale browser session cannot delete the account without the password.
+  const authClient = createClient();
+  const { error: passwordError } = await authClient.auth.signInWithPassword({
+    email: user.email,
+    password,
+  });
+  if (passwordError) {
+    return { error: 'Your password could not be verified. Nothing was deleted.' };
+  }
+
   const admin = createAdminClient();
 
   // 1. Stop billing.

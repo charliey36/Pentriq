@@ -19,7 +19,26 @@ export function DeleteAccountForm() {
       <label htmlFor="confirm" className="label">
         Type {DELETE_CONFIRMATION} to confirm
       </label>
-      <input id="confirm" name="confirm" autoComplete="off" required className="input max-w-xs" placeholder={DELETE_CONFIRMATION} />
+      <input
+        id="confirm"
+        name="confirm"
+        autoComplete="off"
+        required
+        className="input max-w-xs"
+        placeholder={DELETE_CONFIRMATION}
+      />
+      <label htmlFor="password" className="label">
+        Enter your current password
+      </label>
+      <input
+        id="password"
+        name="password"
+        type="password"
+        autoComplete="current-password"
+        required
+        className="input max-w-xs"
+        placeholder="Your current password"
+      />
       {state.error && <Notice variant="error">{state.error}</Notice>}
       <SubmitButton pendingText="Deleting…" variant="secondary" className="text-red-700 dark:text-red-400">
         Delete my account
