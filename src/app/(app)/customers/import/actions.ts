@@ -5,9 +5,40 @@ import { createClient } from '@/lib/supabase/server';
 import { requireBusiness } from '@/lib/business';
 import { bulkImportCustomers, mapCsvRowsToCustomers, parseCsv } from '@/lib/customers';
 import type { BulkImportSummary } from '@/lib/customers';
+import { analyzeCsvMapping, CSV_IMPORT_FIELDS, type CsvConfirmedMapping, type CsvMappingAnalysis } from '@/lib/csv-import-mapping';
 import { CONSENT_REQUIRED_MESSAGE, hasConsent } from '@/lib/consent';
 
 export type ImportCustomersResult = { error?: string; summary?: BulkImportSummary };
+export type AnalyzeImportResult = { error?: string; mapping?: CsvMappingAnalysis };
+
+async function readCsvFile(formData: FormData): Promise<{ rows?: string[][]; error?: string }> {
+  const file = formData.get('file');
+  if (!(file instanceof File) || file.size === 0) return { error: 'Choose a CSV file to upload.' };
+  if (file.size > MAX_FILE_BYTES) return { error: 'File is too large (max 2MB).' };
+  if (!file.name.toLowerCase().endsWith('.csv') && file.type !== 'text/csv') return { error: 'Please upload a .csv file.' };
+  const rows = parseCsv(await file.text());
+  if (rows.length > MAX_ROWS + 1) return { error: `This file has ${rows.length - 1} rows; the limit is ${MAX_ROWS} per import.` };
+  return { rows };
+}
+
+export async function analyzeCsv(_prev: AnalyzeImportResult, formData: FormData): Promise<AnalyzeImportResult> {
+  await requireBusiness();
+  const parsed = await readCsvFile(formData);
+  if (parsed.error) return { error: parsed.error };
+  const analysis = analyzeCsvMapping(parsed.rows!);
+  return 'error' in analysis ? { error: analysis.error } : { mapping: analysis };
+}
+
+function confirmedMapping(formData: FormData): CsvConfirmedMapping | undefined {
+  const fields = [...CSV_IMPORT_FIELDS, 'firstName', 'lastName'] as const;
+  const values = Object.fromEntries(
+    fields.map((field) => [field, String(formData.get(`mapping_${field}`) ?? '')])
+  );
+  if (!Object.values(values).some(Boolean)) return undefined;
+  return Object.fromEntries(
+    fields.filter((field) => values[field] !== '' && /^\d+$/.test(values[field])).map((field) => [field, Number(values[field])])
+  ) as CsvConfirmedMapping;
+}
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024; // 2MB is generous for a name/email CSV
 const MAX_ROWS = 2000;
@@ -19,23 +50,17 @@ export async function importCustomers(
   const business = await requireBusiness();
   const supabase = createClient();
 
-  const file = formData.get('file');
-
-  if (!(file instanceof File) || file.size === 0) {
-    return { error: 'Choose a CSV file to upload.' };
+  const parsedFile = await readCsvFile(formData);
+  if (parsedFile.error) return { error: parsedFile.error };
+  const parsedRows = parsedFile.rows!;
+  const selectedMapping = confirmedMapping(formData);
+  if (selectedMapping && selectedMapping.name === selectedMapping.email) {
+    return { error: 'Name and email must use different CSV columns.' };
   }
-
-  if (file.size > MAX_FILE_BYTES) {
-    return { error: 'File is too large (max 2MB).' };
+  if (selectedMapping && selectedMapping.firstName !== undefined && selectedMapping.firstName === selectedMapping.lastName) {
+    return { error: 'First name and last name must use different CSV columns.' };
   }
-
-  if (!file.name.toLowerCase().endsWith('.csv') && file.type !== 'text/csv') {
-    return { error: 'Please upload a .csv file.' };
-  }
-
-  const content = await file.text();
-  const parsedRows = parseCsv(content);
-  const { rows, error: mapError, warning: mapWarning } = mapCsvRowsToCustomers(parsedRows);
+  const { rows, error: mapError, warning: mapWarning } = mapCsvRowsToCustomers(parsedRows, selectedMapping);
 
   if (mapError) {
     return { error: mapError };

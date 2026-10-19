@@ -55,7 +55,7 @@ describe('GET /api/google-business/callback', () => {
 
     expect(location(res)).toBe('?google=select');
     const [row] = admin.rows('google_business_connections');
-    expect(row).toMatchObject({ business_id: 'biz-1', google_account_id: '111', google_location_id: null, status: 'pending_location' });
+    expect(row).toMatchObject({ business_id: 'biz-1', google_account_id: '111', google_account_name: 'Salon', google_location_id: null, status: 'pending_location' });
     // Tokens are encrypted at rest, never plaintext.
     expect(row.access_token).not.toContain('plain-access');
     expect(row.refresh_token).not.toContain('plain-refresh');

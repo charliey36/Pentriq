@@ -110,6 +110,7 @@ export type Database = {
           id: string;
           business_id: string;
           google_account_id: string;
+          google_account_name: string | null;
           google_location_id: string | null;
           location_name: string | null;
           /** AES-256-GCM encrypted (see lib/google-token-crypto.ts). */
@@ -130,6 +131,7 @@ export type Database = {
           id?: string;
           business_id: string;
           google_account_id: string;
+          google_account_name?: string | null;
           google_location_id?: string | null;
           location_name?: string | null;
           access_token: string;
@@ -145,6 +147,7 @@ export type Database = {
         };
         Update: {
           google_account_id?: string;
+          google_account_name?: string | null;
           google_location_id?: string | null;
           location_name?: string | null;
           access_token?: string;

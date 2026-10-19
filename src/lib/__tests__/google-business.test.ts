@@ -1,4 +1,4 @@
-import { buildAuthUrl, getGoogleConfig, GoogleApiError, idFromResource, normalizeReview } from '../google-business';
+import { buildAuthUrl, getGoogleConfig, GoogleApiError, idFromResource, listLocations, normalizeReview } from '../google-business';
 
 describe('normalizeReview', () => {
   it('maps a Google v4 review resource to our row shape', () => {
@@ -48,6 +48,39 @@ describe('normalizeReview', () => {
     expect(normalizeReview({ starRating: 'FIVE', createTime: '2026-10-01T10:00:00Z' })).toBeNull();
     expect(normalizeReview({ reviewId: 'a', starRating: 'STAR_RATING_UNSPECIFIED', createTime: '2026-10-01T10:00:00Z' })).toBeNull();
     expect(normalizeReview({ reviewId: 'a', starRating: 'FIVE' })).toBeNull();
+  });
+});
+
+describe('location review URL', () => {
+  it('returns Google metadata.newReviewUri for a selectable location', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          locations: [
+            {
+              name: 'accounts/123/locations/456',
+              title: 'Acme Coffee',
+              storefrontAddress: { addressLines: ['1 High Street'], locality: 'London', postalCode: 'SW1A 1AA' },
+              metadata: { newReviewUri: 'https://g.page/r/acme/review' },
+            },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    );
+
+    await expect(listLocations('access-token', '123', 'Acme Account')).resolves.toEqual([
+      {
+        accountId: '123',
+        accountName: 'Acme Account',
+        locationId: '456',
+        title: 'Acme Coffee',
+        address: '1 High Street, London, SW1A 1AA',
+        reviewUrl: 'https://g.page/r/acme/review',
+      },
+    ]);
+    expect(fetchMock.mock.calls[0][0]).toContain('readMask=name%2Ctitle%2CstorefrontAddress%2Cmetadata.newReviewUri');
+    fetchMock.mockRestore();
   });
 });
 

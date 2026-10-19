@@ -9,6 +9,7 @@ export type PublicGoogleConnection = Pick<
   GoogleBusinessConnection,
   | 'id'
   | 'status'
+  | 'google_account_name'
   | 'google_location_id'
   | 'location_name'
   | 'rating_alert_threshold'
@@ -19,7 +20,7 @@ export type PublicGoogleConnection = Pick<
 >;
 
 const PUBLIC_COLUMNS =
-  'id, status, google_location_id, location_name, rating_alert_threshold, initial_sync_done, last_sync_error, connected_at, last_sync_at';
+  'id, status, google_account_name, google_location_id, location_name, rating_alert_threshold, initial_sync_done, last_sync_error, connected_at, last_sync_at';
 
 /** Server-only: reads via the service role (the table has no RLS policies). */
 export async function getPublicConnection(businessId: string): Promise<PublicGoogleConnection | null> {

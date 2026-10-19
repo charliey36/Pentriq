@@ -5,7 +5,8 @@ import { useFormState } from 'react-dom';
 import { Icon } from '@/components/ui/icons';
 import { Notice } from '@/components/ui/notice';
 import { SubmitButton } from '@/components/ui/submit-button';
-import { importCustomers, type ImportCustomersResult } from './actions';
+import { analyzeCsv, importCustomers, type AnalyzeImportResult, type ImportCustomersResult } from './actions';
+import { CSV_IMPORT_FIELDS } from '@/lib/csv-import-mapping';
 import { CONSENT_FIELD, CONSENT_LABEL } from '@/lib/consent';
 
 const resultTones: Record<string, string> = {
@@ -31,15 +32,13 @@ const isNotable = (r: ImportCustomersResultRow) => r.status === 'conflict' || r.
 type ImportCustomersResultRow = NonNullable<ImportCustomersResult['summary']>['results'][number];
 
 export function ImportCustomersForm() {
-  const [state, formAction] = useFormState<ImportCustomersResult, FormData>(
-    importCustomers,
-    {}
-  );
+  const [analysisState, analyzeAction] = useFormState<AnalyzeImportResult, FormData>(analyzeCsv, {});
+  const [state, importAction] = useFormState<ImportCustomersResult, FormData>(importCustomers, {});
   const [fileName, setFileName] = useState<string | null>(null);
 
   return (
     <div>
-      <form action={formAction} className="space-y-5">
+      <form action={analyzeAction} className="space-y-5">
         {/* The real file input is stretched invisibly over the drop zone, so
             clicking, keyboard focus and native drag-and-drop all just work. */}
         <div className="relative">
@@ -66,20 +65,60 @@ export function ImportCustomersForm() {
         </div>
 
         <div className="rounded-xl bg-surface-subtle p-4 text-[13px] leading-6 text-ink-3 ring-1 ring-inset ring-line">
-          <p className="font-medium text-ink-2">Your file needs these columns in the first row:</p>
-          <pre className="mt-2 overflow-x-auto font-mono text-[12px] text-ink-2">{`name,email,service,date
-John Smith,john@gmail.com,Boiler Repair,2026-10-08
-Jane Smith,jane@gmail.com,Leak Repair,2026-10-08`}</pre>
+          <p className="font-medium text-ink-2">Pentriq will detect these fields from your headers and sample values:</p>
+          <pre className="mt-2 overflow-x-auto font-mono text-[12px] text-ink-2">{`Name, Email, Date, Service, Phone, Amount`}</pre>
           <p className="mt-2">
-            Dates can be 2026-10-08 or 08/10/2026. Optional columns: <code className="font-mono">phone</code>,{' '}
-            <code className="font-mono">amount</code>. Customers are matched on email address or phone number (never name): a match updates
-            that customer and adds the new service to their history. If an email and a phone number belong to two different customers, the row is
-            held back for you to review. Uploading the same file twice is safe.{' '}
-            <a href="/pentriq-customer-template.csv" download className="font-medium text-brand-700 underline dark:text-brand-300">
-              Download sample CSV
-            </a>
+            Common exports from Vagaro, Booksy, Fresha, Square and similar systems are supported. Review and adjust the detected mappings before importing. Required fields are <code className="font-mono">Name</code> and <code className="font-mono">Email</code>; the others are optional. Existing customers matched by email receive another visit instead of a duplicate record.{' '}
+            <a href="/pentriq-customer-template.csv" download className="font-medium text-brand-700 underline dark:text-brand-300">Download sample CSV</a>
           </p>
         </div>
+        {analysisState.error && <Notice variant="error">{analysisState.error}</Notice>}
+
+        {analysisState.mapping && (
+          <div className="rounded-xl border border-line bg-surface-subtle p-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="font-medium text-ink-2">Review detected mappings</p>
+              <span className="text-xs text-ink-3">Local header + sample analysis — no data leaves Pentriq</span>
+            </div>
+            {analysisState.mapping!.nameParts.firstName !== null && analysisState.mapping!.nameParts.lastName !== null && (
+              <div className="mb-3 grid gap-3 rounded-lg border border-brand-500/20 bg-brand-500/5 p-3 sm:grid-cols-2">
+                <label className="text-sm text-ink-2">
+                  <span className="font-medium text-ink">First name *</span>
+                  <select name="mapping_firstName" defaultValue={analysisState.mapping!.nameParts.firstName} className="input mt-1.5">
+                    {analysisState.mapping!.headers.map((header, index) => <option key={`first-${index}`} value={index}>{header}</option>)}
+                  </select>
+                </label>
+                <label className="text-sm text-ink-2">
+                  <span className="font-medium text-ink">Last name *</span>
+                  <select name="mapping_lastName" defaultValue={analysisState.mapping!.nameParts.lastName} className="input mt-1.5">
+                    {analysisState.mapping!.headers.map((header, index) => <option key={`last-${index}`} value={index}>{header}</option>)}
+                  </select>
+                </label>
+              </div>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2">
+              {CSV_IMPORT_FIELDS.map((field) => {
+                const detected = analysisState.mapping!.mappings[field];
+                const required = field === 'name' || field === 'email';
+                return (
+                  <label key={field} className="text-sm text-ink-2">
+                    <span className="font-medium capitalize text-ink">{field}{required ? ' *' : ''} <span className={`text-xs font-normal ${detected.confidence === 'low' || detected.confidence === 'none' ? 'text-amber-700 dark:text-amber-300' : 'text-ink-3'}`}>({detected.confidenceScore}%)</span></span>
+                    <select name={`mapping_${field}`} defaultValue={detected.columnIndex ?? ''} className="input mt-1.5">
+                      {field === 'name' && analysisState.mapping!.nameParts.firstName !== null && <option value="">Use first + last name</option>}
+                      {!required && <option value="">Not mapped</option>}
+                      {analysisState.mapping!.headers.map((header, index) => (
+                        <option key={`${field}-${index}`} value={index}>{header}</option>
+                      ))}
+                    </select>
+                    <span className="mt-1 block truncate text-xs text-ink-3">
+                      {detected.samples.length > 0 ? `Sample: ${detected.samples.join(' · ')}` : 'No sample detected'}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <label className="flex items-start gap-3 text-sm text-ink-2">
           <input type="checkbox" name="auto_send" defaultChecked className="mt-1 h-4 w-4 rounded border-line-strong" />
@@ -96,9 +135,18 @@ Jane Smith,jane@gmail.com,Leak Repair,2026-10-08`}</pre>
           <span>{CONSENT_LABEL}</span>
         </label>
 
-        <SubmitButton pendingText="Importing… this can take a few seconds" icon={<Icon name="upload" className="h-4 w-4" />}>
-          Import customers
-        </SubmitButton>
+        <div className="flex flex-wrap items-center gap-3">
+          {!analysisState.mapping ? (
+            <SubmitButton pendingText="Analysing CSV…" icon={<Icon name="upload" className="h-4 w-4" />}>
+              Analyse CSV
+            </SubmitButton>
+          ) : (
+            <>
+              <button type="submit" formAction={analyzeAction} className="btn btn-secondary">Analyse again</button>
+              <button type="submit" formAction={importAction} className="btn btn-primary">Confirm and import customers</button>
+            </>
+          )}
+        </div>
       </form>
 
       {state.error && <Notice variant="error" className="mt-5">{state.error}</Notice>}

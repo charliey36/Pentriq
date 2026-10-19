@@ -176,9 +176,11 @@ export async function GET(request: NextRequest) {
     }
 
     const keepLocation = Boolean(existing?.google_location_id);
+    const selectedAccount = accounts.find((a) => a.accountId === (keepLocation ? existing!.google_account_id : accounts[0].accountId)) ?? accounts[0];
     const row = {
       business_id: business.id,
-      google_account_id: keepLocation ? existing!.google_account_id : accounts[0].accountId,
+      google_account_id: keepLocation ? existing!.google_account_id : selectedAccount.accountId,
+      google_account_name: keepLocation ? (selectedAccount.accountName ?? existing!.google_account_name ?? null) : selectedAccount.accountName,
       google_location_id: keepLocation ? existing!.google_location_id : null,
       location_name: keepLocation ? existing!.location_name : null,
       access_token: encryptToken(tokens.accessToken),

@@ -60,6 +60,7 @@ export async function selectGoogleLocation(value: string): Promise<ActionResult>
     .from('google_business_connections')
     .update({
       google_account_id: accountId,
+      google_account_name: chosen.accountName,
       google_location_id: locationId,
       location_name: chosen.title,
       status: 'active',
@@ -71,6 +72,14 @@ export async function selectGoogleLocation(value: string): Promise<ActionResult>
     .select('*')
     .single();
   if (updateError || !updated) return { ok: false, message: 'Could not save the location. Please try again.' };
+
+  if (!business.google_review_url?.trim() && chosen.reviewUrl) {
+    const { error: reviewUrlError } = await admin
+      .from('businesses')
+      .update({ google_review_url: chosen.reviewUrl })
+      .eq('id', business.id);
+    if (reviewUrlError) return { ok: false, message: 'Location connected, but the Google review link could not be saved.' };
+  }
 
   await setSource(admin, business.id, 'google', 'Google Business Profile', true);
   await admin.from('google_business_locations').upsert(

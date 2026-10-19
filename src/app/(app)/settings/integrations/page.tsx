@@ -64,6 +64,17 @@ export default async function IntegrationsPage({
             : 'active';
   let googleLocations: Awaited<ReturnType<typeof listAllLocations>> = [];
   let googleLocationsError: string | null = null;
+  let googleStats: { totalReviews: number; averageRating: number } | null = null;
+  if (googleConnection?.status === 'active') {
+    const { data: latestStats } = await createAdminClient()
+      .from('review_metrics_daily')
+      .select('total_reviews, average_rating')
+      .eq('business_id', business.id)
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (latestStats) googleStats = { totalReviews: latestStats.total_reviews, averageRating: Number(latestStats.average_rating) };
+  }
   if (googleState === 'select') {
     try {
       const conn = await getConnectionWithTokens(business.id);
@@ -124,6 +135,7 @@ export default async function IntegrationsPage({
               connection={googleConnection}
               locations={googleLocations}
               locationsError={googleLocationsError}
+              reviewStats={googleStats}
             />
           )}
         </SectionCard>

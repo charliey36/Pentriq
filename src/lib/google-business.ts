@@ -1,4 +1,5 @@
 import { getAppUrl } from '@/lib/brand';
+import { isSafeHttpUrl } from '@/lib/email-templates/review-destinations';
 
 /**
  * Thin, dependency-free client for the Google Business Profile APIs and the
@@ -256,6 +257,7 @@ export type GoogleLocationOption = {
   locationId: string;
   title: string;
   address: string | null;
+  reviewUrl: string | null;
 };
 
 /** "accounts/123" -> "123" (also accepts a bare id). */
@@ -285,6 +287,7 @@ type RawLocation = {
   name: string;
   title?: string;
   storefrontAddress?: { addressLines?: string[]; locality?: string; postalCode?: string };
+  metadata?: { newReviewUri?: string };
 };
 
 function formatAddress(a: RawLocation['storefrontAddress']): string | null {
@@ -297,7 +300,7 @@ export async function listLocations(accessToken: string, accountId: string, acco
   const out: GoogleLocationOption[] = [];
   let pageToken = '';
   do {
-    const qs = new URLSearchParams({ readMask: 'name,title,storefrontAddress', pageSize: '100' });
+    const qs = new URLSearchParams({ readMask: 'name,title,storefrontAddress,metadata.newReviewUri', pageSize: '100' });
     if (pageToken) qs.set('pageToken', pageToken);
     const json = await googleFetch<{ locations?: RawLocation[]; nextPageToken?: string }>(
       `${BUSINESS_INFO_URL}/accounts/${encodeURIComponent(accountId)}/locations?${qs}`,
@@ -310,6 +313,7 @@ export async function listLocations(accessToken: string, accountId: string, acco
         locationId: idFromResource(l.name),
         title: l.title ?? 'Untitled location',
         address: formatAddress(l.storefrontAddress),
+        reviewUrl: isSafeHttpUrl(l.metadata?.newReviewUri) ? l.metadata!.newReviewUri!.trim() : null,
       });
     }
     pageToken = json.nextPageToken ?? '';

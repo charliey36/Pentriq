@@ -4,6 +4,7 @@ import { reviewSendTime } from '@/lib/send-window';
 import { daysSinceService, parseAmount, parseServiceDate } from '@/lib/eligibility';
 import { normalizePhone } from '@/lib/phone';
 import { resolveImportIdentities, type MatchedBy } from '@/lib/import-identity';
+import type { CsvConfirmedMapping, CsvImportField } from '@/lib/csv-import-mapping';
 
 type Db = SupabaseClient<Database>;
 
@@ -492,13 +493,11 @@ export function parseCsv(content: string): string[][] {
 }
 
 /**
- * Maps parsed CSV rows to import rows using intelligent header matching.
- * - Required columns: name, email, date
- * - Service is optional (defaults to "General Service" if missing)
- * - Supports common aliases from business software exports (Jobber, ServiceM8, Tradify, etc.)
- * - Case-insensitive and treats spaces/underscores/hyphens as identical
+ * Maps parsed CSV rows into Pentriq's customer fields. Name and email are required;
+ * date, service, phone and amount are optional. Confirmed mappings from the
+ * local header/sample analysis take precedence over aliases.
  */
-export function mapCsvRowsToCustomers(rows: string[][]): { rows: BulkImportRow[]; error?: string; warning?: string } {
+export function mapCsvRowsToCustomers(rows: string[][], confirmedMapping?: CsvConfirmedMapping): { rows: BulkImportRow[]; error?: string; warning?: string } {
   if (rows.length === 0) return { rows: [], error: 'The file is empty.' };
 
   // Normalize header: lowercase and remove spaces/underscores/hyphens for matching
@@ -506,25 +505,36 @@ export function mapCsvRowsToCustomers(rows: string[][]): { rows: BulkImportRow[]
   const normalizedHeader = originalHeader.map((h) => h.trim().toLowerCase().replace(/[\s_-]/g, ''));
 
   // Find column indices using comprehensive alias lists
-  const find = (aliases: string[]): number => normalizedHeader.findIndex((h) => aliases.includes(h));
+  const find = (field: CsvImportField, aliases: string[]): number => confirmedMapping?.[field] ?? normalizedHeader.findIndex((h) => aliases.includes(h));
 
-  const nameIndex = find([
+  const nameIndex = find('name', [
     'name',
     'fullname',
     'customername',
     'customer',
     'clientname',
+    'contactname',
+    'guestname',
+    'membername',
+    'username',
+    'patientname',
+    'leadname',
+    'consumername',
+    'accountname',
     'client',
   ]);
+  const findNamePart = (aliases: string[]) => normalizedHeader.findIndex((header) => aliases.includes(header));
+  const firstNameIndex = confirmedMapping?.firstName ?? (nameIndex === -1 ? findNamePart(['firstname', 'givenname', 'forename', 'christianname', 'first']) : -1);
+  const lastNameIndex = confirmedMapping?.lastName ?? (nameIndex === -1 ? findNamePart(['lastname', 'surname', 'familyname', 'secondname', 'last', 'family']) : -1);
 
-  const emailIndex = find([
+  const emailIndex = find('email', [
     'email',
     'emailaddress',
     'emailaddr',
     'e-mail',
   ]);
 
-  const phoneIndex = find([
+  const phoneIndex = find('phone', [
     'phone',
     'phonenumber',
     'phoneno',
@@ -533,7 +543,7 @@ export function mapCsvRowsToCustomers(rows: string[][]): { rows: BulkImportRow[]
     'tel',
   ]);
 
-  const amountIndex = find([
+  const amountIndex = find('amount', [
     'amount',
     'amountspent',
     'value',
@@ -545,7 +555,7 @@ export function mapCsvRowsToCustomers(rows: string[][]): { rows: BulkImportRow[]
     'total',
   ]);
 
-  const serviceIndex = find([
+  const serviceIndex = find('service', [
     'service',
     'servicetype',
     'servicename',
@@ -558,7 +568,7 @@ export function mapCsvRowsToCustomers(rows: string[][]): { rows: BulkImportRow[]
     'workcompleted',
   ]);
 
-  const dateIndex = find([
+  const dateIndex = find('date', [
     'date',
     'servicedate',
     'datecompleted',
@@ -572,7 +582,8 @@ export function mapCsvRowsToCustomers(rows: string[][]): { rows: BulkImportRow[]
   // Only name and email are required. A service date is optional: a plain customer list can be
   // imported before any jobs exist, and those customers are added without a service record
   // (and so without a review request) until a dated service is imported or logged.
-  const missing = [nameIndex === -1 && 'name', emailIndex === -1 && 'email'].filter(Boolean);
+  const hasName = nameIndex >= 0 || (firstNameIndex >= 0 && lastNameIndex >= 0);
+  const missing = [!hasName && 'name', emailIndex === -1 && 'email'].filter(Boolean);
 
   if (missing.length > 0) {
     const detectedHeaders = originalHeader.join(', ') || '(empty)';
@@ -604,9 +615,11 @@ Supported aliases:
   }
   const result: BulkImportRow[] = rows.slice(1).map((r) => {
     const service = cell(r, serviceIndex) || 'General Service';
+    const fullName = cell(r, nameIndex);
+    const name = fullName || [cell(r, firstNameIndex), cell(r, lastNameIndex)].filter(Boolean).join(' ');
 
     return {
-      name: cell(r, nameIndex),
+      name,
       email: cell(r, emailIndex),
       phone: cell(r, phoneIndex) || null,
       amountSpent: cell(r, amountIndex) || null,

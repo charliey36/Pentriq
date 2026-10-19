@@ -35,11 +35,13 @@ export function GooglePanel({
   connection,
   locations,
   locationsError,
+  reviewStats,
 }: {
   state: GooglePanelState;
   connection: PublicGoogleConnection | null;
   locations: GoogleLocationOption[];
   locationsError: string | null;
+  reviewStats: { totalReviews: number; averageRating: number } | null;
 }) {
   const [result, setResult] = useState<ActionResult | null>(null);
   const [pending, start] = useTransition();
@@ -161,6 +163,7 @@ export function GooglePanel({
             Connected{connection?.location_name ? ` to ${connection.location_name}` : ''}
           </p>
           <p className="mt-1 text-xs text-ink-3">
+            {connection?.google_account_name ? `Account: ${connection.google_account_name} · ` : ''}
             {connection?.last_sync_at ? `Last synced ${formatUKDateTime(new Date(connection.last_sync_at))}` : 'Not synced yet'} &middot;
             syncs automatically once a day, or use Sync now
           </p>
@@ -169,6 +172,19 @@ export function GooglePanel({
           View Reviews Analytics
         </Link>
       </div>
+
+      {reviewStats && (
+        <div className="grid max-w-sm grid-cols-2 gap-3">
+          <div className="rounded-xl border border-line bg-surface-subtle px-3 py-2">
+            <p className="text-xs text-ink-3">Total reviews</p>
+            <p className="mt-0.5 text-lg font-semibold text-ink">{reviewStats.totalReviews.toLocaleString('en-GB')}</p>
+          </div>
+          <div className="rounded-xl border border-line bg-surface-subtle px-3 py-2">
+            <p className="text-xs text-ink-3">Average rating</p>
+            <p className="mt-0.5 text-lg font-semibold text-ink">{reviewStats.averageRating.toFixed(1)}★</p>
+          </div>
+        </div>
+      )}
 
       {connection?.last_sync_error && <Notice variant="warning">Last sync problem: {connection.last_sync_error}</Notice>}
 

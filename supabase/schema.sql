@@ -697,6 +697,7 @@ create table if not exists public.google_business_connections (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null unique references public.businesses (id) on delete cascade,
   google_account_id text not null,          -- numeric id from "accounts/{id}"
+  google_account_name text,
   google_location_id text,                  -- numeric id from "locations/{id}"; null until a location is chosen
   location_name text,
   access_token text not null,               -- encrypted ("v1:iv:tag:ciphertext")
