@@ -19,7 +19,7 @@ export default async function ImportCustomersPage() {
         title="Import customers"
         icon="upload"
         tone="sky"
-        description="Export your jobs from Excel, Google Sheets, ServiceM8, Jobber or Tradify, upload the file here, then review requests go out the day after each job, between 9am and 12pm."
+        description="Export your jobs from Excel, Google Sheets, ServiceM8, Jobber or Tradify, upload the file here, then review requests are sent automatically at 8:00am the day after each completed service."
       />
 
       <SectionCard>

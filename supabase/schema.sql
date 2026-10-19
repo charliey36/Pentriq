@@ -645,8 +645,8 @@ alter table public.businesses
 -- Service dates + review settings (see migrations/0007)
 alter table public.customers add column if not exists last_service_date date;
 alter table public.businesses
-  add column if not exists review_request_window_days integer not null default 14,
-  add column if not exists rebooking_reminder_interval_days integer not null default 90;
+  add column if not exists review_request_window_days integer not null default 1,
+  add column if not exists rebooking_reminder_interval_days integer not null default 30;
 
 -- Integrations (see migrations/0008)
 alter table public.customers

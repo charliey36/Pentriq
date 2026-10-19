@@ -103,7 +103,7 @@ export default async function CustomersPage({
         tone="sky"
         description={`${rows.length.toLocaleString('en-US')} ${
           rows.length === 1 ? 'customer' : 'customers'
-        }. Review requests are emailed the day after a service, between 9am and 12pm.`}
+        }. Review requests are sent automatically at 8:00am the day after a completed service.`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {heldCount > 0 && <SendHeldButton count={heldCount} />}

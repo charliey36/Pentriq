@@ -382,7 +382,7 @@ export async function bulkImportCustomers(
   });
 
   // Held = waits in Customers until the owner presses Send. Scheduled = emailed the
-  // day after the service between 9am and 12pm, followed by the day-3 / day-7 reminders.
+  // day after the service at 8:00am, followed by the day-3 / day-7 reminders.
   let journeyId: string | null = null;
   if (autoSend) {
     const { data: journey } = await supabase

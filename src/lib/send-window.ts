@@ -1,11 +1,7 @@
-/**
- * Customer emails go out between 09:00 and 12:00 UK time. Scheduled sends are
- * snapped to 09:00 (Europe/London) so the daily job (09:00 UTC, which is
- * 09:00-11:00 UK time all year) delivers them inside that window.
- */
+/** Customer emails are scheduled for 08:00 UK time the day after a completed service. */
 const TZ = 'Europe/London';
-export const SEND_WINDOW_START_HOUR = 9;
-export const SEND_WINDOW_END_HOUR = 12;
+export const SEND_WINDOW_START_HOUR = 8;
+export const SEND_WINDOW_END_HOUR = 9;
 
 const fmt = new Intl.DateTimeFormat('en-GB', {
   timeZone: TZ,
@@ -33,7 +29,7 @@ function londonToUtc(y: number, m: number, d: number, hour: number): Date {
   return new Date(guess - offsetAt(guess - offsetAt(guess)));
 }
 
-/** If `at` is inside 09:00-12:00 UK time keep it, otherwise move to the next 09:00. */
+/** If the current time is outside 08:00-09:00 UK time, move to the next 08:00. */
 export function snapToSendWindow(at: Date): Date {
   const p = londonParts(at.getTime());
   if (p.hour >= SEND_WINDOW_START_HOUR && p.hour < SEND_WINDOW_END_HOUR) return at;
@@ -41,7 +37,7 @@ export function snapToSendWindow(at: Date): Date {
   return londonToUtc(day.y, day.m, day.d, SEND_WINDOW_START_HOUR);
 }
 
-/** When to email a review request for a service done on `serviceDate` (YYYY-MM-DD): 09:00 the next day, or the next window if that has passed. */
+/** When to email a review request for a service done on `serviceDate` (YYYY-MM-DD): 08:00 the next day, or the next 08:00 if that has passed. */
 export function reviewSendTime(serviceDate: string, now = new Date()): Date {
   const [y, m, d] = serviceDate.split('-').map(Number);
   const next = new Date(Date.UTC(y, m - 1, d + 1));

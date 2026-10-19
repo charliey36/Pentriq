@@ -14,7 +14,7 @@
  *     the owner presses Send. No journey enrollment.
  *   - `autoSend = true` enrolls the customer in the active `review_sequence`
  *     journey (initial request + day-3 / day-7 reminders) with the first
- *     send snapped to 09:00 UK the day after the service, or inserts a bare
+ *     send at 08:00 UK the day after the service, or inserts a bare
  *     pending message if no active journey exists.
  *
  * Duplicate protection is enforced in two layers:

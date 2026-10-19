@@ -86,6 +86,7 @@ export async function GET(request: NextRequest) {
   let failed = 0;
   let skippedUnsubscribed = 0;
   const results: Array<{ id: string; status: 'sent' | 'retrying' | 'failed' | 'skipped'; error?: string }> = [];
+  const ownerEmailCache = new Map<string, string | null>();
 
   for (const reviewRequest of dueRequests) {
     try {
@@ -97,7 +98,7 @@ export async function GET(request: NextRequest) {
           .single(),
         supabase
           .from('businesses')
-          .select('name, subscription_status, trial_ends_at, created_at, google_review_url')
+          .select('id, owner_id, name, subscription_status, trial_ends_at, created_at, google_review_url')
           .eq('id', reviewRequest.business_id)
           .single(),
       ]);
@@ -106,8 +107,16 @@ export async function GET(request: NextRequest) {
         throw new Error('Customer or business record not found.');
       }
 
+      let ownerEmail: string | null;
+      if (ownerEmailCache.has(business.owner_id)) {
+        ownerEmail = ownerEmailCache.get(business.owner_id) ?? null;
+      } else {
+        ownerEmail = (await supabase.auth.admin.getUserById(business.owner_id)).data.user?.email ?? null;
+        ownerEmailCache.set(business.owner_id, ownerEmail);
+      }
+
       // Subscription required: defer a day instead of failing or starving the batch.
-      if (sendBlockedReason(business)) {
+      if (sendBlockedReason(business, new Date(), ownerEmail ?? undefined)) {
         await supabase
           .from('review_requests')
           .update({ next_attempt_at: new Date(Date.now() + 86_400_000).toISOString() })

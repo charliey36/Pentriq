@@ -76,6 +76,7 @@ export async function GET(request: NextRequest) {
   let retried = 0;
   let failed = 0;
   let skipped = 0;
+  const ownerEmailCache = new Map<string, string | null>();
 
   for (const message of dueMessages) {
     try {
@@ -88,9 +89,17 @@ export async function GET(request: NextRequest) {
         throw new Error('Customer or business record not found.');
       }
 
+      let ownerEmail: string | null;
+      if (ownerEmailCache.has(business.owner_id)) {
+        ownerEmail = ownerEmailCache.get(business.owner_id) ?? null;
+      } else {
+        ownerEmail = (await supabase.auth.admin.getUserById(business.owner_id)).data.user?.email ?? null;
+        ownerEmailCache.set(business.owner_id, ownerEmail);
+      }
+
       // Subscription required: leave the row pending and look again tomorrow,
       // so it neither fails nor starves other businesses' rows in the batch.
-      if (sendBlockedReason(business)) {
+      if (sendBlockedReason(business, new Date(), ownerEmail ?? undefined)) {
         await supabase
           .from('messages')
           .update({ next_attempt_at: new Date(Date.now() + 86_400_000).toISOString() })

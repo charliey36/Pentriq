@@ -39,7 +39,7 @@ export function parseServiceDate(raw: string): string | null {
 /**
  * Schedules the review request for a customer who has just received a service:
  * enrolled in the review_sequence journey (initial request + day-3 / day-7
- * reminders) with the first send at 09:00 the next day (UK time). Skips if a
+ * reminders) with the first send at 08:00 the next day (UK time). Skips if a
  * request is already queued or scheduled.
  *
  * Thin wrapper over the shared scheduling engine (see

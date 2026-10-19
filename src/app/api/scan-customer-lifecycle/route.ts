@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
       // Service-date rule: reminder once `rebooking_reminder_interval_days` have passed,
       // at most once per service (skip if already enrolled since that service date).
       if (rebookingJourney && customer.last_service_date &&
-          isRebookingEligible(customer.last_service_date, business.rebooking_reminder_interval_days ?? 90)) {
+          isRebookingEligible(customer.last_service_date, business.rebooking_reminder_interval_days ?? 30)) {
         const { count } = await supabase
           .from('journey_enrollments')
           .select('id', { count: 'exact', head: true })

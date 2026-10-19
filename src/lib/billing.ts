@@ -15,6 +15,11 @@ export const PLAN = {
 };
 
 export const TRIAL_DAYS = 14;
+export const BILLING_OVERRIDE_EMAIL = 'charlieyoults123@gmail.com';
+
+export function isBillingOverrideEmail(email: string | null | undefined): boolean {
+  return email?.trim().toLowerCase() === BILLING_OVERRIDE_EMAIL;
+}
 
 export type BillingState = {
   /**
@@ -31,7 +36,10 @@ export type BillingState = {
 /** The subset of a business row the billing logic needs. */
 export type BillingInput = Pick<Business, 'subscription_status' | 'trial_ends_at' | 'created_at'>;
 
-export function getBillingState(b: BillingInput, now = new Date()): BillingState {
+export function getBillingState(b: BillingInput, now = new Date(), ownerEmail?: string): BillingState {
+  if (isBillingOverrideEmail(ownerEmail)) {
+    return { status: 'active', trialDaysLeft: TRIAL_DAYS, hasAccess: true };
+  }
   const status = b.subscription_status ?? 'trialing';
 
   // Trial not claimed yet: after migration 0023 the column exists and is NULL.
@@ -78,9 +86,9 @@ export type Feature = 'view' | 'send_messages' | 'automation';
 
 const FREE_FEATURES: Feature[] = ['view'];
 
-export function canUse(b: BillingInput, feature: Feature, now = new Date()): boolean {
+export function canUse(b: BillingInput, feature: Feature, now = new Date(), ownerEmail?: string): boolean {
   if (FREE_FEATURES.includes(feature)) return true;
-  return getBillingState(b, now).hasAccess;
+  return getBillingState(b, now, ownerEmail).hasAccess;
 }
 
 export const SUBSCRIPTION_REQUIRED_MESSAGE =
@@ -90,7 +98,7 @@ export const TRIAL_NOT_STARTED_MESSAGE =
   'Start your 14-day free trial (or subscribe) in Settings → Billing to begin sending messages.';
 
 /** Throws-free guard for send paths: returns an error string when blocked. */
-export function sendBlockedReason(b: BillingInput, now = new Date()): string | null {
-  if (canUse(b, 'send_messages', now)) return null;
-  return getBillingState(b, now).status === 'trial_available' ? TRIAL_NOT_STARTED_MESSAGE : SUBSCRIPTION_REQUIRED_MESSAGE;
+export function sendBlockedReason(b: BillingInput, now = new Date(), ownerEmail?: string): string | null {
+  if (canUse(b, 'send_messages', now, ownerEmail)) return null;
+  return getBillingState(b, now, ownerEmail).status === 'trial_available' ? TRIAL_NOT_STARTED_MESSAGE : SUBSCRIPTION_REQUIRED_MESSAGE;
 }

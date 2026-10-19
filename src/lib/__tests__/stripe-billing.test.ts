@@ -30,6 +30,13 @@ describe('opt-in trial', () => {
     const legacy = { subscription_status: 'trialing' as const, created_at: new Date(now.getTime() - 5 * DAY).toISOString() } as never;
     expect(getBillingState(legacy, now)).toMatchObject({ status: 'trialing', trialDaysLeft: 9 });
   });
+
+  it('keeps the specified account active regardless of stored trial state', () => {
+    const expired = biz('canceled', -100);
+    expect(getBillingState(expired, now, 'charlieyoults123@gmail.com')).toMatchObject({ status: 'active', hasAccess: true });
+    expect(sendBlockedReason(expired, now, 'charlieyoults123@gmail.com')).toBeNull();
+    expect(getBillingState(expired, now, 'other@example.com').hasAccess).toBe(false);
+  });
 });
 
 describe('access control', () => {

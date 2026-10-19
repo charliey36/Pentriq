@@ -81,7 +81,7 @@ export async function importCustomers(
     console.log('[CSV Import] Starting import process');
     summary = await bulkImportCustomers(
       supabase,
-      { id: business.id, delay_hours: business.delay_hours, review_request_window_days: business.review_request_window_days ?? 14 },
+      { id: business.id, delay_hours: business.delay_hours, review_request_window_days: business.review_request_window_days ?? 1 },
       rows,
       formData.get('auto_send') === 'on',
       new Date().toISOString()

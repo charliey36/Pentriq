@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { provisionBusiness } from '@/lib/provision-business';
 import { setErrorContext } from '@/lib/monitoring';
+import { isBillingOverrideEmail } from '@/lib/billing';
 import type { Business } from '@/lib/database.types';
 
 /**
@@ -110,6 +111,9 @@ export const requireBusiness = cache(async (): Promise<Business> => {
   const business = await loadBusiness();
   const user = await getAuthUser();
   if (user) setErrorContext(user.id, business.id);
+  if (user && isBillingOverrideEmail(user.email)) {
+    return { ...business, subscription_status: 'active', trial_ends_at: null };
+  }
   return business;
 });
 

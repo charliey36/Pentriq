@@ -39,7 +39,7 @@ export default async function ServicesPage() {
 
       <SectionCard className="mt-6" title="Your services" flush>
         {services && services.length > 0 ? (
-          <div className="scroll-thin overflow-x-auto">
+          <div className="scroll-thin max-h-[20rem] overflow-auto">
             <table className="data-table data-table-hover">
               <thead>
                 <tr>

@@ -125,7 +125,7 @@ export function ImportCustomersForm() {
           <span>
             <span className="font-medium text-ink">Email review requests automatically the day after each service</span>
             <span className="block text-[13px] text-ink-3">
-              Sent between 9am and 12pm, only for jobs within your review window. Untick to hold them on the Customers page until you press Send.
+              Sent automatically at 8:00am the day after a completed service. Untick to hold them on the Customers page until you press Send.
             </span>
           </span>
         </label>
@@ -183,7 +183,7 @@ export function ImportCustomersForm() {
           {state.summary.queued > 0 && (
             <Notice variant="success" className="mt-4">
               {state.summary.autoSend
-                ? `${state.summary.queued} review request${state.summary.queued === 1 ? ' is' : 's are'} scheduled (day after service, 9am-12pm).`
+                ? `${state.summary.queued} review request${state.summary.queued === 1 ? ' is' : 's are'} scheduled for 8:00am the day after service.`
                 : `${state.summary.queued} review request${state.summary.queued === 1 ? ' is' : 's are'} held until you send ${state.summary.queued === 1 ? 'it' : 'them'}.`}{' '}
               <a href="/customers" className="font-medium underline">View customers</a>
             </Notice>

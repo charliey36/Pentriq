@@ -191,9 +191,9 @@ describe('Scenario 1: Manual visit logging -> auto review scheduling', () => {
     });
   });
 
-  it('schedules the review for 09:00 UK time the day after the service', () => {
-    // Service completed 2026-06-15 -> email at 09:00 Europe/London on 2026-06-16.
-    // (June is BST = UTC+1, so 09:00 London == 08:00 UTC.)
+  it('schedules the review for 08:00 UK time the day after the service', () => {
+    // Service completed 2026-06-15 -> email at 08:00 Europe/London on 2026-06-16.
+    // (June is BST = UTC+1, so 08:00 London == 07:00 UTC.)
     const sendAt = reviewSendTime('2026-06-15', new Date('2026-06-15T18:00:00Z'));
     const parts = new Intl.DateTimeFormat('en-GB', {
       timeZone: UK_TIMEZONE,
@@ -201,7 +201,7 @@ describe('Scenario 1: Manual visit logging -> auto review scheduling', () => {
       minute: '2-digit',
       hourCycle: 'h23',
     }).format(sendAt);
-    expect(parts).toBe('09:00');
+    expect(parts).toBe('08:00');
     expect(formatUKDate(sendAt)).toBe('16/06/2026');
   });
 
@@ -566,7 +566,7 @@ describe('Scenario 6: UK date format (DD/MM/YYYY)', () => {
 
   it('anchors scheduling to Europe/London for the UK send window', () => {
     expect(UK_TIMEZONE).toBe('Europe/London');
-    // A 03:00 UK-time instant is before the 09:00 window -> snapped to 09:00.
+    // A 03:00 UK-time instant is before the 08:00 window -> snapped to 08:00.
     const snapped = snapToSendWindow(new Date('2026-06-15T02:00:00Z')); // 03:00 BST
     const hour = Number(
       new Intl.DateTimeFormat('en-GB', { timeZone: UK_TIMEZONE, hour: '2-digit', hourCycle: 'h23' }).format(snapped)
