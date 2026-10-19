@@ -101,25 +101,17 @@ export function renderMessage(
     }
 
     case 'rebooking_reminder': {
-      const intro = `It's been a while since your last visit to ${business} — ready to book your next one?`;
       if (channel === 'email') {
-        const subject = `Time to rebook with ${ctx.businessName}?`;
-        const button = ctx.rebookingUrl
-          ? `<div style="text-align: center; margin: 32px 0;">
-              <a href="${ctx.rebookingUrl}" style="background-color: #4f46e5; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-size: 15px; font-weight: 600; display: inline-block;">
-                Book Your Next Appointment
-              </a>
-            </div>`
-          : '';
-        const html = wrapEmailHtml(
-          `<p style="font-size: 16px; margin: 0 0 16px;">Hi ${name},</p>
-           <p style="font-size: 16px; line-height: 1.5; margin: 0 0 8px;">${intro}</p>
-           ${button}`,
-          unsubscribeFooterHtml(ctx.businessName, ctx.unsubscribeUrl)
-        );
-        const text = `Hi ${ctx.customerName}, ${intro}${ctx.rebookingUrl ? ` Book here: ${ctx.rebookingUrl}` : ''}`;
-        return { subject, html, text };
+        const email = renderReviewRequestEmail({
+          variant: 'rebooking',
+          customerName: ctx.customerName,
+          businessName: ctx.businessName,
+          rebookingLink: ctx.rebookingUrl,
+          unsubscribeUrl: ctx.unsubscribeUrl,
+        });
+        return { subject: email.subject, html: email.html, text: email.text };
       }
+      const intro = `Whenever you're ready, we'd love to see you again at ${ctx.businessName}.`;
       return { text: `Hi ${ctx.customerName}, ${intro}${ctx.rebookingUrl ? ` ${ctx.rebookingUrl}` : ''}` };
     }
 

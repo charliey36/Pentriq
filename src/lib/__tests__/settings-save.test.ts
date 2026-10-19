@@ -195,6 +195,8 @@ describe('validateDatabaseSchema (startup check for missing columns)', () => {
       'review_request_window_days',
       'rebooking_reminder_interval_days',
       'rebooking_reminders_enabled',
+      'booking_url',
+      'booking_url_updated_at',
     ]);
   });
 

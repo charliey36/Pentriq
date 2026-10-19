@@ -46,7 +46,9 @@ create table if not exists public.businesses (
 
 alter table public.businesses
   add column if not exists brand_logo_url text,
-  add column if not exists brand_primary_color text;
+  add column if not exists brand_primary_color text,
+  add column if not exists booking_url text,
+  add column if not exists booking_url_updated_at timestamptz;
 
 -- ---------------------------------------------------------------------------
 -- business_members

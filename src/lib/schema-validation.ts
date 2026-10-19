@@ -11,6 +11,8 @@ export const REQUIRED_BUSINESS_COLUMNS = [
   'review_request_window_days',
   'rebooking_reminder_interval_days',
   'rebooking_reminders_enabled',
+  'booking_url',
+  'booking_url_updated_at',
 ] as const;
 
 export interface SchemaValidationResult {
@@ -94,10 +96,13 @@ export async function validateDatabaseSchema(supabase: Db): Promise<SchemaValida
       if (isMissingColumnError(businessError)) {
         const column = missingColumnName(businessError) ?? 'unknown column';
         result.missingColumns.push(`businesses.${column}`);
+        const migration = column.startsWith('booking_url')
+          ? '0029_booking_url.sql'
+          : '0017_ensure_business_settings_columns.sql';
         result.errors.push(
           `Missing required column: businesses.${column}\n` +
           'Settings cannot be saved until this is fixed.\n' +
-          'To fix: run supabase/migrations/0017_ensure_business_settings_columns.sql in the Supabase SQL editor\n' +
+          `To fix: run supabase/migrations/${migration} in the Supabase SQL editor\n` +
           "(it adds the column and runs NOTIFY pgrst, 'reload schema')."
         );
       } else {

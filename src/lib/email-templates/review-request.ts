@@ -34,7 +34,7 @@ import {
   type ReviewPlatformId,
 } from './review-destinations';
 
-export type ReviewEmailVariant = 'request' | 'reminder';
+export type ReviewEmailVariant = 'request' | 'reminder' | 'rebooking';
 
 export type ReviewEmailParams = {
   variant?: ReviewEmailVariant;
@@ -47,6 +47,8 @@ export type ReviewEmailParams = {
   /** Always-on private feedback channel (compliance). */
   privateFeedbackUrl?: string | null;
   unsubscribeUrl?: string | null;
+  /** Booking destination for the rebooking variant. */
+  rebookingLink?: string | null;
   /** Optional business contact details shown in the footer. */
   businessContact?: { email?: string | null; phone?: string | null; website?: string | null };
   /** Base URL for hosted email assets. '' = relative (preview). Defaults to the app's public URL. */
@@ -64,20 +66,21 @@ export type RenderedReviewEmail = {
 // Design tokens (hex equivalents of the app's CSS variables / brand scale)
 // ---------------------------------------------------------------------------
 const C = {
-  canvas: '#eff3f9',
-  surface: '#ffffff',
-  surface2: '#f7f9fc',
-  line: '#e1e7f0',
-  ink: '#0b1220',
-  ink2: '#2d384e',
-  ink3: '#5e6a81',
+  canvas: '#070b14',
+  surface: '#0f1726',
+  surface2: '#131f31',
+  line: '#263952',
+  ink: '#f5f8fc',
+  ink2: '#c1cede',
+  ink3: '#91a1b8',
   brand50: '#ecfdf5',
   brand200: '#a7f3d0',
   brand300: '#6ee7b7',
-  brand700: '#047857',
-  brand800: '#065f46',
-  brand900: '#064e3b',
-  star: '#f59e0b',
+  brand700: '#22c98a',
+  brand800: '#0e9f72',
+  brand900: '#101c31',
+  blue400: '#60a5fa',
+  star: '#7dd3fc',
 } as const;
 
 const FONT =
@@ -96,24 +99,30 @@ type CopyVars = { customerName: string; businessName: string; reviewLink: string
 /** Copy is expressed with {{variables}} so it can later be made editable per business. */
 export const REVIEW_EMAIL_COPY = {
   request: {
-    badge: 'Review request',
     heading: 'Thank you for choosing {{businessName}}',
     lead: "Hi {{customerName}}, we'd love to hear about your experience.",
     preheader: 'It only takes a minute to tell {{businessName}} how it went.',
     textIntro: "Thank you for choosing {{businessName}}. We'd love to hear about your experience.",
   },
   reminder: {
-    badge: 'Friendly reminder',
-    heading: 'A quick reminder from {{businessName}}',
+    heading: "We'd still love to hear from you",
     lead: "Hi {{customerName}}, we'd still love to hear how your visit went.",
-    preheader: 'One minute is all it takes — your feedback means a lot to {{businessName}}.',
-    textIntro: "A quick reminder from {{businessName}}: we'd still love to hear how your visit went.",
+    preheader: 'Your feedback means a lot to {{businessName}}.',
+    textIntro: "We'd still love to hear how your visit to {{businessName}} went.",
+  },
+  rebooking: {
+    heading: 'Ready for your next visit?',
+    lead: "Hi {{customerName}}, whenever you're ready, we'd love to see you again at {{businessName}}.",
+    preheader: 'Whenever you are ready, book your next visit with {{businessName}}.',
+    textIntro: "Whenever you're ready, we'd love to see you again at {{businessName}}.",
   },
   cta: 'Leave a Review',
   ctaFallback: 'Share Your Feedback',
+  rebookingCta: 'Book Your Next Appointment',
   ctaNote: 'Takes less than a minute',
-  whyLabel: 'Why it matters',
+  whyLabel: 'A note from the team',
   why: 'Your feedback helps local businesses improve and helps other customers make informed decisions.',
+  rebookingWhy: "There is no rush — book whenever it suits you, and we look forward to welcoming you back.",
   privatePrompt: 'Prefer to share your thoughts privately?',
   privateLink: 'Send private feedback',
 } as const;
@@ -138,10 +147,13 @@ function firstName(value: string | null | undefined): string {
 }
 
 function subjectFor(variant: ReviewEmailVariant, businessName: string): string {
+  if (variant === 'rebooking') {
+    return businessName ? `Ready for your next visit to ${businessName}?` : 'Ready for your next visit?';
+  }
   if (variant === 'reminder') {
     return businessName
-      ? `Quick reminder — how was your visit to ${businessName}?`
-      : 'Quick reminder — how was your recent visit?';
+      ? `We'd still love to hear from you — ${businessName}`
+      : "We'd still love to hear from you";
   }
   return businessName ? `How was your visit to ${businessName}?` : 'How was your recent visit?';
 }
@@ -156,16 +168,16 @@ function buttonHtml(href: string, label: string): string {
   // display:block so the whole button is tappable (>= 56px tall).
   return `
 <!--[if mso]>
-<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${safeHref}" style="height:58px;v-text-anchor:middle;width:300px;" arcsize="22%" strokecolor="${C.brand800}" fillcolor="${C.brand700}">
+<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${safeHref}" style="height:58px;v-text-anchor:middle;width:300px;" arcsize="22%" strokecolor="${C.brand300}" fillcolor="${C.brand700}">
 <w:anchorlock/>
-<center style="color:#ffffff;font-family:Arial,sans-serif;font-size:18px;font-weight:bold;">${safeLabel}</center>
+<center style="color:#06131a;font-family:Arial,sans-serif;font-size:18px;font-weight:bold;">${safeLabel}</center>
 </v:roundrect>
 <![endif]-->
 <!--[if !mso]><!-- -->
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:320px;margin:0 auto;border-collapse:separate;">
   <tr>
-    <td align="center" bgcolor="${C.brand700}" style="border-radius:14px;background-color:${C.brand700};border:1px solid ${C.brand800};box-shadow:inset 0 1px 0 rgba(255,255,255,0.28),0 1px 2px rgba(4,120,87,0.4),0 12px 22px -10px rgba(16,185,129,0.75);">
-      <a href="${safeHref}" target="_blank" class="rf-btn" style="display:block;padding:18px 24px;font-family:${FONT};font-size:18px;line-height:22px;font-weight:700;letter-spacing:-0.01em;color:#ffffff;text-decoration:none;border-radius:14px;">${safeLabel}</a>
+    <td align="center" bgcolor="${C.brand700}" style="border-radius:14px;background-color:${C.brand700};background-image:linear-gradient(135deg,${C.brand700} 0%,${C.brand800} 100%);border:1px solid ${C.brand300};box-shadow:0 0 0 1px rgba(52,211,153,0.12),0 12px 28px -12px rgba(34,201,138,0.85);">
+      <a href="${safeHref}" target="_blank" class="rf-btn" style="display:block;padding:18px 24px;font-family:${FONT};font-size:18px;line-height:22px;font-weight:700;letter-spacing:-0.01em;color:#06131a;text-decoration:none;border-radius:14px;">${safeLabel}</a>
     </td>
   </tr>
 </table>
@@ -215,8 +227,8 @@ export function renderReviewRequestEmail(params: ReviewEmailParams = {}): Render
 
   const reviewHref = isSafeHttpUrl(params.reviewLink) ? params.reviewLink.trim() : '';
   const feedbackHref = isSafeHttpUrl(params.privateFeedbackUrl) ? params.privateFeedbackUrl.trim() : '';
+  const rebookingHref = isSafeHttpUrl(params.rebookingLink) ? params.rebookingLink.trim() : '';
   const unsubscribeHref = isSafeHttpUrl(params.unsubscribeUrl) ? params.unsubscribeUrl.trim() : '';
-
   const vars: CopyVars = {
     customerName: rawCustomer || FALLBACKS.customerName,
     businessName: rawBusiness || FALLBACKS.businessName,
@@ -228,18 +240,24 @@ export function renderReviewRequestEmail(params: ReviewEmailParams = {}): Render
   const subject = subjectFor(variant, rawBusiness);
   const preheader = t(copy.preheader);
 
-  // Primary CTA: the review link; if there isn't one, promote private
-  // feedback so the email still has exactly one clear action.
-  const primary = reviewHref
-    ? { href: reviewHref, label: REVIEW_EMAIL_COPY.cta }
-    : feedbackHref
-      ? { href: feedbackHref, label: REVIEW_EMAIL_COPY.ctaFallback }
-      : null;
-  const showSecondaryFeedback = Boolean(reviewHref && feedbackHref);
+  // Keep one clear action: review/feedback for review emails, booking for rebooking.
+  const primary = variant === 'rebooking'
+    ? rebookingHref
+      ? { href: rebookingHref, label: REVIEW_EMAIL_COPY.rebookingCta }
+      : null
+    : reviewHref
+      ? { href: reviewHref, label: REVIEW_EMAIL_COPY.cta }
+      : feedbackHref
+        ? { href: feedbackHref, label: REVIEW_EMAIL_COPY.ctaFallback }
+        : null;
+  const showSecondaryFeedback = variant !== 'rebooking' && Boolean(reviewHref && feedbackHref);
+  const supportCopy = variant === 'rebooking' ? REVIEW_EMAIL_COPY.rebookingWhy : REVIEW_EMAIL_COPY.why;
+  const supportLabel = variant === 'rebooking' ? '' : REVIEW_EMAIL_COPY.whyLabel;
 
   const platformLabel = params.reviewPlatform ? REVIEW_PLATFORMS[params.reviewPlatform]?.label : undefined;
-  const ctaNote =
-    REVIEW_EMAIL_COPY.ctaNote + (platformLabel && reviewHref ? ` · Opens ${platformLabel}` : '');
+  const ctaNote = variant === 'rebooking'
+    ? 'Choose a time that suits you'
+    : REVIEW_EMAIL_COPY.ctaNote + (platformLabel && reviewHref ? ` · Opens ${platformLabel}` : '');
 
   const base = (params.appUrl ?? getAppUrl()).replace(/\/+$/, '');
   const logoSrc = `${base}/email-assets/logo-mark.png`;
@@ -256,7 +274,7 @@ export function renderReviewRequestEmail(params: ReviewEmailParams = {}): Render
     hasBusiness ? escapeHtml(rawBusiness) : `a business that uses ${APP_NAME}`
   }${/[.!?]$/.test(rawBusiness) && hasBusiness ? '' : '.'}${
     unsubscribeHref
-      ? ` <a href="${escapeHtml(unsubscribeHref)}" class="rf-link" style="color:${C.brand700};text-decoration:underline;">Unsubscribe</a> from future review emails.`
+      ? ` <a href="${escapeHtml(unsubscribeHref)}" class="rf-link" style="color:${C.brand700};text-decoration:underline;">Unsubscribe</a> from future emails.`
       : ''
   }</p>`;
 
@@ -305,16 +323,15 @@ export function renderReviewRequestEmail(params: ReviewEmailParams = {}): Render
   <tr>
     <td align="center" class="rf-outer" style="padding:20px 12px 32px;">
       <!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="rf-card" bgcolor="${C.surface}" style="max-width:600px;margin:0 auto;background-color:${C.surface};border:1px solid ${C.line};border-radius:20px;border-collapse:separate;box-shadow:0 1px 2px rgba(16,24,40,0.05),0 28px 56px -28px rgba(16,24,40,0.22);">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="rf-card" bgcolor="${C.surface}" style="max-width:600px;margin:0 auto;background-color:${C.surface};border:1px solid ${C.line};border-radius:20px;border-collapse:separate;box-shadow:0 0 0 1px rgba(96,165,250,0.06),0 28px 70px -30px rgba(0,0,0,0.9);">
 
         <!-- Header -->
         <tr>
-          <td class="rf-px" bgcolor="${C.brand900}" style="padding:20px 24px;background-color:${C.brand900};background-image:linear-gradient(135deg,${C.brand900} 0%,${C.brand700} 100%);border-radius:19px 19px 0 0;">
+          <td class="rf-px" bgcolor="${C.brand900}" style="padding:20px 24px;background-color:${C.brand900};background-image:linear-gradient(135deg,#101c31 0%,#12344b 58%,#075b50 100%);border-bottom:1px solid rgba(110,231,183,0.24);border-radius:19px 19px 0 0;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr>
                 <td width="40" valign="middle" style="width:40px;">${logoMarkHtml(logoSrc, 36)}</td>
                 <td valign="middle" style="padding-left:10px;font-family:${FONT};font-size:17px;line-height:24px;font-weight:600;letter-spacing:-0.02em;color:#ffffff;">${APP_NAME_LEAD}<span style="color:#ffffff;">${APP_NAME_ACCENT}</span></td>
-                <td align="right" valign="middle" style="font-family:${FONT};font-size:11px;line-height:16px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:${C.brand200};">${escapeHtml(copy.badge)}</td>
               </tr>
             </table>
           </td>
@@ -344,11 +361,11 @@ ${
         <!-- Supporting content -->
         <tr>
           <td class="rf-px" style="padding:28px 24px 8px;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="rf-panel" bgcolor="${C.surface2}" style="background-color:${C.surface2};border:1px solid ${C.line};border-radius:14px;border-collapse:separate;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="rf-panel" bgcolor="${C.surface2}" style="background-color:${C.surface2};border:1px solid ${C.line};border-radius:14px;border-collapse:separate;box-shadow:inset 0 1px 0 rgba(255,255,255,0.035),0 10px 26px -20px rgba(0,0,0,0.9);">
               <tr>
                 <td style="padding:18px 20px;font-family:${FONT};">
-                  <p class="rf-eyebrow" style="margin:0 0 6px;font-size:11px;line-height:16px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${C.brand700};">${escapeHtml(REVIEW_EMAIL_COPY.whyLabel)}</p>
-                  <p class="rf-ink2" style="margin:0;font-size:15px;line-height:24px;color:${C.ink2};">${escapeHtml(REVIEW_EMAIL_COPY.why)}</p>
+                  ${supportLabel ? `<p class="rf-eyebrow" style="margin:0 0 6px;font-size:11px;line-height:16px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${C.brand700};">${escapeHtml(supportLabel)}</p>` : ''}
+                  <p class="rf-ink2" style="margin:0;font-size:15px;line-height:24px;color:${C.ink2};">${escapeHtml(supportCopy)}</p>
                 </td>
               </tr>
             </table>
@@ -396,19 +413,25 @@ ${
   // AI-draft hook in lib/ai.ts.
   const textReview = clean(params.reviewLink);
   const textFeedback = clean(params.privateFeedbackUrl);
+  const textRebooking = clean(params.rebookingLink);
   const textUnsubscribe = clean(params.unsubscribeUrl);
+  const textAction = variant === 'rebooking'
+    ? textRebooking
+      ? `${REVIEW_EMAIL_COPY.rebookingCta}: ${textRebooking}`
+      : ''
+    : textReview
+      ? `${REVIEW_EMAIL_COPY.cta}: ${textReview}`
+      : textFeedback
+        ? `${REVIEW_EMAIL_COPY.ctaFallback}: ${textFeedback}`
+        : '';
   const textLines = [
     `Hi ${vars.customerName},`,
     '',
     t(copy.textIntro),
     '',
-    textReview
-      ? `${REVIEW_EMAIL_COPY.cta}: ${textReview}`
-      : textFeedback
-        ? `${REVIEW_EMAIL_COPY.ctaFallback}: ${textFeedback}`
-        : '',
+    textAction,
     '',
-    REVIEW_EMAIL_COPY.why,
+    supportCopy,
     '',
     textReview && textFeedback
       ? `${REVIEW_EMAIL_COPY.privatePrompt} ${REVIEW_EMAIL_COPY.privateLink}: ${textFeedback}`

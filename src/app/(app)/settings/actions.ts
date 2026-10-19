@@ -46,7 +46,9 @@ export async function saveSettings(
         hint: error.hint,
         missingColumn: isMissingColumnError(error) ? missingColumnName(error) : undefined,
         fix: isMissingColumnError(error)
-          ? 'Apply supabase/migrations/0017_ensure_business_settings_columns.sql (it also reloads the PostgREST schema cache).'
+          ? missingColumnName(error)?.startsWith('booking_url')
+            ? 'Apply supabase/migrations/0029_booking_url.sql (it also reloads the PostgREST schema cache).'
+            : 'Apply supabase/migrations/0017_ensure_business_settings_columns.sql (it also reloads the PostgREST schema cache).'
           : undefined,
       });
       return { error: friendlySaveError(error) };

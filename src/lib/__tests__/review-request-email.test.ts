@@ -22,13 +22,19 @@ describe('renderReviewRequestEmail', () => {
     expect(html).toContain('Leave a Review');
     expect(html).toContain('href="https://app.test/api/track-message/m1?x=1&amp;y=2"');
     expect(html).toContain('helps other customers make informed decisions');
-    expect(html).toContain('Sent via Pentriq');
+    expect(html).not.toContain('Review request');
     expect(html).toContain('Sent on behalf of');
+    expect(html).not.toContain('Friendly reminder');
+    expect(html).toContain('Sent via Pentriq');
     expect(html).toContain('https://app.test/email-assets/logo-mark.png');
   });
 
   it('is email-safe: table layout, viewport meta, VML button for Outlook, no scripts', () => {
     const { html } = renderReviewRequestEmail(base);
+    expect(html).toContain('background-color:#070b14');
+    expect(html).toContain('background-color:#0f1726');
+    expect(html).toContain('linear-gradient(135deg,#101c31 0%,#12344b 58%,#075b50 100%)');
+    expect(html).toContain('rgba(34,201,138,0.85)');
     expect(html).toContain('<meta name="viewport"');
     expect(html).toContain('<v:roundrect');
     expect(html).toContain('role="presentation"');
@@ -83,8 +89,10 @@ describe('renderReviewRequestEmail', () => {
 
   it('renders the reminder variant', () => {
     const { html, subject } = renderReviewRequestEmail({ ...base, variant: 'reminder' });
-    expect(subject).toBe('Quick reminder — how was your visit to Acme Coffee?');
-    expect(html).toContain('A quick reminder from Acme Coffee');
+    expect(subject).toBe("We'd still love to hear from you — Acme Coffee");
+    expect(html).toContain("We'd still love to hear from you");
+    expect(html).not.toContain('Review request');
+    expect(html).not.toContain('Friendly reminder');
   });
 
   it('renders optional contact details and platform note', () => {
@@ -105,6 +113,24 @@ describe('review destinations', () => {
     expect(resolveReviewLink({ url: 'nope' }, { usePlaceholder: true })).toBe(PLACEHOLDER_REVIEW_URL);
     expect(resolveReviewLink({ url: 'https://g.page/r/abc/review' })).toBe('https://g.page/r/abc/review');
   });
+
+  it('renders rebooking in the shared premium layout without workflow labels', () => {
+    const { html, subject, text } = renderReviewRequestEmail({
+      variant: 'rebooking',
+      customerName: 'Alex Morgan',
+      businessName: 'Acme Coffee',
+      rebookingLink: 'https://app.test/book/alex',
+      unsubscribeUrl: base.unsubscribeUrl,
+      appUrl: base.appUrl,
+    });
+    expect(subject).toBe('Ready for your next visit to Acme Coffee?');
+    expect(html).toContain('Ready for your next visit?');
+    expect(html).toContain('Book Your Next Appointment');
+    expect(html).toContain('href="https://app.test/book/alex"');
+    expect(html).toContain('role="presentation"');
+    expect(html).not.toMatch(/Review Request|Rebooking Reminder|Reminder Email|Automated Reminder/i);
+    expect(text).toContain('https://app.test/book/alex');
+  });
 });
 
 describe('send pipeline integration', () => {
@@ -120,7 +146,7 @@ describe('send pipeline integration', () => {
     expect(request.html).toContain('Thank you for choosing Acme Coffee');
     expect(request.html).toContain('Unsubscribe');
     const reminder = renderMessage('review_reminder', 'email', ctx);
-    expect(reminder.subject).toContain('Quick reminder');
+    expect(reminder.subject).toContain("We'd still love to hear from you");
   });
 
   it('renderMessage still enforces the private feedback invariant', () => {
