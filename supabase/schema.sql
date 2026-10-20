@@ -341,14 +341,39 @@ create index if not exists loyalty_ledger_customer_id_idx on public.loyalty_ledg
 -- ---------------------------------------------------------------------------
 -- referrals
 -- ---------------------------------------------------------------------------
+create table if not exists public.referral_promotions (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses (id) on delete cascade,
+  name text not null,
+  description text not null default '',
+  customer_reward text not null,
+  referrer_reward text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists referral_promotions_business_id_idx on public.referral_promotions (business_id);
+
+alter table public.referral_promotions enable row level security;
+drop policy if exists "Member can manage own referral_promotions" on public.referral_promotions;
+create policy "Member can manage own referral_promotions"
+  on public.referral_promotions
+  for all
+  using (business_id in (select business_id from public.business_members where user_id = auth.uid()))
+  with check (business_id in (select business_id from public.business_members where user_id = auth.uid()));
+
+
 create table if not exists public.referrals (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null references public.businesses (id) on delete cascade,
   referrer_customer_id uuid not null references public.customers (id) on delete cascade,
   referee_customer_id uuid references public.customers (id) on delete set null,
   code text not null,
-  status text not null default 'pending' check (status in ('pending', 'completed')),
+  status text not null default 'active' check (status in ('active', 'redeemed', 'expired')),
   reward_granted_at timestamptz,
+  redeemed_at timestamptz,
+  promotion_id uuid references public.referral_promotions (id) on delete set null,
+  promotion_name text,
+  customer_reward text,
+  referrer_reward text,
   created_at timestamptz not null default now(),
   unique (business_id, code)
 );

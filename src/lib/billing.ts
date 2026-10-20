@@ -14,7 +14,7 @@ export const PLAN = {
   ],
 };
 
-export const TRIAL_DAYS = 14;
+export const TRIAL_DAYS = 30;
 export const BILLING_OVERRIDE_EMAIL = 'charlieyoults123@gmail.com';
 
 export function isBillingOverrideEmail(email: string | null | undefined): boolean {
@@ -95,7 +95,7 @@ export const SUBSCRIPTION_REQUIRED_MESSAGE =
   'Your free trial has ended. Subscribe in Settings → Billing to keep sending messages.';
 
 export const TRIAL_NOT_STARTED_MESSAGE =
-  'Start your 14-day free trial (or subscribe) in Settings → Billing to begin sending messages.';
+  'Start your 30-day free trial (or subscribe) in Settings → Billing to begin sending messages.';
 
 /** Throws-free guard for send paths: returns an error string when blocked. */
 export function sendBlockedReason(b: BillingInput, now = new Date(), ownerEmail?: string): string | null {

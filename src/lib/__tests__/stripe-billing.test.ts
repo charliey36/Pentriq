@@ -16,7 +16,7 @@ describe('opt-in trial', () => {
     const state = getBillingState(biz('trialing', null), now);
     expect(state.status).toBe('trial_available');
     expect(state.hasAccess).toBe(false);
-    expect(sendBlockedReason(biz('trialing', null), now)).toMatch(/Start your 14-day free trial/);
+    expect(sendBlockedReason(biz('trialing', null), now)).toMatch(/Start your 30-day free trial/);
     expect(canUse(biz('trialing', null), 'view', now)).toBe(true);
   });
   it('starts counting from the claimed end date', () => {
@@ -28,7 +28,7 @@ describe('opt-in trial', () => {
   });
   it('falls back to the legacy automatic trial when the column does not exist yet', () => {
     const legacy = { subscription_status: 'trialing' as const, created_at: new Date(now.getTime() - 5 * DAY).toISOString() } as never;
-    expect(getBillingState(legacy, now)).toMatchObject({ status: 'trialing', trialDaysLeft: 9 });
+    expect(getBillingState(legacy, now)).toMatchObject({ status: 'trialing', trialDaysLeft: 25 });
   });
 
   it('keeps the specified account active regardless of stored trial state', () => {

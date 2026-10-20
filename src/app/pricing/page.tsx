@@ -7,12 +7,12 @@ import { SITE_URL } from '@/lib/site';
 
 export const metadata = pageMetadata({
   title: 'Pricing',
-  description: `Pentriq costs ${PLAN.currency}${PLAN.priceMonthly} a month with a 14-day free trial. Unlimited customers and review requests, follow-up reminders, feedback inbox and analytics.`,
+  description: `Pentriq costs ${PLAN.currency}${PLAN.priceMonthly} a month with a 30-day free trial. Unlimited customers and review requests, follow-up reminders, feedback inbox and analytics.`,
   path: '/pricing',
 });
 
 const faqs = [
-  ['Is there a free trial?', 'Yes. Once you have created an account you can start a 14-day free trial from the Billing page whenever you are ready. It does not start automatically, and no card is needed to start it.'],
+  ['Is there a free trial?', 'Yes. Once you have created an account you can start a 30-day free trial from the Billing page whenever you are ready. It does not start automatically, and no card is needed to start it.'],
   ['Can I cancel any time?', 'Yes. You can cancel from the Stripe customer portal on the Billing page, and keep access until the end of the period you have paid for.'],
   ['How do I pay?', 'Payments are handled by Stripe Checkout. Pentriq never sees or stores your card details.'],
   ['What happens if my trial ends?', 'You can still sign in and view your data, but sending review requests and reminders pauses until you subscribe.'],
@@ -47,7 +47,7 @@ export default function PricingPage() {
           {PLAN.currency}{PLAN.priceMonthly}
           <span className="text-base font-normal text-ink-3"> / month</span>
         </p>
-        <p className="mt-2 text-sm text-ink-3">14-day free trial. Cancel any time.</p>
+        <p className="mt-2 text-sm text-ink-3">30-day free trial. Cancel any time.</p>
         <ul className="mt-6 space-y-2.5 text-[15px] text-ink-2">
           {PLAN.perks.map((p) => (
             <li key={p}>✓ {p}</li>

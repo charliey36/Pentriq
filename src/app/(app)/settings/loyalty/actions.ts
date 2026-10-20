@@ -82,3 +82,40 @@ export async function redeemLoyaltyPoints(customerId: string) {
   revalidatePath(`/customers/${customerId}`);
   return { success: true };
 }
+
+export async function createReferralPromotion(
+  _prev: LoyaltyFormResult,
+  formData: FormData
+): Promise<LoyaltyFormResult> {
+  const business = await requireBusiness();
+  const supabase = createClient();
+
+  const field = (key: string) => String(formData.get(key) ?? '').trim().slice(0, 200);
+  const name = field('name');
+  const referrerReward = field('referrer_reward');
+  if (!name || !referrerReward) {
+    return { error: 'Promotion name and referrer reward are required.' };
+  }
+
+  const { error } = await supabase.from('referral_promotions').insert({
+    business_id: business.id,
+    name,
+    // The promotion name is the offer shown to the referred customer.
+    customer_reward: name,
+    referrer_reward: referrerReward,
+  });
+  if (error) return { error: 'Could not create promotion.' };
+
+  revalidatePath('/settings/loyalty');
+  revalidatePath('/referrals');
+  return { success: true };
+}
+
+export async function deleteReferralPromotion(promotionId: string) {
+  const business = await requireBusiness();
+  const supabase = createClient();
+  await supabase.from('referral_promotions').delete().eq('id', promotionId).eq('business_id', business.id);
+  revalidatePath('/settings/loyalty');
+  revalidatePath('/referrals');
+  return { success: true };
+}

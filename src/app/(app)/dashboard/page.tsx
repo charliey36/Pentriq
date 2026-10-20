@@ -179,7 +179,7 @@ export default async function DashboardPage() {
     {
       done: trialStarted,
       title: 'Start free trial',
-      description: 'Your 14-day trial begins when you start it. No card needed.',
+      description: 'Your 30-day trial begins when you start it. No card needed.',
       href: '/settings/billing',
       cta: 'Start trial',
     },

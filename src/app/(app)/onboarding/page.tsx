@@ -19,10 +19,10 @@ export default async function OnboardingPage() {
         <div className="card mt-6 space-y-3 p-5">
           <p className="text-sm font-medium text-ink">Start your free trial to send</p>
           <p className="text-sm text-ink-3">
-            Your 14-day trial begins when you start it, not when you signed up, and no card is needed. You can fill in
+            Your 30-day trial begins when you start it, not when you signed up, and no card is needed. You can fill in
             the form below first; the request is sent once your trial has started.
           </p>
-          <BillingButton action={claimTrial as (p: BillingResult, f: FormData) => Promise<BillingResult>} label="Start my 14-day free trial" />
+          <BillingButton action={claimTrial as (p: BillingResult, f: FormData) => Promise<BillingResult>} label="Start my 30-day free trial" />
         </div>
       )}
       <OnboardingForm defaultName={business.name === 'My Business' ? '' : business.name} defaultUrl={business.google_review_url} defaultBookingUrl={business.booking_url ?? ''} />

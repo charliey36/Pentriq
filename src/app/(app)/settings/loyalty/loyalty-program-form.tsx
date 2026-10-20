@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useFormState } from 'react-dom';
 import { useActionToast } from '@/components/toast';
 import type { LoyaltyProgram } from '@/lib/database.types';
@@ -40,45 +41,21 @@ function PointsField({
   );
 }
 
-export function LoyaltyProgramForm({ program }: { program: LoyaltyProgram | null }) {
+export function LoyaltyProgramForm({ program, children }: { program: LoyaltyProgram | null; children?: ReactNode }) {
   const [state, formAction] = useFormState<LoyaltyFormResult, FormData>(saveLoyaltyProgram, {});
   useActionToast(state, { title: 'Loyalty program saved' });
 
   return (
-    <form action={formAction} className="space-y-6">
-      <SectionCard>
-        <label className="flex cursor-pointer items-center justify-between gap-6">
-          <span className="min-w-0">
-            <span className="block text-sm font-semibold text-ink">Loyalty program is active</span>
-            <span className="mt-1 block text-[13px] leading-5 text-ink-3">
-              When on, customers earn points automatically and can redeem them for your reward.
-            </span>
-          </span>
+    <form id="loyalty-form" action={formAction} className="space-y-6">
 
-          <span className="relative inline-flex flex-shrink-0 items-center">
-            <input
-              type="checkbox"
-              role="switch"
-              name="is_active"
-              defaultChecked={program?.is_active ?? false}
-              className="peer sr-only"
-            />
-            <span className="h-6 w-11 rounded-full bg-line-strong transition-colors duration-200 peer-checked:bg-brand-600 peer-focus-visible:ring-[3px] peer-focus-visible:ring-brand-500/30" />
-            <span className="pointer-events-none absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out-expo peer-checked:translate-x-5" />
-          </span>
-        </label>
-      </SectionCard>
-
-      <SectionCard title="Earning rules" description="How many points customers earn for each action.">
+      <SectionCard title="Earning rules and reward" description="How many points customers earn for each action, and what they get when they reach the redemption threshold.">
         <div className="grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-3">
           <PointsField id="points_per_visit" label="Per visit" defaultValue={program?.points_per_visit ?? 10} />
           <PointsField id="points_per_review" label="Per review" defaultValue={program?.points_per_review ?? 20} />
           <PointsField id="points_per_referral" label="Per referral" defaultValue={program?.points_per_referral ?? 50} />
         </div>
-      </SectionCard>
 
-      <SectionCard title="Reward" description="What customers get when they reach the redemption threshold.">
-        <div className="max-w-lg space-y-5">
+        <div className="mt-6 max-w-lg space-y-5">
           <div className="w-full sm:w-52">
             <PointsField
               id="redemption_points"
@@ -104,6 +81,8 @@ export function LoyaltyProgramForm({ program }: { program: LoyaltyProgram | null
         </div>
       </SectionCard>
 
+      {children}
+
       <div className="flex flex-wrap items-center gap-4">
         <SubmitButton pendingText="Saving…" icon={<Icon name="check" className="h-4 w-4" strokeWidth={2.2} />}>
           Save loyalty program
@@ -111,5 +90,27 @@ export function LoyaltyProgramForm({ program }: { program: LoyaltyProgram | null
         {state.error && <Notice variant="error">{state.error}</Notice>}
       </div>
     </form>
+  );
+}
+
+/** Header toggle; submitted with the main form via the `form` attribute. */
+export function LoyaltyActiveToggle({ program }: { program: LoyaltyProgram | null }) {
+  return (
+    <label className="flex cursor-pointer items-center gap-3">
+          <span className="text-sm font-semibold text-ink">Loyalty program active</span>
+
+          <span className="relative inline-flex flex-shrink-0 items-center">
+            <input
+              type="checkbox"
+              form="loyalty-form"
+              role="switch"
+              name="is_active"
+              defaultChecked={program?.is_active ?? false}
+              className="peer sr-only"
+            />
+            <span className="h-6 w-11 rounded-full bg-line-strong transition-colors duration-200 peer-checked:bg-brand-600 peer-focus-visible:ring-[3px] peer-focus-visible:ring-brand-500/30" />
+            <span className="pointer-events-none absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out-expo peer-checked:translate-x-5" />
+          </span>
+        </label>
   );
 }

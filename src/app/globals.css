@@ -450,6 +450,20 @@
     background-size: 1rem;
   }
 
+  /* Native option list: use theme tokens so it stays readable in dark mode. */
+  select.input option {
+    @apply bg-surface text-ink;
+  }
+
+  select.input option:disabled {
+    @apply text-ink-4;
+  }
+
+  /* Required select with no value chosen yet shows the placeholder colour. */
+  select.input:required:invalid {
+    @apply text-ink-4;
+  }
+
   /* ---- Data tables ---- */
   .data-table {
     @apply w-full min-w-full border-collapse text-left text-sm;

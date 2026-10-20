@@ -20,7 +20,7 @@ export function RedeemReferralForm({ customers }: { customers: Customer[] }) {
         e.preventDefault();
         setPending(true);
         setMessage(null);
-        const result = await redeemReferralCode(code, refereeId);
+        const result = await redeemReferralCode(code);
         if (result?.error) {
           setMessage({ type: 'error', text: result.error });
         } else {

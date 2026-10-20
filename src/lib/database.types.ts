@@ -621,6 +621,27 @@ export type Database = {
         };
         Relationships: [];
       };
+      referral_promotions: {
+        Row: {
+          id: string;
+          business_id: string;
+          name: string;
+          description: string;
+          customer_reward: string;
+          referrer_reward: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          name: string;
+          description?: string;
+          customer_reward: string;
+          referrer_reward: string;
+        };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
       segments: {
         Row: {
           id: string;
@@ -704,8 +725,13 @@ export type Database = {
           referrer_customer_id: string;
           referee_customer_id: string | null;
           code: string;
-          status: 'pending' | 'completed';
+          status: 'active' | 'redeemed' | 'expired';
           reward_granted_at: string | null;
+          redeemed_at: string | null;
+          promotion_id: string | null;
+          promotion_name: string | null;
+          customer_reward: string | null;
+          referrer_reward: string | null;
           created_at: string;
         };
         Insert: {
@@ -714,13 +740,23 @@ export type Database = {
           referrer_customer_id: string;
           referee_customer_id?: string | null;
           code: string;
-          status?: 'pending' | 'completed';
+          status?: 'active' | 'redeemed' | 'expired';
           reward_granted_at?: string | null;
+          redeemed_at?: string | null;
+          promotion_id?: string | null;
+          promotion_name?: string | null;
+          customer_reward?: string | null;
+          referrer_reward?: string | null;
         };
         Update: {
           referee_customer_id?: string | null;
-          status?: 'pending' | 'completed';
+          status?: 'active' | 'redeemed' | 'expired';
           reward_granted_at?: string | null;
+          redeemed_at?: string | null;
+          promotion_id?: string | null;
+          promotion_name?: string | null;
+          customer_reward?: string | null;
+          referrer_reward?: string | null;
         };
         Relationships: [];
       };
@@ -855,6 +891,7 @@ export type PrivateFeedback = Database['public']['Tables']['private_feedback']['
 export type Journey = Database['public']['Tables']['journeys']['Row'];
 export type JourneyEnrollment = Database['public']['Tables']['journey_enrollments']['Row'];
 export type Segment = Database['public']['Tables']['segments']['Row'];
+export type ReferralPromotion = Database['public']['Tables']['referral_promotions']['Row'];
 export type LoyaltyProgram = Database['public']['Tables']['loyalty_programs']['Row'];
 export type LoyaltyLedgerEntry = Database['public']['Tables']['loyalty_ledger_entries']['Row'];
 export type Referral = Database['public']['Tables']['referrals']['Row'];

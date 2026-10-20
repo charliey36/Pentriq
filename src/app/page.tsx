@@ -187,6 +187,13 @@ export default async function HomePage() {
               ))}
             </ul>
 
+            {/* Early-access offer: limited-time 30-day free trial, claimable on account creation. */}
+            <p className="mx-auto mt-6 max-w-2xl animate-fade-in-up text-sm text-ink-3 [animation-delay:200ms]">
+              <span className="font-semibold text-brand-600 dark:text-brand-400">Early access:</span>{' '}
+              for a limited time, new businesses can claim a <span className="font-semibold">30-day free trial</span>{' '}
+              &mdash; available as soon as you create your account.
+            </p>
+
             <div className="relative mx-auto mt-16 max-w-5xl animate-fade-in-up [animation-delay:240ms]">
               <div
                 aria-hidden="true"
