@@ -6,7 +6,7 @@ import { AuthShell } from '@/components/auth-shell';
 
 export const metadata: Metadata = pageMetadata({
   title: 'Create your account',
-  description: 'Create a Pentriq account, then start your 14-day free trial when you are ready. Automate review requests and bring customers back.',
+  description: 'Create a Pentriq account, then start your 30-day free trial when you are ready. Automate review requests and bring customers back.',
   path: '/signup',
 });
 

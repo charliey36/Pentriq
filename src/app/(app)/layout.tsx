@@ -83,7 +83,7 @@ export default async function AppLayout({
                 {billing.status !== 'active' && (
                   <Link href="/settings/billing" className="mb-6 block rounded-xl bg-brand-50 px-4 py-2.5 text-sm text-brand-800 ring-1 ring-brand-600/15 dark:bg-brand-500/10 dark:text-brand-200">
                     {billing.status === 'trial_available'
-                      ? 'Start your 14-day free trial to begin sending — no card needed'
+                      ? 'Start your 30-day free trial to begin sending — no card needed'
                       : billing.status === 'trialing'
                         ? `${billing.trialDaysLeft} days left in your free trial — subscribe`
                         : 'Subscription needed to keep sending — view billing'}

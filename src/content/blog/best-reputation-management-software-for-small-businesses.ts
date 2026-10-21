@@ -16,7 +16,7 @@ export const post: BlogPost = {
   related: ['reputation-management-for-small-business', 'how-many-google-reviews-does-a-business-need'],
   cta: {
     title: 'See whether Pentriq fits your business.',
-    text: 'Pentriq is a single-plan reputation tool for service businesses: review requests with reminders, a private feedback inbox, rebooking reminders and review analytics. Check the pricing or try it free for 14 days.',
+    text: 'Pentriq is a single-plan reputation tool for service businesses: review requests with reminders, a private feedback inbox, rebooking reminders and review analytics. Check the pricing or try it free for 30 days.',
     label: 'Start your free trial',
     href: '/signup',
   },
@@ -66,7 +66,7 @@ export const post: BlogPost = {
     h2('Where Pentriq fits', 'pentriq'),
     p('We built Pentriq for owner-run service businesses that want consistent, compliant review collection and simple analytics, without enterprise complexity. Here is an honest summary.'),
     h3('What Pentriq does today'),
-    ul('Automatic review requests by email, with a three-step sequence (request, day-three reminder, day-seven final reminder) that stops when the customer responds.', 'A public review link and a private feedback option on every request, offered to everyone and never gated by sentiment, with a private feedback inbox.', 'Click tracking that filters automated hits, and a funnel from requests to clicks to reviews.', 'Reviews Analytics: review count, rating, rating change since last month, review velocity and plain-English insights, using manual snapshots or Google data when connected.', 'Customer management with CSV import, visit history, segments, rebooking reminders and unsubscribe handling.', 'One plan with a 14-day free trial, with billing handled through Stripe.'),
+    ul('Automatic review requests by email, with a three-step sequence (request, day-three reminder, day-seven final reminder) that stops when the customer responds.', 'A public review link and a private feedback option on every request, offered to everyone and never gated by sentiment, with a private feedback inbox.', 'Click tracking that filters automated hits, and a funnel from requests to clicks to reviews.', 'Reviews Analytics: review count, rating, rating change since last month, review velocity and plain-English insights, using manual snapshots or Google data when connected.', 'Customer management with CSV import, visit history, segments, rebooking reminders and unsubscribe handling.', 'One plan with a 30-day free trial, with billing handled through Stripe.'),
     h3('What to know before you choose it'),
     ul('Requests currently go out by email; SMS is not live yet.', 'Automatic Google review import depends on Google approving Business Profile API access, so until then you can record rating snapshots manually. You can follow progress on the [roadmap](/roadmap).', 'It is designed for single-business owners, not large multi-location chains.'),
     p('You can read the full [feature overview](/#features), check the [pricing](/pricing), and see how our [reputation management approach](/blog/reputation-management-for-small-business) works in practice. If it sounds like a fit, [start a free trial](/signup).'),

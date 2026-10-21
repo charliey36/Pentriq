@@ -26,7 +26,7 @@ export const post: BlogPost = {
   related: ['how-to-get-more-google-reviews', 'google-business-profile-guide'],
   cta: {
     title: 'Monitor, collect and analyse your reputation in one place with Pentriq.',
-    text: 'Pentriq combines review requests, a private feedback inbox, and review analytics so you can hear from customers early, respond quickly, and see how your reputation is trending. Try it free for 14 days.',
+    text: 'Pentriq combines review requests, a private feedback inbox, and review analytics so you can hear from customers early, respond quickly, and see how your reputation is trending. Try it free for 30 days.',
     label: 'Start your free trial',
     href: '/signup',
   },
@@ -220,7 +220,7 @@ export const post: BlogPost = {
     },
     {
       t: 'p',
-      text: 'You can assemble these in a spreadsheet, but it takes discipline. [Pentriq](/) brings click tracking, a request-to-review funnel, review growth and rating change into one dashboard, so you spend your time acting on the data instead of collecting it. You can [try it free for 14 days](/signup). See the [feature overview](/#features) for what is included, and the [pricing](/pricing) for the single plan.',
+      text: 'You can assemble these in a spreadsheet, but it takes discipline. [Pentriq](/) brings click tracking, a request-to-review funnel, review growth and rating change into one dashboard, so you spend your time acting on the data instead of collecting it. You can [try it free for 30 days](/signup). See the [feature overview](/#features) for what is included, and the [pricing](/pricing) for the single plan.',
     },
 
     { t: 'h2', text: 'Building a long-term reputation strategy', id: 'long-term-strategy' },

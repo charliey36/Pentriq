@@ -113,7 +113,7 @@ function PromotionForm({ promotion, onDone }: { promotion?: ReferralPromotion; o
   }, [state, editing, onDone]);
 
   return (
-    <form key={formKey} action={formAction} className="max-w-2xl space-y-4">
+    <form key={formKey} action={formAction} className="max-w-4xl space-y-4">
       <div>
         <label htmlFor={`promo_name_${promotion?.id ?? 'new'}`} className="label">Promotion name</label>
         <input
@@ -127,6 +127,7 @@ function PromotionForm({ promotion, onDone }: { promotion?: ReferralPromotion; o
         />
         <p className="mt-1 text-xs text-ink-4">The name you will pick from the Referrals dropdown.</p>
       </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       <RewardField
         prefix="referrer"
         title="Referrer reward"
@@ -141,6 +142,7 @@ function PromotionForm({ promotion, onDone }: { promotion?: ReferralPromotion; o
         initialPoints={promotion?.customer_points}
         initialText={promotion?.customer_reward_type === 'custom' ? promotion.customer_reward : ''}
       />
+      </div>
       <div className="flex flex-wrap items-center gap-3">
         <SubmitButton pendingText={editing ? 'Saving…' : 'Creating…'}>{editing ? 'Save changes' : 'Create Promotion'}</SubmitButton>
         {editing && <button type="button" className="btn btn-secondary" onClick={onDone}>Cancel</button>}

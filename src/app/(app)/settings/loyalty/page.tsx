@@ -3,7 +3,7 @@ import { requireBusiness } from '@/lib/business';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/ui/page-header';
 import { SettingsTabs } from '@/components/settings-tabs';
-import { LoyaltyActiveToggle, LoyaltyProgramForm } from './loyalty-program-form';
+import { LoyaltyActiveToggle, LoyaltyProgramForm, LoyaltySaveButton } from './loyalty-program-form';
 import { ReferralPromotions } from './referral-promotions';
 
 export const metadata: Metadata = { title: 'Loyalty program' };
@@ -39,6 +39,8 @@ export default async function LoyaltySettingsPage() {
 
       {/* Sibling, not a child: a <form> nested inside #loyalty-form is invalid HTML and broke Create Promotion. */}
       <ReferralPromotions promotions={promotions ?? []} />
+
+      <LoyaltySaveButton />
     </div>
   );
 }

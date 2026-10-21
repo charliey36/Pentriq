@@ -15,7 +15,7 @@ const NOT_CONFIGURED = 'Online payments are not switched on yet. Your free trial
 const GENERIC_ERROR = 'Something went wrong talking to Stripe. Please try again.';
 
 /**
- * Claims the 14-day free trial. The trial is opt-in: it never starts at
+ * Claims the 30-day free trial. The trial is opt-in: it never starts at
  * signup. The update is conditional on `trial_ends_at IS NULL`, so a double
  * click or two tabs cannot restart or extend it, and a business that has ever
  * claimed (or subscribed) is refused.

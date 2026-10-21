@@ -27,7 +27,7 @@ export const post: BlogPost = {
   cta: {
     title: 'Turn your Business Profile into a review engine with Pentriq.',
     text: 'Once your profile is set up, Pentriq helps you collect reviews consistently, offers customers a private feedback route, and tracks your review count and rating over time so you can see what is working.',
-    label: 'Try Pentriq free for 14 days',
+    label: 'Try Pentriq free for 30 days',
     href: '/signup',
   },
   body: [

@@ -1,6 +1,6 @@
 # Stripe setup and test checklist
 
-Pentriq has **one plan** (see `PLAN` in `src/lib/billing.ts`: £19.99/month, 14-day free trial with no card).
+Pentriq has **one plan** (see `PLAN` in `src/lib/billing.ts`: £19.99/month, 30-day free trial with no card).
 Stripe is wired into the existing Settings → Billing page; nothing about the plan, price or page layout changed.
 
 ## How it fits together
@@ -20,13 +20,13 @@ webhooks write those **and** the fuller `subscriptions` row.
 
 ### Access tiers
 - **Free (always):** viewing data, settings, billing, feedback inbox, reputation tracking.
-- **Trial (14 days from signup) and Paid (`active`, `past_due`):** everything that sends customer messages.
+- **Trial (30 days from signup) and Paid (`active`, `past_due`):** everything that sends customer messages.
 - **Blocked (trial ended, canceled):** manual sends return "Your free trial has ended…"; scheduled jobs defer
   affected rows by a day (not cancelled, so they resume after subscribing).
 `past_due` keeps access while Stripe retries the card.
 
 ### Trial
-Already existed (`businesses.trial_ends_at`, default now()+14 days; countdown banner in the app layout and Billing page).
+Already existed (`businesses.trial_ends_at`, default now()+14 days (legacy default; trial is now opt-in, 30 days); countdown banner in the app layout and Billing page).
 If a user subscribes mid-trial and ≥2 days remain, the remaining trial is carried into Stripe (`trial_end`), so the first charge
 happens when the trial would have ended.
 
@@ -57,7 +57,7 @@ extend `PLAN`/`planNameForPrice`, and enable plan switching in the portal config
 6. Local webhooks: `stripe listen --forward-to localhost:3000/api/stripe/webhook` (use the `whsec_` it prints).
 
 ## Test checklist (Stripe test mode)
-- [ ] **Signup / trial start:** new account → Billing shows "Free trial", 14 days left; banner shows countdown.
+- [ ] **Signup / trial start:** new account → Billing shows "Free trial", 30 days left; banner shows countdown.
 - [ ] **Checkout:** click Subscribe → Stripe-hosted page opens with £19.99/month. Cancel → back on Billing with "Checkout cancelled".
 - [ ] **Successful payment:** card `4242 4242 4242 4242` → returns to Billing with "subscription is active"; `subscriptions` and `businesses` rows updated; payment method + invoice appear (invoice appears after the trial if one was carried over).
 - [ ] **Failed payment:** subscribe with `4000 0000 0000 0341` (attaches, then fails on charge) or use a test clock to advance; `invoice.payment_failed` → status "Payment failed" (`past_due`); access retained.

@@ -26,7 +26,7 @@ export const post: BlogPost = {
   related: ['reputation-management-for-small-business', 'google-business-profile-guide'],
   cta: {
     title: 'Track and analyse your review growth with Pentriq.',
-    text: 'Pentriq sends review requests with automatic reminders, offers a private feedback option on every request, and shows you clicks, reviews and rating trends in one dashboard. Start with a 14-day free trial.',
+    text: 'Pentriq sends review requests with automatic reminders, offers a private feedback option on every request, and shows you clicks, reviews and rating trends in one dashboard. Start with a 30-day free trial.',
     label: 'Start your free trial',
     href: '/signup',
   },
@@ -259,7 +259,7 @@ export const post: BlogPost = {
     },
     {
       t: 'p',
-      text: 'Pentriq does this for you. Review requests are tracked from send to click, reminders stop automatically when a customer responds, and bots and link scanners are filtered out so your numbers are honest. The Reviews Analytics area shows review growth and rating change over time, using snapshots you record or data from a connected Google Business Profile where available. You can see how it works on the [Pentriq features page](/#features), and the plan is a single simple price on the [pricing page](/pricing), with a [14-day free trial](/signup) to test it on your own customers.',
+      text: 'Pentriq does this for you. Review requests are tracked from send to click, reminders stop automatically when a customer responds, and bots and link scanners are filtered out so your numbers are honest. The Reviews Analytics area shows review growth and rating change over time, using snapshots you record or data from a connected Google Business Profile where available. You can see how it works on the [Pentriq features page](/#features), and the plan is a single simple price on the [pricing page](/pricing), with a [30-day free trial](/signup) to test it on your own customers.',
     },
 
     { t: 'h2', text: 'Measuring review growth', id: 'measuring-growth' },

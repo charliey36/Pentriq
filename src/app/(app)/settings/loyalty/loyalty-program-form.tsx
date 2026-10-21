@@ -6,7 +6,6 @@ import type { LoyaltyProgram } from '@/lib/database.types';
 import { Icon } from '@/components/ui/icons';
 import { Notice } from '@/components/ui/notice';
 import { SectionCard } from '@/components/ui/section-card';
-import { SubmitButton } from '@/components/ui/submit-button';
 import { saveLoyaltyProgram, type LoyaltyFormResult } from './actions';
 
 function PointsField({
@@ -80,13 +79,20 @@ export function LoyaltyProgramForm({ program }: { program: LoyaltyProgram | null
         </div>
       </SectionCard>
 
-      <div className="flex flex-wrap items-center gap-4">
-        <SubmitButton pendingText="Saving…" icon={<Icon name="check" className="h-4 w-4" strokeWidth={2.2} />}>
-          Save loyalty program
-        </SubmitButton>
-        {state.error && <Notice variant="error">{state.error}</Notice>}
-      </div>
+      {state.error && <Notice variant="error">{state.error}</Notice>}
     </form>
+  );
+}
+
+/** Save button, rendered at the bottom of the page (below Referral Promotions) but submitting the main form. */
+export function LoyaltySaveButton() {
+  return (
+    <div className="mt-6">
+      <button type="submit" form="loyalty-form" className="btn btn-primary">
+        <Icon name="check" className="h-4 w-4" strokeWidth={2.2} />
+        Save loyalty program
+      </button>
+    </div>
   );
 }
 
