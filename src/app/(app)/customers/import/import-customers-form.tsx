@@ -110,6 +110,11 @@ export function ImportCustomersForm({ windowDays }: { windowDays: number }) {
                         <option key={`${field}-${index}`} value={index}>{header}</option>
                       ))}
                     </select>
+                    {detected.columnIndex !== null && detected.confidence !== 'high' && (
+                      <span className="mt-1 block text-xs text-amber-700 dark:text-amber-300">
+                        We think this matches your {field} field. Please check it is right.
+                      </span>
+                    )}
                     <span className="mt-1 block truncate text-xs text-ink-3">
                       {detected.samples.length > 0 ? `Sample: ${detected.samples.join(' · ')}` : 'No sample detected'}
                     </span>
@@ -154,6 +159,16 @@ export function ImportCustomersForm({ windowDays }: { windowDays: number }) {
       {state.summary && (
         <div className="mt-8 animate-fade-in border-t border-line pt-6">
           <h3 className="text-sm font-semibold text-ink">Import complete</h3>
+          {(() => {
+            const s = state.summary;
+            const skipped = s.conflicts + s.duplicates + s.errors;
+            const warnings = (s.warning ? 1 : 0) + s.results.filter((r) => r.status === 'updated' && 'note' in r && r.note).length;
+            return (
+              <p className="mt-2 text-sm font-medium text-ink">
+                Imported: {Math.max(0, s.totalRows - skipped)} · Skipped: {skipped} · Warnings: {warnings}
+              </p>
+            );
+          })()}
           <ul className="mt-3 space-y-1.5 text-sm text-ink-2">
             <li>✅ Customers created: <b>{state.summary.customersCreated}</b></li>
             <li>🔄 Customers updated: <b>{state.summary.customersUpdated}</b> <span className="text-ink-3">(matched on email or phone)</span></li>

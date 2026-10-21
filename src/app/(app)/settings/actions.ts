@@ -1,5 +1,6 @@
 'use server';
 
+import { userSafeError } from '@/lib/log';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireBusiness } from '@/lib/business';
@@ -122,7 +123,7 @@ export async function uploadBusinessLogo(
     .upload(path, file, { contentType: file.type, upsert: true });
 
   if (uploadError) {
-    return { error: `Failed to upload image: ${uploadError.message}` };
+    return { error: userSafeError('Failed to upload image', uploadError) };
   }
 
   const {
@@ -139,7 +140,7 @@ export async function uploadBusinessLogo(
     .eq('id', business.id);
 
   if (updateError) {
-    return { error: `Failed to save image: ${updateError.message}` };
+    return { error: userSafeError('Failed to save image', updateError) };
   }
 
   revalidatePath('/settings');

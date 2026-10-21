@@ -1,5 +1,6 @@
 'use server';
 
+import { userSafeError } from '@/lib/log';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { requireBusiness } from '@/lib/business';
@@ -40,7 +41,7 @@ export async function completeOnboarding(_prev: OnboardingResult, fd: FormData):
     .from('businesses')
     .update({ name, google_review_url: url, booking_url: bookingUrl || null, ...(bookingUrl ? { booking_url_updated_at: new Date().toISOString() } : {}) })
     .eq('id', business.id);
-  if (bizError) return { error: `Could not save your business: ${bizError.message}` };
+  if (bizError) return { error: userSafeError('Could not save your business', bizError) };
 
   const { data: customer, error: custError } = await supabase
     .from('customers')

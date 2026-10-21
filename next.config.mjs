@@ -12,6 +12,21 @@ const baseConfig = {
   // instrumentationHook: loads src/instrumentation.ts (Sentry) on Next 14.
   experimental: { staleTimes: { dynamic: 0, static: 30 }, instrumentationHook: true },
   // The release id is baked into the browser bundle so frontend errors carry the same release as the server.
+  // Baseline security headers on every response (no CSP yet: it needs testing against Stripe/Sentry/Google scripts).
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+          { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
+        ],
+      },
+    ];
+  },
   env: { NEXT_PUBLIC_SENTRY_RELEASE: process.env.VERCEL_GIT_COMMIT_SHA || '' },
 };
 

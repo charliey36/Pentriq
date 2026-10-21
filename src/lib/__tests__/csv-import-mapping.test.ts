@@ -102,16 +102,42 @@ describe('local CSV import mapping', () => {
     expect(result).toEqual(expect.objectContaining({ error: expect.stringMatching(/name/i) }));
   });
 
-  it('marks an ambiguous header as low confidence instead of silently trusting it', () => {
-    const result = analyzeCsvMapping([
-      ['Name', 'Email', 'Appointment'],
-      ['Alex Smith', 'alex@example.com', 'not a date'],
-    ]);
-    expect('error' in result).toBe(false);
-    if ('error' in result) return;
-    expect(result.mappings.date.header).toBe('Appointment');
-    expect(result.mappings.date.confidence).toBe('low');
-    expect(result.mappings.date.confidenceScore).toBeGreaterThanOrEqual(40);
-    expect(result.mappings.date.confidenceScore).toBeLessThan(70);
+  it('maps an "Appointment" column of text to service, and of dates to date', () => {
+    const text = analyzeCsvMapping([['Name', 'Email', 'Appointment'], ['Alex Smith', 'alex@example.com', 'Check-up']]);
+    if ('error' in text) throw new Error(text.error);
+    expect(text.mappings.service.header).toBe('Appointment');
+    expect(text.mappings.date.columnIndex).toBeNull();
+    expect(text.mappings.service.confidence).not.toBe('high'); // always shown for confirmation
+
+    const dates = analyzeCsvMapping([['Name', 'Email', 'Appointment'], ['Alex Smith', 'alex@example.com', '2026-01-05']]);
+    if ('error' in dates) throw new Error(dates.error);
+    expect(dates.mappings.date.header).toBe('Appointment');
+    expect(dates.mappings.service.columnIndex).toBeNull();
+  });
+
+  it.each([
+    ['Services', 'Cut & Colour', 'service'],
+    ['Treatment', 'Deep tissue massage', 'service'],
+    ['Treatments', 'Facial', 'service'],
+    ['Job', 'Boiler repair', 'service'],
+    ['Session', 'PT session', 'service'],
+    ['Products', 'Shampoo', 'service'],
+    ['Package', 'Gold', 'service'],
+    ['Task', 'Fit brakes', 'service'],
+  ])('recognises "%s" as a service column', (header, value, field) => {
+    const r = analyzeCsvMapping([['Client', 'Email', header], ['Alex Smith', 'alex@example.com', value]]);
+    if ('error' in r) throw new Error(r.error);
+    expect(r.mappings[field as 'service'].header).toBe(header);
+  });
+
+  it('scores strong synonyms above weak ones', () => {
+    const score = (h: string) => {
+      const r = analyzeCsvMapping([['Client', 'Email', h], ['Alex Smith', 'alex@example.com', 'Trim']]);
+      return 'error' in r ? 0 : r.mappings.service.confidenceScore;
+    };
+    expect(score('Service')).toBeGreaterThan(score('Job'));
+    expect(score('Appointment')).toBeGreaterThan(score('Task'));
+    expect(score('Treatment')).toBeGreaterThan(score('Task'));
+    expect(score('Task')).toBeGreaterThanOrEqual(40);
   });
 });

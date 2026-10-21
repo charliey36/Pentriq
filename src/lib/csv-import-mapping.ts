@@ -44,13 +44,33 @@ const ALIASES: Record<CsvImportField, string[]> = {
   service: [
     'service', 'servicename', 'treatment', 'treatmentname', 'bookingtype', 'appointmenttype', 'visittype',
     'package', 'category', 'procedure', 'sessiontype', 'workperformed', 'jobtype', 'servicedescription',
-    'serviceType', 'servicetype', 'jobname', 'worktype', 'description', 'workcompleted',
+    'servicetype', 'jobname', 'worktype', 'description', 'workcompleted',
   ],
   amount: [
     'amount', 'amountspent', 'total', 'totalspend', 'spend', 'price', 'cost', 'salevalue', 'revenue',
     'transactionamount', 'paymentamount', 'invoicevalue', 'appointmentvalue', 'grossvalue', 'netvalue',
     'totalrevenue', 'charge', 'amountpaid', 'serviceprice', 'servicecost', 'value', 'fee',
   ],
+};
+
+/**
+ * Weighted service-column synonyms (normalised, singular). The weight is the header score for an
+ * exact match: strong, unambiguous names score highest; looser words ("task", "description",
+ * "transaction") score lower so they are still offered but never trusted blindly. Covers hair,
+ * barbering, beauty, nails, dental, clinics, trades, automotive, fitness and consulting exports.
+ */
+const SERVICE_SYNONYMS: Record<string, number> = {
+  // strong
+  service: 70, servicename: 70, servicetype: 70, servicerequested: 70, requestedservice: 70, servicebooked: 70,
+  treatment: 70, treatmentname: 70, treatmenttype: 70, appointment: 68, appointmenttype: 70, appointmentname: 68,
+  procedure: 68, procedurename: 68, visittype: 66, bookingtype: 66, sessiontype: 66, servicedescription: 66,
+  // good
+  booking: 60, visit: 56, session: 58, job: 58, jobtype: 62, jobname: 60, jobdescription: 58, package: 58, packagename: 58,
+  worktype: 60, workperformed: 62, workcompleted: 60, worktodo: 56, lesson: 55, lessontype: 58, classname: 55, class: 50,
+  appointmentreason: 56, reasonforvisit: 56, visitreason: 56, treatmentplan: 55, repair: 52, jobcategory: 55, category: 52,
+  // weaker but plausible
+  work: 50, product: 48, productname: 52, purchase: 48, itempurchased: 52, item: 46, order: 46, transaction: 42,
+  task: 44, activity: 44, description: 44, type: 42, details: 42, notes: 0,
 };
 
 const FIRST_NAME_ALIASES = ['firstname', 'givenname', 'forename', 'christianname', 'first'];
@@ -112,6 +132,13 @@ function headerScore(field: CsvImportField, header: string): number {
   const normalizedHeader = normalize(header);
   if (STAFF_HEADERS.includes(normalizedHeader) && (field === 'name' || field === 'service')) return 0;
   if (field === 'name' && (FIRST_NAME_ALIASES.includes(normalizedHeader) || LAST_NAME_ALIASES.includes(normalizedHeader))) return 0;
+  if (field === 'service') {
+    const exact = SERVICE_SYNONYMS[normalizedHeader] ?? SERVICE_SYNONYMS[normalizedHeader.replace(/s$/, '')];
+    if (exact) return exact;
+    // Multi-word headers ("Treatment Details", "Hair Services Booked"): the strongest known word, discounted.
+    const best = Math.max(0, ...headerWords(header).map((w) => SERVICE_SYNONYMS[w] ?? SERVICE_SYNONYMS[w.replace(/s$/, '')] ?? 0));
+    if (best) return Math.max(40, best - 14);
+  }
   const aliases = ALIASES[field];
   // Name priority is intentionally strict: only an exact approved full-name alias
   // may win here. `service name` must never inherit the generic `name` token.
@@ -229,9 +256,20 @@ export function analyzeCsvMapping(rows: string[][]): CsvMappingAnalysis | { erro
   }
 
   logDevelopmentScores(headers, rows);
+  // Assign the remaining fields best-score-first across ALL fields, so a column such as
+  // "Appointment" goes to the field it fits best (service) rather than whichever field is checked first.
+  const pairs: Array<{ field: CsvImportField; candidate: Candidate }> = [];
   for (const field of CSV_IMPORT_FIELDS.filter((candidate) => candidate !== 'name')) {
-    const candidate = bestCandidate(field, headers, rows, used);
-    if (!candidate) continue;
+    headers.forEach((header, columnIndex) => {
+      if (used.has(columnIndex)) return;
+      const samples = sampleValues(rows, columnIndex);
+      const s = score(field, header, samples);
+      if (s >= 40) pairs.push({ field, candidate: { columnIndex, header, samples, score: s } });
+    });
+  }
+  pairs.sort((a, b) => b.candidate.score - a.candidate.score || a.candidate.columnIndex - b.candidate.columnIndex);
+  for (const { field, candidate } of pairs) {
+    if (mappings[field].columnIndex !== null || used.has(candidate.columnIndex)) continue;
     used.add(candidate.columnIndex);
     mappings[field] = { field, columnIndex: candidate.columnIndex, header: candidate.header, confidence: confidence(candidate.score), confidenceScore: candidate.score, samples: candidate.samples };
   }

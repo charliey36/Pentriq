@@ -1,5 +1,6 @@
 'use server';
 
+import { userSafeError } from '@/lib/log';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireBusiness } from '@/lib/business';
@@ -43,7 +44,7 @@ export async function saveLoyaltyProgram(
   );
 
   if (error) {
-    return { error: `Failed to save loyalty program: ${error.message}` };
+    return { error: userSafeError('Failed to save loyalty program', error) };
   }
 
   revalidatePath('/settings/loyalty');
@@ -61,6 +62,9 @@ export async function redeemLoyaltyPoints(customerId: string) {
     .maybeSingle();
 
   if (!program || !program.is_active) return { error: 'Loyalty program is not active.' };
+
+  const { data: ownedCustomer } = await supabase.from('customers').select('id').eq('id', customerId).eq('business_id', business.id).maybeSingle();
+  if (!ownedCustomer) return { error: 'Customer not found.' };
 
   const { data: entries } = await supabase
     .from('loyalty_ledger_entries')

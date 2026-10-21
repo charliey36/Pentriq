@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { isAdminEmail } from '@/lib/admin-access';
 
 /**
  * Refreshes the Supabase auth session cookie on every request and protects
@@ -63,6 +64,13 @@ export async function middleware(request: NextRequest) {
   if (!user && !isAuthPage && !isPublicApiRoute && !isPublicPage && pathname !== '/') {
     const redirectUrl = new URL('/login', request.url);
     return NextResponse.redirect(redirectUrl);
+  }
+
+  // Admin Portal: signed-in non-admins get a real 403 (not a redirect or a guessable 404).
+  if (user && (pathname === '/admin' || pathname.startsWith('/admin/') || pathname.startsWith('/api/admin/')) && !isAdminEmail(typeof user.email === 'string' ? user.email : null)) {
+    return pathname.startsWith('/api/')
+      ? NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+      : new NextResponse('403 - You do not have permission to view this page.', { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } });
   }
 
   if (user && isAuthPage) {

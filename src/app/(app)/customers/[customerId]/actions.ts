@@ -1,5 +1,6 @@
 'use server';
 
+import { userSafeError } from '@/lib/log';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireBusiness } from '@/lib/business';
@@ -23,8 +24,17 @@ export async function logVisit(
   const price = priceRaw ? Number(priceRaw) : null;
   const notes = String(formData.get('notes') ?? '').trim() || null;
 
-  if (price !== null && (!Number.isFinite(price) || price < 0)) {
-    return { error: 'Price must be a positive number.' };
+  if (price !== null && (!Number.isFinite(price) || price < 0 || price > 1_000_000)) {
+    return { error: 'Price must be a number between 0 and 1,000,000.' };
+  }
+  if (notes && notes.length > 1000) return { error: 'Notes must be 1,000 characters or fewer.' };
+
+  // The customer and service must belong to this business (ids come from the browser).
+  const { data: ownedCustomer } = await supabase.from('customers').select('id').eq('id', customerId).eq('business_id', business.id).maybeSingle();
+  if (!ownedCustomer) return { error: 'Customer not found.' };
+  if (serviceId) {
+    const { data: ownedService } = await supabase.from('services').select('id').eq('id', serviceId).eq('business_id', business.id).maybeSingle();
+    if (!ownedService) return { error: 'Service not found.' };
   }
 
   const { data: visit, error } = await supabase
@@ -40,7 +50,7 @@ export async function logVisit(
     .single();
 
   if (error || !visit) {
-    return { error: `Failed to log visit: ${error?.message ?? 'unknown error'}` };
+    return { error: userSafeError('Could not log the visit', error ?? 'no row returned') };
   }
 
   // A logged visit is a completed service — keep last_service_date in step so
@@ -185,7 +195,7 @@ export async function archiveCustomer(customerId: string): Promise<ManualActionR
     .eq('id', customerId)
     .eq('business_id', business.id);
 
-  if (error) return { error: `Failed to archive customer: ${error.message}` };
+  if (error) return { error: userSafeError('Failed to archive customer', error) };
 
   // Stop anything still waiting to go out — an archived customer shouldn't
   // receive further automated messages.
@@ -212,7 +222,7 @@ export async function unarchiveCustomer(customerId: string): Promise<ManualActio
     .eq('id', customerId)
     .eq('business_id', business.id);
 
-  if (error) return { error: `Failed to restore customer: ${error.message}` };
+  if (error) return { error: userSafeError('Failed to restore customer', error) };
 
   revalidatePath('/customers');
   revalidatePath(`/customers/${customerId}`);
@@ -243,7 +253,7 @@ export async function editCustomer(
     .eq('id', customerId)
     .eq('business_id', business.id);
 
-  if (error) return { error: `Failed to update customer: ${error.message}` };
+  if (error) return { error: userSafeError('Failed to update customer', error) };
 
   revalidatePath('/customers');
   revalidatePath(`/customers/${customerId}`);

@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireBusiness } from '@/lib/business';
-import { bulkImportCustomers, mapCsvRowsToCustomers, parseCsv } from '@/lib/customers';
+import { bulkImportWithRecovery, mapCsvRowsToCustomers, parseCsvWithIssues } from '@/lib/customers';
 import type { BulkImportSummary } from '@/lib/customers';
 import { analyzeCsvMapping, CSV_IMPORT_FIELDS, type CsvConfirmedMapping, type CsvMappingAnalysis } from '@/lib/csv-import-mapping';
 import { CONSENT_REQUIRED_MESSAGE, hasConsent } from '@/lib/consent';
@@ -16,7 +16,11 @@ async function readCsvFile(formData: FormData): Promise<{ rows?: string[][]; err
   if (!(file instanceof File) || file.size === 0) return { error: 'Choose a CSV file to upload.' };
   if (file.size > MAX_FILE_BYTES) return { error: 'File is too large (max 2MB).' };
   if (!file.name.toLowerCase().endsWith('.csv') && file.type !== 'text/csv') return { error: 'Please upload a .csv file.' };
-  const rows = parseCsv(await file.text());
+  const parsed = parseCsvWithIssues(await file.text());
+  if (parsed.binary) return { error: 'This does not look like a text CSV file. Export it again as "CSV (comma delimited)".' };
+  if (parsed.unterminatedQuote) return { error: 'This file looks damaged: a quoted value is never closed. Open it in Excel or Google Sheets and export it as CSV again.' };
+  const rows = parsed.rows;
+  if (rows.length < 2) return { error: 'The file needs a header row and at least one customer row.' };
   if (rows.length > MAX_ROWS + 1) return { error: `This file has ${rows.length - 1} rows; the limit is ${MAX_ROWS} per import.` };
   return { rows };
 }
@@ -78,8 +82,8 @@ export async function importCustomers(
 
   let summary: BulkImportSummary;
   try {
-    console.log('[CSV Import] Starting import process');
-    summary = await bulkImportCustomers(
+    console.log('[CSV Import] start', JSON.stringify({ businessId: business.id, rows: rows.length }));
+    summary = await bulkImportWithRecovery(
       supabase,
       { id: business.id, delay_hours: business.delay_hours, review_request_window_days: business.review_request_window_days ?? 1, review_cooldown_enabled: business.review_cooldown_enabled, review_cooldown_days: business.review_cooldown_days },
       rows,
@@ -92,13 +96,9 @@ export async function importCustomers(
   } catch (e) {
     const error = e instanceof Error ? e : new Error(String(e));
     
-    // DO NOT MASK THE ERROR - LOG THE ACTUAL EXCEPTION
-    console.error('❌ CSV IMPORT FAILED - ACTUAL ERROR:', error.message);
-    console.error('Stack trace:', error.stack);
-    console.error('Full error object:', JSON.stringify(e, Object.getOwnPropertyNames(e)));
-    
-    // Re-throw the actual error message to the user
-    return { error: `Import failed: ${error.message}` };
+    console.error('[CSV Import] FAILED', JSON.stringify({ businessId: business.id, error: error.message }));
+
+    return { error: 'The import could not be completed. Nothing was lost; please try again, and contact support if it keeps happening.' };
   }
 
   revalidatePath('/customers');

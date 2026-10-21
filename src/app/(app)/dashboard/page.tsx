@@ -639,12 +639,9 @@ export default async function DashboardPage() {
       </div>
 
       {isAdmin && (
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          <Link href="/admin/organisations" className="card block px-5 py-4 text-sm font-medium text-ink hover:bg-surface-muted">
-            Manage organisations (admin) →
-          </Link>
-          <Link href="/admin/changelog" className="card block px-5 py-4 text-sm font-medium text-ink hover:bg-surface-muted">
-            Manage changelog (admin) →
+        <div className="mt-6">
+          <Link href="/admin" className="card block px-5 py-4 text-sm font-medium text-ink hover:bg-surface-muted">
+            Admin Portal →
           </Link>
         </div>
       )}

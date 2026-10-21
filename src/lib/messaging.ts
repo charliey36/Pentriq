@@ -19,6 +19,8 @@
 import { Resend } from 'resend';
 import { escapeHtml } from '@/lib/html';
 import { transformResendError } from '@/lib/email-sandbox';
+import { logEvent } from '@/lib/log';
+import { notifyEmailSent } from '@/lib/email-events';
 import { isBlockedTestEmail, TEST_EMAIL_ERROR_MESSAGE } from '@/lib/test-email';
 
 export type MessageChannel = 'email' | 'sms' | 'whatsapp';
@@ -49,16 +51,13 @@ async function sendEmail(params: SendMessageParams, fromLabel: string) {
 
   // Reserved testing domains are always rejected by Resend; skip the call (still logged locally).
   if (isBlockedTestEmail(params.to.email)) {
-    console.warn(`[Email Send] Blocked testing domain, not sending to ${params.to.email}`);
+    logEvent('email', 'blocked_test_domain', { to: params.to.email }, 'warn');
     throw new MessageSendError(TEST_EMAIL_ERROR_MESSAGE);
   }
 
   const resend = getResendClient();
   const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
   
-  console.log(`[Email Send] Preparing to send email to ${params.to.email}`);
-  console.log(`[Email Send] From: ${fromLabel} <${from}>`);
-  console.log(`[Email Send] Subject: ${params.subject}`);
 
   const { error } = await resend.emails.send({
     from: `${fromLabel} <${from}>`,
@@ -73,14 +72,15 @@ async function sendEmail(params: SendMessageParams, fromLabel: string) {
 
   if (error) {
     const errorMsg = typeof error === 'string' ? error : error.message;
-    console.error(`[Email Send] ❌ Resend error:`, error);
+    logEvent('email', 'send_failed', { to: params.to.email, subject: params.subject, reason: errorMsg }, 'error');
     
     // Transform sandbox errors into human-readable messages
     const humanError = transformResendError(errorMsg);
     throw new MessageSendError(humanError);
   }
   
-  console.log(`[Email Send] ✅ Email sent successfully to ${params.to.email}`);
+  logEvent('email', 'sent', { to: params.to.email, subject: params.subject });
+  notifyEmailSent();
 }
 
 /**
@@ -107,7 +107,7 @@ class LoggingStubSmsProvider implements SmsProvider {
   async send(params: { to: string; body: string; whatsapp: boolean }): Promise<void> {
     // eslint-disable-next-line no-console
     console.log(
-      `[messaging:stub] Would send ${params.whatsapp ? 'WhatsApp' : 'SMS'} to ${params.to}: ${params.body}`
+      `[messaging:stub] Would send ${params.whatsapp ? 'WhatsApp' : 'SMS'} message (${params.body.length} chars)`
     );
   }
 }

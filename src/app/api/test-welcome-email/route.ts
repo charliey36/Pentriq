@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { logEvent } from '@/lib/log';
 import { isCronAuthorized } from '@/lib/cron-auth';
 import { sendNotificationEmail } from '@/lib/email';
 import { renderWelcomeEmail } from '@/lib/email-templates/welcome';
@@ -28,11 +29,11 @@ export async function GET(request: NextRequest) {
 
   try {
     await sendNotificationEmail(to, 'welcome', SAMPLE_BUSINESS);
-    console.log(`[test-welcome-email] SUCCESS sent to ${to}`);
+    logEvent('email', 'test_welcome_sent', { to });
     return NextResponse.json({ sent: true, to });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[test-welcome-email] FAILED to ${to}: ${message}`);
+    logEvent('email', 'test_welcome_failed', { to, reason: message }, 'error');
     return NextResponse.json({ sent: false, to, error: message }, { status: 502 });
   }
 }

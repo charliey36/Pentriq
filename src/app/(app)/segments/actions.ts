@@ -1,5 +1,6 @@
 'use server';
 
+import { userSafeError } from '@/lib/log';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireBusiness } from '@/lib/business';
@@ -35,7 +36,7 @@ export async function createSegment(
   });
 
   if (error) {
-    return { error: `Failed to create segment: ${error.message}` };
+    return { error: userSafeError('Failed to create segment', error) };
   }
 
   revalidatePath('/segments');

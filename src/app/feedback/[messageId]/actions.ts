@@ -1,5 +1,6 @@
 'use server';
 
+import { userSafeError } from '@/lib/log';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { exitJourneyEnrollment } from '@/lib/journeys';
 import { RATE_LIMITS, requesterId, withinLimit } from '@/lib/rate-limit';
@@ -62,7 +63,7 @@ export async function submitPrivateFeedback(
   });
 
   if (insertError) {
-    return { error: `Failed to submit feedback: ${insertError.message}` };
+    return { error: userSafeError('Failed to submit feedback', insertError) };
   }
 
   await supabase.from('interaction_events').insert({

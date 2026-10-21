@@ -1,5 +1,6 @@
 'use server';
 
+import { logEvent, userSafeError } from '@/lib/log';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireBusiness } from '@/lib/business';
@@ -41,9 +42,9 @@ export async function createReferralCode(_prev: ReferralFormResult, formData: Fo
   for (let attempt = 0; attempt < 10; attempt += 1) {
     const code = generateCode();
     const { error } = await supabase.from('referrals').insert({ business_id: business.id, referrer_customer_id: customerId, code, status: 'active', promotion_id: promotion.id, promotion_name: promotion.name, customer_reward: promotion.customer_reward, referrer_reward: promotion.referrer_reward });
-    if (!error) { revalidatePath('/referrals'); return { success: true, code, qrUrl: qrUrl(code) }; }
+    if (!error) { logEvent('referral', 'code_created', { businessId: business.id, promotionId: promotion.id }); revalidatePath('/referrals'); return { success: true, code, qrUrl: qrUrl(code) }; }
     if (!error.message.toLowerCase().includes('duplicate') && error.code !== '23505') {
-      return { error: `Could not generate referral code: ${error.message}` };
+      return { error: userSafeError('Could not generate referral code', error) };
     }
   }
   return { error: 'Could not generate a unique referral code after 10 attempts. Please try again.' };
@@ -98,6 +99,7 @@ export async function redeemReferralCode(referralId: string): Promise<ReferralFo
     supabase.from('businesses').select('name').eq('id', business.id).maybeSingle(),
   ]);
   if (customer?.email) await sendReferralRedeemedEmail({ to: customer.email, businessName: settings?.name ?? 'your business', code: referral.code, reward: rewardLabel });
+  logEvent('referral', 'redeemed', { businessId: business.id, referralId: referral.id, points });
   revalidatePath('/referrals');
   return { success: true };
 }

@@ -458,12 +458,94 @@ export async function bulkImportCustomers(
 }
 
 /**
+ * Failsafe wrapper around `bulkImportCustomers`: if the whole import hits an unexpected database
+ * error, it is retried in chunks of 50 rows and then row by row, so one bad record is reported as
+ * an 'error' row and skipped while every other row still imports. The import is idempotent
+ * (customers match on email/phone, identical services are skipped), so retrying is safe.
+ */
+export async function bulkImportWithRecovery(
+  supabase: Db,
+  business: Parameters<typeof bulkImportCustomers>[1],
+  rows: BulkImportRow[],
+  autoSend: boolean,
+  consentConfirmedAt?: string
+): Promise<BulkImportSummary> {
+  try {
+    return await bulkImportCustomers(supabase, business, rows, autoSend, consentConfirmedAt);
+  } catch (firstError) {
+    console.error('[CSV Import] bulk attempt failed, retrying in chunks', JSON.stringify({ businessId: business.id, rows: rows.length, error: String((firstError as Error)?.message ?? firstError) }));
+  }
+
+  const total: BulkImportSummary = {
+    totalRows: rows.length, customersCreated: 0, customersUpdated: 0, customersUnchanged: 0, serviceRecordsAdded: 0,
+    conflicts: 0, duplicates: 0, errors: 0, queued: 0, notQueued: 0, autoSend, results: [],
+    warning: 'Some rows needed to be imported one at a time because of a temporary problem. Check the skipped rows below.',
+  };
+  const add = (part: BulkImportSummary, offset: number) => {
+    total.customersCreated += part.customersCreated;
+    total.customersUpdated += part.customersUpdated;
+    total.customersUnchanged += part.customersUnchanged;
+    total.serviceRecordsAdded += part.serviceRecordsAdded;
+    total.conflicts += part.conflicts;
+    total.duplicates += part.duplicates;
+    total.errors += part.errors;
+    total.queued += part.queued;
+    total.notQueued += part.notQueued;
+    total.results.push(...part.results.map((r) => ({ ...r, row: r.row + offset })));
+  };
+  const tryRows = async (slice: BulkImportRow[], offset: number): Promise<boolean> => {
+    try {
+      add(await bulkImportCustomers(supabase, business, slice, autoSend, consentConfirmedAt), offset);
+      return true;
+    } catch (e) {
+      if (slice.length === 1) {
+        console.error('[CSV Import] row skipped', JSON.stringify({ businessId: business.id, row: offset + 1, error: String((e as Error)?.message ?? e) }));
+        total.errors += 1;
+        total.results.push({ row: offset + 1, status: 'error', name: slice[0].name, email: slice[0].email, reason: 'This row could not be saved and was skipped.' });
+        return false;
+      }
+      return false;
+    }
+  };
+  for (let start = 0; start < rows.length; start += 50) {
+    const chunk = rows.slice(start, start + 50);
+    if (await tryRows(chunk, start)) continue;
+    for (let i = 0; i < chunk.length; i += 1) await tryRows([chunk[i]], start + i);
+  }
+  total.results.sort((x, y) => x.row - y.row);
+  return total;
+}
+
+/**
  * Minimal CSV parser sufficient for a simple name/email customer list.
  * Handles quoted fields (with escaped "" inside quotes) and both \n and
  * \r\n line endings. Not a full RFC 4180 implementation, but covers what
  * spreadsheet exports (Excel, Google Sheets, Apple Numbers) produce.
  */
 export function parseCsv(content: string): string[][] {
+  return parseCsvWithIssues(content).rows;
+}
+
+/** Picks the separator used by the header line: comma, semicolon (common in European Excel), tab or pipe. */
+function detectDelimiter(text: string): string {
+  const counts: Record<string, number> = { ',': 0, ';': 0, '\t': 0, '|': 0 };
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') inQuotes = !inQuotes;
+    else if (!inQuotes && (c === '\n' || c === '\r')) break;
+    else if (!inQuotes && c in counts) counts[c] += 1;
+  }
+  const best = Object.entries(counts).sort((x, y) => y[1] - x[1])[0];
+  return best[1] > 0 ? best[0] : ',';
+}
+
+/**
+ * Tolerant CSV parser. Handles a BOM, quoted fields, doubled quotes, CRLF/LF/CR line endings and
+ * comma/semicolon/tab/pipe separators. `unterminatedQuote` is true when a quoted value is never
+ * closed (a damaged file), and `binary` when the content contains NUL bytes (not a text file).
+ */
+export function parseCsvWithIssues(content: string): { rows: string[][]; unterminatedQuote: boolean; binary: boolean } {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = '';
@@ -471,6 +553,8 @@ export function parseCsv(content: string): string[][] {
 
   // Strip a UTF-8 BOM if present (common in Excel-exported CSVs).
   const text = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
+  const delimiter = detectDelimiter(text);
+  const binary = text.includes('\u0000');
 
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
@@ -491,7 +575,7 @@ export function parseCsv(content: string): string[][] {
 
     if (char === '"') {
       inQuotes = true;
-    } else if (char === ',') {
+    } else if (char === delimiter) {
       row.push(field);
       field = '';
     } else if (char === '\n' || char === '\r') {
@@ -510,7 +594,7 @@ export function parseCsv(content: string): string[][] {
     rows.push(row);
   }
 
-  return rows.filter((r) => r.some((cell) => cell.trim().length > 0));
+  return { rows: rows.filter((r) => r.some((cell) => cell.trim().length > 0)), unterminatedQuote: inQuotes, binary };
 }
 
 /**

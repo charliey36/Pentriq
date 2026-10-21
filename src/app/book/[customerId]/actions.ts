@@ -1,5 +1,6 @@
 'use server';
 
+import { userSafeError } from '@/lib/log';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { RATE_LIMITS, requesterId, withinLimit } from '@/lib/rate-limit';
 import { headers } from 'next/headers';
@@ -51,7 +52,7 @@ export async function requestRebooking(
   });
 
   if (error) {
-    return { error: `Failed to send your request: ${error.message}` };
+    return { error: userSafeError('Failed to send your request', error) };
   }
 
   return { success: true };

@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { renderReviewRequestEmail } from '@/lib/email-templates/review-request';
+import { notifyEmailSent } from '@/lib/email-events';
 import { renderWelcomeEmail } from '@/lib/email-templates/welcome';
 import { APP_NAME, senderDisplayName, getAppUrl } from '@/lib/brand';
 
@@ -70,6 +71,7 @@ export async function sendReviewRequestEmail(params: {
   if (error) {
     throw new Error(typeof error === 'string' ? error : error.message);
   }
+  notifyEmailSent();
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +118,7 @@ export async function sendNotificationEmail(to: string, kind: NotificationKind, 
   }
   const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
   const { error } = await getResendClient().emails.send({ from: `${APP_NAME} <${from}>`, to, subject, html, ...(text ? { text } : {}) });
-  if (error) throw new Error(typeof error === 'string' ? error : error.message);
+  if (error) throw new Error(typeof error === 'string' ? error : error.message); notifyEmailSent();
 }
 
 /**
@@ -137,7 +139,7 @@ export async function sendReviewAlertEmail(to: string, businessName: string, ale
   }
   const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
   const { error } = await getResendClient().emails.send({ from: `${APP_NAME} <${from}>`, to, subject, html });
-  if (error) throw new Error(typeof error === 'string' ? error : error.message);
+  if (error) throw new Error(typeof error === 'string' ? error : error.message); notifyEmailSent();
 }
 
 export async function sendReferralEmail(params: { to: string; customerName: string; businessName: string; code: string; customerReward: string; referrerReward: string; qrUrl: string }) {
@@ -150,7 +152,7 @@ export async function sendReferralEmail(params: { to: string; customerName: stri
   const text = `${params.businessName}\n\nRefer A Friend\n\nShare this referral code: ${params.code}\nYour friend gets: ${params.customerReward}\nYou will receive: ${params.referrerReward}`;
   if (!process.env.RESEND_API_KEY) { console.log(`[email stub] to=${params.to} subject="${subject}"`); return; }
   const { error } = await getResendClient().emails.send({ from: `${senderDisplayName(params.businessName)} <${from}>`, to: params.to, subject, html, text });
-  if (error) throw new Error(typeof error === 'string' ? error : error.message);
+  if (error) throw new Error(typeof error === 'string' ? error : error.message); notifyEmailSent();
 }
 
 export async function sendReferralRedeemedEmail(params: { to: string; businessName: string; code: string; reward: string }) {
@@ -159,5 +161,5 @@ export async function sendReferralRedeemedEmail(params: { to: string; businessNa
   const html = layout(`<p>Great news!</p><p>Your referral code <strong>${escapeHtml(params.code)}</strong> has been redeemed.</p><p>You have received:</p><p><strong>${escapeHtml(params.reward)}</strong></p><p>Thank you for helping grow the business.</p>`);
   if (!process.env.RESEND_API_KEY) { console.log(`[email stub] to=${params.to} subject="${subject}"`); return; }
   const { error } = await getResendClient().emails.send({ from: `${senderDisplayName(params.businessName)} <${from}>`, to: params.to, subject, html });
-  if (error) throw new Error(typeof error === 'string' ? error : error.message);
+  if (error) throw new Error(typeof error === 'string' ? error : error.message); notifyEmailSent();
 }

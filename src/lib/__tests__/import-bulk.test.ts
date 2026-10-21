@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { bulkImportCustomers, type BulkImportRow } from '@/lib/customers';
+import { bulkImportCustomers, bulkImportWithRecovery, type BulkImportRow } from '@/lib/customers';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>;
@@ -8,6 +8,8 @@ type Row = Record<string, any>;
 class FakeDb {
   tables: Record<string, Row[]> = { customers: [], visits: [], services: [], messages: [], journeys: [], journey_enrollments: [] };
   private n = 0;
+  /** Simulate a database failure for matching inserts. */
+  failInsert: ((table: string, rows: Row[]) => boolean) | null = null;
   nextId(t: string) {
     return `${t}-${++this.n}`;
   }
@@ -66,6 +68,7 @@ class Q implements PromiseLike<any> {
     const rows = this.db.tables[this.t];
     const hit = () => rows.filter((r) => this.filters.every((f) => f(r)));
     if (this.op === 'insert') {
+      if (this.db.failInsert?.(this.t, this.payload)) return { data: null, error: { message: 'simulated database failure' } };
       const created = (this.payload as Row[]).map((p) => ({ id: this.db.nextId(this.t), ...p }));
       rows.push(...created);
       return { data: this.returning ? created : null, error: null };
@@ -264,5 +267,67 @@ describe('bulkImportCustomers — a plain customer list with no service dates', 
     const s = await run(db, [csv('Cy', 'cy@x.com', null, daysAgo(1), '20'), plain('Di', 'di@x.com')]);
     expect(s).toMatchObject({ customersCreated: 2, serviceRecordsAdded: 1 });
     expect(db.tables.customers.find((c) => c.email === 'di@x.com')).toMatchObject({ visit_count: 0 });
+  });
+});
+
+
+describe('bulkImportWithRecovery — one bad row never sinks the import', () => {
+  const rows = (n: number): BulkImportRow[] => Array.from({ length: n }, (_, i) => csv(`Person ${i}`, `p${i}@x.com`, null, daysAgo(1)));
+
+  it('behaves exactly like a normal import when nothing fails', async () => {
+    const db = seed();
+    const s = await bulkImportWithRecovery(db as never, BIZ, rows(5), false, '2026-10-12T00:00:00Z');
+    expect(s.customersCreated).toBe(5);
+    expect(s.errors).toBe(0);
+    expect(s.warning).toBeUndefined();
+  });
+
+  it('skips only the failing row, imports the rest and reports the original row number', async () => {
+    const db = seed();
+    db.failInsert = (table, payload) => table === 'visits' && payload.some((p: Row) => p.notes === 'Imported from CSV' && p.customer_id === db.tables.customers.find((c) => c.email === 'p3@x.com')?.id);
+    const s = await bulkImportWithRecovery(db as never, BIZ, rows(8), false, '2026-10-12T00:00:00Z');
+    expect(s.errors).toBe(1);
+    expect(s.results.find((r) => r.status === 'error')).toMatchObject({ row: 4, email: 'p3@x.com' });
+    expect(s.serviceRecordsAdded).toBe(7);
+    expect(s.totalRows).toBe(8);
+    expect(s.warning).toMatch(/one at a time/);
+  });
+
+  it('survives a complete outage by reporting every row as skipped instead of throwing', async () => {
+    const db = seed();
+    db.failInsert = () => true;
+    const s = await bulkImportWithRecovery(db as never, BIZ, rows(3), false, '2026-10-12T00:00:00Z');
+    expect(s.errors).toBe(3);
+    expect(s.customersCreated).toBe(0);
+  });
+
+  it('handles empty, no-email-match and future-dated rows without crashing', async () => {
+    const db = seed();
+    const s = await bulkImportWithRecovery(db as never, BIZ, [
+      csv('', 'blank@x.com', null, daysAgo(1)),
+      csv('No Email', 'not-an-email', null, daysAgo(1)),
+      csv('Future', 'future@x.com', null, new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10)),
+      csv('Fine', 'fine@x.com', null, daysAgo(1)),
+    ], false, '2026-10-12T00:00:00Z');
+    expect(s.errors).toBe(3);
+    expect(s.customersCreated).toBe(1);
+  });
+
+  it('re-importing the same file creates nothing new', async () => {
+    const db = seed();
+    const file = rows(4);
+    await bulkImportWithRecovery(db as never, BIZ, file, false, '2026-10-12T00:00:00Z');
+    const again = await bulkImportWithRecovery(db as never, BIZ, file, false, '2026-10-12T00:00:00Z');
+    expect(again.customersCreated).toBe(0);
+    expect(again.serviceRecordsAdded).toBe(0);
+    expect(again.duplicates).toBe(4);
+  });
+
+  it('a customer with no service date is added but never queued for a review', async () => {
+    const db = seed();
+    const s = await bulkImportWithRecovery(db as never, BIZ, [csv('Just Contact', 'contact@x.com', null, '')], true, '2026-10-12T00:00:00Z');
+    expect(s.customersCreated).toBe(1);
+    expect(s.queued).toBe(0);
+    expect(db.tables.messages).toHaveLength(0);
   });
 });

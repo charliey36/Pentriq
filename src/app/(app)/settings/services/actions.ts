@@ -1,5 +1,6 @@
 'use server';
 
+import { userSafeError } from '@/lib/log';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireBusiness } from '@/lib/business';
@@ -39,7 +40,7 @@ export async function createService(
   });
 
   if (error) {
-    return { error: `Failed to create service: ${error.message}` };
+    return { error: userSafeError('Failed to create service', error) };
   }
 
   revalidatePath('/settings/services');

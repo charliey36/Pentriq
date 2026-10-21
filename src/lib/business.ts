@@ -1,4 +1,5 @@
 import { cache } from 'react';
+import { isAdminEmail as isAdminEmailImpl } from '@/lib/admin-access';
 import { redirect } from 'next/navigation';
 import { notifyOwner } from '@/lib/notifications';
 import { createClient } from '@/lib/supabase/server';
@@ -125,13 +126,5 @@ export const requireBusiness = cache(async (): Promise<Business> => {
  * by commas, e.g. "owner@example.com,teammate@example.com".
  */
 export function isAdminEmail(email: string | undefined | null): boolean {
-  const adminEmailsRaw = process.env.ADMIN_EMAIL;
-  if (!adminEmailsRaw || !email) return false;
-
-  const adminEmails = adminEmailsRaw
-    .split(',')
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-
-  return adminEmails.includes(email.toLowerCase());
+  return isAdminEmailImpl(email);
 }
