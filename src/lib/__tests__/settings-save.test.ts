@@ -39,6 +39,7 @@ function form(overrides: Record<string, string | null> = {}): FormData {
     name: 'Acme Coffee',
     google_review_url: 'https://g.page/r/abc123/review',
     booking_url: 'https://acme.com/book',
+    contact_email: null,
     review_request_window_days: '14',
     rebooking_reminder_interval_days: '90',
     rebooking_reminders_enabled: 'on',
@@ -89,6 +90,7 @@ describe('parseSettingsForm (invalid values)', () => {
         review_cooldown_enabled: false,
         review_cooldown_days: 60,
         booking_url: 'https://acme.com/book',
+        contact_email: null,
       },
     });
   });
@@ -183,6 +185,7 @@ describe('saveSettings action', () => {
       review_cooldown_enabled: false,
       review_cooldown_days: 60,
       booking_url: 'https://acme.com/book',
+      contact_email: null,
       booking_url_updated_at: expect.any(String),
     });
     expect(revalidatePathMock).toHaveBeenCalledWith('/settings');

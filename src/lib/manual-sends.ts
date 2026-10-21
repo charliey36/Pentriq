@@ -172,6 +172,7 @@ export async function sendManualRebookingReminderFor(
   try {
     const rendered = renderMessage('rebooking_reminder', channel, {
       businessName: business.name,
+      contactEmail: business.contact_email,
       customerName: customer.name,
       rebookingUrl: rebookingLink(business, customer.id, appUrl),
       unsubscribeUrl: `${appUrl}/api/unsubscribe/${customer.id}`,

@@ -81,6 +81,15 @@ export function SettingsForm({ business }: { business: Business }) {
                 : <p id={`${field}_msg`} className="field-hint">{hint}</p>}
             </div>
           ))}
+          <div className="md:col-span-2 md:max-w-[calc(50%-0.625rem)]">
+            <label htmlFor="contact_email" className="label">Business Contact Email <span className="font-normal text-ink-4">(optional)</span></label>
+            <input id="contact_email" name="contact_email" type="email" autoComplete="email" maxLength={254} defaultValue={business.contact_email ?? ''}
+              aria-invalid={Boolean(state.fieldErrors?.contact_email)} aria-describedby="contact_email_msg"
+              className={`input mt-1.5 ${state.fieldErrors?.contact_email ? 'border-red-500 hover:border-red-500 focus:border-red-500' : ''}`} placeholder="support@yourbusiness.com" />
+            {state.fieldErrors?.contact_email
+              ? <p id="contact_email_msg" role="alert" className="mt-1.5 text-xs leading-5 text-red-600 dark:text-red-400">{state.fieldErrors.contact_email}</p>
+              : <p id="contact_email_msg" className="field-hint">Customers will see this email address in Pentriq emails if they need assistance. Leave blank to hide the support section.</p>}
+          </div>
         </div>
 
         <div className="mt-5 max-w-3xl rounded-xl bg-surface-muted px-4 py-3 text-[13px] ring-1 ring-inset ring-line">

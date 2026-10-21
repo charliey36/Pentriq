@@ -143,6 +143,7 @@ export async function GET(request: NextRequest) {
 
       const rendered = renderMessage(message.purpose, channel, {
         businessName: business.name,
+        contactEmail: business.contact_email,
         customerName: customer.name,
         publicReviewUrl: trackingUrl,
         privateFeedbackUrl,

@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { renderReviewRequestEmail } from '@/lib/email-templates/review-request';
+import { renderSupportFooter } from '@/lib/email-templates/support-footer';
 import { notifyEmailSent } from '@/lib/email-events';
 import { renderWelcomeEmail } from '@/lib/email-templates/welcome';
 import { APP_NAME, senderDisplayName, getAppUrl } from '@/lib/brand';
@@ -34,14 +35,16 @@ export function buildReviewRequestEmail(params: {
   customerName: string;
   trackingUrl: string;
   unsubscribeUrl: string;
+  contactEmail?: string | null;
 }) {
-  const { businessName, customerName, trackingUrl, unsubscribeUrl } = params;
+  const { businessName, customerName, trackingUrl, unsubscribeUrl, contactEmail } = params;
   const { subject, html, text } = renderReviewRequestEmail({
     variant: 'request',
     businessName,
     customerName,
     reviewLink: trackingUrl,
     unsubscribeUrl,
+    businessContact: { email: contactEmail },
   });
   return { subject, html, text };
 }
@@ -52,6 +55,7 @@ export async function sendReviewRequestEmail(params: {
   customerName: string;
   trackingUrl: string;
   unsubscribeUrl: string;
+  contactEmail?: string | null;
 }) {
   const resend = getResendClient();
   const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
@@ -82,10 +86,13 @@ export async function sendReviewRequestEmail(params: {
 
 export type NotificationKind = 'welcome' | 'campaign' | 'trial_ending';
 
-function layout(body: string) {
+const PENTRIQ_OWNER_FOOTER = '<p style="font-size:13px;color:#64748b;margin-top:32px">Questions? Just reply to this email.</p>';
+
+/** `footer` defaults to the account-notification line (Pentriq to the business owner). Customer-facing emails pass the business's support footer (or '') instead. */
+function layout(body: string, footer: string = PENTRIQ_OWNER_FOOTER) {
   return `<div style="font-family:-apple-system,Helvetica,Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#0f172a">
 <p style="font-size:18px;font-weight:700;color:#188038;margin:0 0 24px">${APP_NAME}</p>${body}
-<p style="font-size:13px;color:#64748b;margin-top:32px">Questions? Just reply to this email.</p></div>`;
+${footer}</div>`;
 }
 
 export function buildNotificationEmail(kind: NotificationKind, businessName: string): { subject: string; html: string; text?: string } {
@@ -142,23 +149,24 @@ export async function sendReviewAlertEmail(to: string, businessName: string, ale
   if (error) throw new Error(typeof error === 'string' ? error : error.message); notifyEmailSent();
 }
 
-export async function sendReferralEmail(params: { to: string; customerName: string; businessName: string; code: string; customerReward: string; referrerReward: string; qrUrl: string }) {
+export async function sendReferralEmail(params: { to: string; customerName: string; businessName: string; code: string; customerReward: string; referrerReward: string; qrUrl: string; contactEmail?: string | null }) {
   const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
   const safe = (v: string) => escapeHtml(v);
+  const support = renderSupportFooter(params.contactEmail);
   const subject = 'Refer a Friend and Get Rewarded';
   const html = `<div style="font-family:-apple-system,Helvetica,Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#0f172a">
 <p style="font-size:22px;font-weight:700;color:#188038;margin:0 0 8px;padding-bottom:12px;border-bottom:2px solid #188038">${safe(params.businessName)}</p>
-<p style="font-size:18px;font-weight:600;margin:20px 0 4px">Refer A Friend</p><p>Hi ${safe(params.customerName)},</p><p>Share this referral code:</p><p style="font-size:28px;font-weight:700;letter-spacing:4px;color:#188038">${safe(params.code)}</p><p>Your friend gets:<br><strong>${safe(params.customerReward)}</strong></p><p>You will receive:<br><strong>${safe(params.referrerReward)}</strong></p><p><img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(params.qrUrl)}" alt="Referral QR code" width="180" height="180" /></p></div>`;
-  const text = `${params.businessName}\n\nRefer A Friend\n\nShare this referral code: ${params.code}\nYour friend gets: ${params.customerReward}\nYou will receive: ${params.referrerReward}`;
+<p style="font-size:18px;font-weight:600;margin:20px 0 4px">Refer A Friend</p><p>Hi ${safe(params.customerName)},</p><p>Share this referral code:</p><p style="font-size:28px;font-weight:700;letter-spacing:4px;color:#188038">${safe(params.code)}</p><p>Your friend gets:<br><strong>${safe(params.customerReward)}</strong></p><p>You will receive:<br><strong>${safe(params.referrerReward)}</strong></p><p><img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(params.qrUrl)}" alt="Referral QR code" width="180" height="180" /></p>${support.html}</div>`;
+  const text = `${params.businessName}\n\nRefer A Friend\n\nShare this referral code: ${params.code}\nYour friend gets: ${params.customerReward}\nYou will receive: ${params.referrerReward}${support.text ? `\n\n${support.text}` : ''}`;
   if (!process.env.RESEND_API_KEY) { console.log(`[email stub] to=${params.to} subject="${subject}"`); return; }
   const { error } = await getResendClient().emails.send({ from: `${senderDisplayName(params.businessName)} <${from}>`, to: params.to, subject, html, text });
   if (error) throw new Error(typeof error === 'string' ? error : error.message); notifyEmailSent();
 }
 
-export async function sendReferralRedeemedEmail(params: { to: string; businessName: string; code: string; reward: string }) {
+export async function sendReferralRedeemedEmail(params: { to: string; businessName: string; code: string; reward: string; contactEmail?: string | null }) {
   const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
   const subject = 'Your referral was successful';
-  const html = layout(`<p>Great news!</p><p>Your referral code <strong>${escapeHtml(params.code)}</strong> has been redeemed.</p><p>You have received:</p><p><strong>${escapeHtml(params.reward)}</strong></p><p>Thank you for helping grow the business.</p>`);
+  const html = layout(`<p>Great news!</p><p>Your referral code <strong>${escapeHtml(params.code)}</strong> has been redeemed.</p><p>You have received:</p><p><strong>${escapeHtml(params.reward)}</strong></p><p>Thank you for helping grow the business.</p>`, renderSupportFooter(params.contactEmail).html);
   if (!process.env.RESEND_API_KEY) { console.log(`[email stub] to=${params.to} subject="${subject}"`); return; }
   const { error } = await getResendClient().emails.send({ from: `${senderDisplayName(params.businessName)} <${from}>`, to: params.to, subject, html });
   if (error) throw new Error(typeof error === 'string' ? error : error.message); notifyEmailSent();

@@ -15,7 +15,7 @@ export default async function EmailPreviewPage() {
         icon="eye"
         tone="sky"
         description="See exactly how review request emails look before they are sent — rendered by the same template the send jobs use."
-        back={{ href: '/settings/email', label: 'Email settings' }}
+        back={{ href: '/admin/email-usage', label: 'Email Usage' }}
       />
       <EmailPreview defaultBusinessName={business.name} />
     </div>

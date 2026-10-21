@@ -57,10 +57,10 @@ export async function sendReferralInvitation(code: string): Promise<ReferralForm
   if (!referral) return { error: 'Referral code not found.' };
   const [{ data: customer }, { data: settings }] = await Promise.all([
     supabase.from('customers').select('name,email').eq('id', referral.referrer_customer_id).maybeSingle(),
-    supabase.from('businesses').select('name').eq('id', business.id).maybeSingle(),
+    supabase.from('businesses').select('*').eq('id', business.id).maybeSingle(),
   ]);
   if (!customer?.email) return { error: 'The referring customer has no email address.' };
-  await sendReferralEmail({ to: customer.email, customerName: customer.name, businessName: settings?.name ?? 'your business', code: referral.code, customerReward: referral.customer_reward ?? '£10 off your first appointment', referrerReward: referral.referrer_reward ?? '100 Loyalty Points', qrUrl: qrUrl(referral.code) });
+  await sendReferralEmail({ to: customer.email, customerName: customer.name, businessName: settings?.name ?? 'your business', contactEmail: settings?.contact_email, code: referral.code, customerReward: referral.customer_reward ?? '£10 off your first appointment', referrerReward: referral.referrer_reward ?? '100 Loyalty Points', qrUrl: qrUrl(referral.code) });
   return { success: true };
 }
 
@@ -96,9 +96,9 @@ export async function redeemReferralCode(referralId: string): Promise<ReferralFo
   if (program && points > 0) await supabase.from('loyalty_ledger_entries').insert({ business_id: business.id, customer_id: referral.referrer_customer_id, delta: points, reason: 'referral', reference_type: 'referral', reference_id: referral.id });
   const [{ data: customer }, { data: settings }] = await Promise.all([
     supabase.from('customers').select('name,email').eq('id', referral.referrer_customer_id).maybeSingle(),
-    supabase.from('businesses').select('name').eq('id', business.id).maybeSingle(),
+    supabase.from('businesses').select('*').eq('id', business.id).maybeSingle(),
   ]);
-  if (customer?.email) await sendReferralRedeemedEmail({ to: customer.email, businessName: settings?.name ?? 'your business', code: referral.code, reward: rewardLabel });
+  if (customer?.email) await sendReferralRedeemedEmail({ to: customer.email, businessName: settings?.name ?? 'your business', contactEmail: settings?.contact_email, code: referral.code, reward: rewardLabel });
   logEvent('referral', 'redeemed', { businessId: business.id, referralId: referral.id, points });
   revalidatePath('/referrals');
   return { success: true };

@@ -77,6 +77,7 @@ export async function sendQueuedReview(
     console.log(`[Send Review] Rendering message for channel: ${channel}`);
     const rendered = renderMessage('review_request', channel, {
       businessName: business.name,
+      contactEmail: business.contact_email,
       customerName: customer.name,
       publicReviewUrl: business.google_review_url ? buildTrackingUrl(appUrl, message, { source: 'review-queue', kind: 'message' }) : undefined,
       privateFeedbackUrl: `${appUrl}/feedback/${message.id}`,

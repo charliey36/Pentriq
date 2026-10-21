@@ -13,6 +13,14 @@ const baseConfig = {
   experimental: { staleTimes: { dynamic: 0, static: 30 }, instrumentationHook: true },
   // The release id is baked into the browser bundle so frontend errors carry the same release as the server.
   // Baseline security headers on every response (no CSP yet: it needs testing against Stripe/Sentry/Google scripts).
+  // The Email tab moved to the Admin Portal; keep old bookmarks and links working.
+  async redirects() {
+    return [
+      { source: '/settings/email/preview', destination: '/admin/email-preview', permanent: true },
+      { source: '/settings/email/:path*', destination: '/admin/email-usage', permanent: true },
+      { source: '/settings/email', destination: '/admin/email-usage', permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

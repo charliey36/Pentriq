@@ -4,7 +4,7 @@
  * Pure function: params in, { subject, html, text, preheader } out. No React,
  * no I/O — so the exact same output is used by the real send pipeline
  * (lib/templates.ts, lib/email.ts) and by the in-app preview
- * (/settings/email/preview).
+ * (/admin/email-preview, Admin Portal).
  *
  * Email-client notes:
  *  - Table-based layout with every style inlined; the <style> block is only a
@@ -27,6 +27,7 @@
  * independent of anything about the customer — see lib/compliance.ts.
  */
 import { escapeHtml } from '@/lib/html';
+import { renderSupportFooter } from '@/lib/email-templates/support-footer';
 import { APP_NAME, APP_NAME_ACCENT, APP_NAME_LEAD, getAppUrl } from '@/lib/brand';
 import {
   REVIEW_PLATFORMS,
@@ -192,12 +193,9 @@ function logoMarkHtml(src: string, size: number): string {
 function contactLine(contact: ReviewEmailParams['businessContact']): string {
   if (!contact) return '';
   const parts: string[] = [];
-  const email = clean(contact.email);
   const phone = clean(contact.phone);
   const website = clean(contact.website);
-  if (email && /^[^\s@<>"]+@[^\s@<>"]+$/.test(email)) {
-    parts.push(`<a href="mailto:${escapeHtml(email)}" class="rf-link" style="color:${C.brand700};text-decoration:underline;">${escapeHtml(email)}</a>`);
-  }
+  // The email address is rendered by the shared "Need help?" footer (support-footer.ts), not here.
   if (phone) {
     const tel = phone.replace(/[^\d+]/g, '');
     parts.push(
@@ -267,9 +265,10 @@ export function renderReviewRequestEmail(params: ReviewEmailParams = {}): Render
   const footerBusiness = hasBusiness
     ? `<p class="rf-muted" style="margin:0 0 4px;font-size:13px;line-height:20px;color:${C.ink3};">Sent on behalf of <strong class="rf-ink2" style="color:${C.ink2};font-weight:600;">${escapeHtml(rawBusiness)}</strong></p>`
     : '';
-  const footerContact = contact
+  const help = renderSupportFooter(params.businessContact?.email, { label: C.ink3, strong: C.ink2, link: C.brand700, labelClass: 'rf-muted', strongClass: 'rf-ink2', linkClass: 'rf-link' });
+  const footerContact = (contact
     ? `<p class="rf-muted" style="margin:0 0 4px;font-size:13px;line-height:20px;color:${C.ink3};">${contact}</p>`
-    : '';
+    : '') + help.html;
   const footerReason = `<p class="rf-muted" style="margin:12px 0 0;font-size:12px;line-height:18px;color:${C.ink3};">You received this email because you are a customer of ${
     hasBusiness ? escapeHtml(rawBusiness) : `a business that uses ${APP_NAME}`
   }${/[.!?]$/.test(rawBusiness) && hasBusiness ? '' : '.'}${
@@ -439,9 +438,10 @@ ${
     '',
     '--',
     `Sent via ${APP_NAME}${hasBusiness ? ` on behalf of ${rawBusiness}` : ''}`,
-    [clean(params.businessContact?.email), clean(params.businessContact?.phone), clean(params.businessContact?.website)]
+    [clean(params.businessContact?.phone), clean(params.businessContact?.website)]
       .filter(Boolean)
       .join(' · '),
+    renderSupportFooter(params.businessContact?.email).text,
     textUnsubscribe ? `Unsubscribe: ${textUnsubscribe}` : '',
   ];
   // Collapse runs of blank lines left by omitted sections.

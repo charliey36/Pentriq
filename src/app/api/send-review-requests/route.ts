@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
           .single(),
         supabase
           .from('businesses')
-          .select('id, owner_id, name, subscription_status, trial_ends_at, created_at, google_review_url')
+          .select('*')
           .eq('id', reviewRequest.business_id)
           .single(),
       ]);
@@ -154,6 +154,7 @@ export async function GET(request: NextRequest) {
       await sendReviewRequestEmail({
         to: customer.email,
         businessName: business.name,
+        contactEmail: business.contact_email,
         customerName: customer.name,
         trackingUrl,
         unsubscribeUrl,

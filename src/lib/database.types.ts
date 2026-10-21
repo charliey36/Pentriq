@@ -33,6 +33,7 @@ export type Database = {
           review_request_window_days: number;
           rebooking_reminder_interval_days: number;
           rebooking_reminders_enabled: boolean;
+          contact_email: string | null;
           review_cooldown_enabled: boolean;
           review_cooldown_days: number;
           booking_url: string | null;
@@ -68,6 +69,7 @@ export type Database = {
           review_request_window_days?: number;
           rebooking_reminder_interval_days?: number;
           rebooking_reminders_enabled?: boolean;
+          contact_email?: string | null;
           review_cooldown_enabled?: boolean;
           review_cooldown_days?: number;
           booking_url?: string | null;

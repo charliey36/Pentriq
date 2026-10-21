@@ -6,6 +6,7 @@
  *   name, google_review_url, review_request_window_days,
  *   rebooking_reminder_interval_days, rebooking_reminders_enabled
  */
+import { normalizeContactEmail } from '@/lib/email-templates/support-footer';
 import { isSafeHttpUrl } from '@/lib/email-templates/review-destinations';
 
 export const SETTINGS_LIMITS = {
@@ -25,13 +26,14 @@ export type SettingsValues = {
   review_cooldown_enabled: boolean;
   review_cooldown_days: number;
   booking_url: string | null;
+  contact_email: string | null;
 };
 
 export type SettingsParseResult =
   | { ok: true; values: SettingsValues }
   | { ok: false; error: string; field: keyof SettingsValues; fieldErrors?: UrlFieldErrors };
 
-export type UrlFieldErrors = { google_review_url?: string; booking_url?: string };
+export type UrlFieldErrors = { google_review_url?: string; booking_url?: string; contact_email?: string };
 
 /**
  * Both customer-facing links are mandatory: review requests need the review URL and
@@ -77,6 +79,13 @@ export function parseSettingsForm(formData: FormData): SettingsParseResult {
   if (fieldErrors.google_review_url) return { ok: false, field: 'google_review_url', error: fieldErrors.google_review_url, fieldErrors };
   if (fieldErrors.booking_url) return { ok: false, field: 'booking_url', error: fieldErrors.booking_url, fieldErrors };
 
+  // Optional: blank hides the "Need help?" section; anything else must be a valid email address.
+  const contactRaw = String(formData.get('contact_email') ?? '').trim();
+  const contactEmail = normalizeContactEmail(contactRaw);
+  if (contactRaw && !contactEmail) {
+    return { ok: false, field: 'contact_email', error: 'Please enter a valid contact email address, or leave it blank.', fieldErrors: { contact_email: 'Please enter a valid email address, or leave it blank.' } };
+  }
+
   const { reviewWindowDays: w, rebookingIntervalDays: r } = SETTINGS_LIMITS;
   const windowDays = parseDays(formData.get('review_request_window_days'), w.min, w.max);
   if (windowDays === null) {
@@ -121,6 +130,7 @@ export function parseSettingsForm(formData: FormData): SettingsParseResult {
       review_cooldown_enabled: cooldownEnabled,
       review_cooldown_days: cooldownDays,
       booking_url: bookingUrl,
+      contact_email: contactEmail,
     },
   };
 }

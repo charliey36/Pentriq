@@ -933,3 +933,6 @@ notify pgrst, 'reload schema';
 -- Optional review request cooldown (migration 0035).
 alter table public.businesses add column if not exists review_cooldown_enabled boolean not null default false;
 alter table public.businesses add column if not exists review_cooldown_days integer not null default 60;
+
+-- Optional business contact email shown in customer emails (migration 0036).
+alter table public.businesses add column if not exists contact_email text;
