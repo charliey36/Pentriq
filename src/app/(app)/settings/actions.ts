@@ -6,7 +6,7 @@ import { requireBusiness } from '@/lib/business';
 import { friendlySaveError, isMissingColumnError, missingColumnName } from '@/lib/db-errors';
 import { parseSettingsForm } from '@/lib/settings-validation';
 
-export type SaveSettingsResult = { error?: string; success?: boolean };
+export type SaveSettingsResult = { error?: string; success?: boolean; fieldErrors?: { google_review_url?: string; booking_url?: string } };
 
 export async function saveSettings(
   _prev: SaveSettingsResult,
@@ -16,7 +16,7 @@ export async function saveSettings(
 
   const parsed = parseSettingsForm(formData);
   if (!parsed.ok) {
-    return { error: parsed.error };
+    return { error: parsed.fieldErrors ? 'Please fix the highlighted fields.' : parsed.error, fieldErrors: parsed.fieldErrors };
   }
 
   try {

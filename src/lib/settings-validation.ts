@@ -7,7 +7,6 @@
  *   rebooking_reminder_interval_days, rebooking_reminders_enabled
  */
 import { isSafeHttpUrl } from '@/lib/email-templates/review-destinations';
-import { validateBookingUrl } from '@/lib/booking-url';
 
 export const SETTINGS_LIMITS = {
   nameMaxLength: 120,
@@ -30,7 +29,29 @@ export type SettingsValues = {
 
 export type SettingsParseResult =
   | { ok: true; values: SettingsValues }
-  | { ok: false; error: string; field: keyof SettingsValues };
+  | { ok: false; error: string; field: keyof SettingsValues; fieldErrors?: UrlFieldErrors };
+
+export type UrlFieldErrors = { google_review_url?: string; booking_url?: string };
+
+/**
+ * Both customer-facing links are mandatory: review requests need the review URL and
+ * rebooking reminders need the booking URL. Returns a message per invalid field.
+ * Shared by the server action and the Settings form (which shows the same messages).
+ */
+export function validateRequiredUrls(urls: { google_review_url: string; booking_url: string }): UrlFieldErrors {
+  const errors: UrlFieldErrors = {};
+  const review = urls.google_review_url.trim();
+  const booking = urls.booking_url.trim();
+  if (!review) errors.google_review_url = 'Google Review URL is required.';
+  else if (review.length > SETTINGS_LIMITS.urlMaxLength || !isSafeHttpUrl(review)) {
+    errors.google_review_url = 'Please enter a valid Review URL (starting with http:// or https://).';
+  }
+  if (!booking) errors.booking_url = 'Booking URL is required.';
+  else if (booking.length > SETTINGS_LIMITS.urlMaxLength || !isSafeHttpUrl(booking)) {
+    errors.booking_url = 'Please enter a valid Booking URL (starting with http:// or https://).';
+  }
+  return errors;
+}
 
 function parseDays(raw: FormDataEntryValue | null, min: number, max: number): number | null {
   if (raw === null || String(raw).trim() === '') return null;
@@ -51,19 +72,10 @@ export function parseSettingsForm(formData: FormData): SettingsParseResult {
   }
 
   const googleReviewUrl = String(formData.get('google_review_url') ?? '').trim();
-  if (googleReviewUrl) {
-    if (googleReviewUrl.length > SETTINGS_LIMITS.urlMaxLength || !isSafeHttpUrl(googleReviewUrl)) {
-      return {
-        ok: false,
-        field: 'google_review_url',
-        error: 'Google review URL must be a valid web address starting with http:// or https:// (e.g. https://g.page/r/...).',
-      };
-    }
-  }
-
   const bookingUrl = String(formData.get('booking_url') ?? '').trim();
-  const bookingError = validateBookingUrl(bookingUrl);
-  if (bookingError) return { ok: false, field: 'booking_url', error: bookingError };
+  const fieldErrors = validateRequiredUrls({ google_review_url: googleReviewUrl, booking_url: bookingUrl });
+  if (fieldErrors.google_review_url) return { ok: false, field: 'google_review_url', error: fieldErrors.google_review_url, fieldErrors };
+  if (fieldErrors.booking_url) return { ok: false, field: 'booking_url', error: fieldErrors.booking_url, fieldErrors };
 
   const { reviewWindowDays: w, rebookingIntervalDays: r } = SETTINGS_LIMITS;
   const windowDays = parseDays(formData.get('review_request_window_days'), w.min, w.max);
@@ -108,7 +120,7 @@ export function parseSettingsForm(formData: FormData): SettingsParseResult {
       rebooking_reminders_enabled: formData.get('rebooking_reminders_enabled') === 'on',
       review_cooldown_enabled: cooldownEnabled,
       review_cooldown_days: cooldownDays,
-      booking_url: bookingUrl || null,
+      booking_url: bookingUrl,
     },
   };
 }

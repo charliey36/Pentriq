@@ -38,6 +38,7 @@ function form(overrides: Record<string, string | null> = {}): FormData {
   const base: Record<string, string | null> = {
     name: 'Acme Coffee',
     google_review_url: 'https://g.page/r/abc123/review',
+    booking_url: 'https://acme.com/book',
     review_request_window_days: '14',
     rebooking_reminder_interval_days: '90',
     rebooking_reminders_enabled: 'on',
@@ -87,15 +88,34 @@ describe('parseSettingsForm (invalid values)', () => {
         rebooking_reminders_enabled: true,
         review_cooldown_enabled: false,
         review_cooldown_days: 60,
-        booking_url: null,
+        booking_url: 'https://acme.com/book',
       },
     });
   });
 
-  it('treats an unchecked toggle as false and an empty review URL as allowed', () => {
-    const r = parseSettingsForm(form({ rebooking_reminders_enabled: null, google_review_url: '' }));
+  it('treats an unchecked toggle as false', () => {
+    const r = parseSettingsForm(form({ rebooking_reminders_enabled: null }));
     expect(r.ok && r.values.rebooking_reminders_enabled).toBe(false);
-    expect(r.ok && r.values.google_review_url).toBe('');
+  });
+
+  it('requires both the review URL and the booking URL, reporting every problem', () => {
+    const r = parseSettingsForm(form({ google_review_url: '  ', booking_url: '' }));
+    expect(r).toMatchObject({
+      ok: false,
+      field: 'google_review_url',
+      fieldErrors: { google_review_url: 'Google Review URL is required.', booking_url: 'Booking URL is required.' },
+    });
+  });
+
+  it('rejects invalid URLs with friendly messages', () => {
+    const r = parseSettingsForm(form({ google_review_url: 'not a url', booking_url: 'javascript:alert(1)' }));
+    expect(r).toMatchObject({
+      ok: false,
+      fieldErrors: {
+        google_review_url: expect.stringContaining('valid Review URL'),
+        booking_url: expect.stringContaining('valid Booking URL'),
+      },
+    });
   });
 
   it.each([
@@ -162,7 +182,8 @@ describe('saveSettings action', () => {
       rebooking_reminders_enabled: false,
       review_cooldown_enabled: false,
       review_cooldown_days: 60,
-      booking_url: null,
+      booking_url: 'https://acme.com/book',
+      booking_url_updated_at: expect.any(String),
     });
     expect(revalidatePathMock).toHaveBeenCalledWith('/settings');
   });
