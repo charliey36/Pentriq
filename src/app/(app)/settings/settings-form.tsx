@@ -101,7 +101,7 @@ export function SettingsForm({ business }: { business: Business }) {
             <label htmlFor="review_request_window_days" className="label">Review request window (days)</label>
             <input id="review_request_window_days" name="review_request_window_days" type="number" min={1} max={365} required
               defaultValue={business.review_request_window_days ?? 1} className="input mt-1.5 tabular-nums" />
-            <p className="field-hint">Only customers serviced within this many days get review requests.</p>
+            <p className="field-hint">Only customers serviced within this many days get review requests. Also used by customer import when it schedules requests automatically.</p>
           </div>
           <div>
             <label htmlFor="rebooking_reminder_interval_days" className="label">Rebooking reminder after (days)</label>

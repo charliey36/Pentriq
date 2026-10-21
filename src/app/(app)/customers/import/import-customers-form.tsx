@@ -31,7 +31,7 @@ const resultLabels: Record<string, string> = {
 const isNotable = (r: ImportCustomersResultRow) => r.status === 'conflict' || r.status === 'error' || r.status === 'skipped_duplicate' || (r.status === 'updated' && Boolean(r.note));
 type ImportCustomersResultRow = NonNullable<ImportCustomersResult['summary']>['results'][number];
 
-export function ImportCustomersForm() {
+export function ImportCustomersForm({ windowDays }: { windowDays: number }) {
   const [analysisState, analyzeAction] = useFormState<AnalyzeImportResult, FormData>(analyzeCsv, {});
   const [state, importAction] = useFormState<ImportCustomersResult, FormData>(importCustomers, {});
   const [fileName, setFileName] = useState<string | null>(null);
@@ -123,9 +123,9 @@ export function ImportCustomersForm() {
         <label className="flex items-start gap-3 text-sm text-ink-2">
           <input type="checkbox" name="auto_send" defaultChecked className="mt-1 h-4 w-4 rounded border-line-strong" />
           <span>
-            <span className="font-medium text-ink">Email review requests automatically the day after each service</span>
+            <span className="font-medium text-ink">Automatically email review requests for services in the last {windowDays} {windowDays === 1 ? 'day' : 'days'}</span>
             <span className="block text-[13px] text-ink-3">
-              Sent automatically at 8:00am the day after a completed service. Untick to hold them on the Customers page until you press Send.
+              Uses your review request window from Settings → Service timing. Eligible customers are emailed automatically at 8:00am (the day after the service). Untick to hold them on the Customers page and send them yourself.
             </span>
           </span>
         </label>

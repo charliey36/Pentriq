@@ -10,7 +10,8 @@ export const maxDuration = 60;
 export const metadata: Metadata = { title: 'Import customers' };
 
 export default async function ImportCustomersPage() {
-  await requireBusiness();
+  const business = await requireBusiness();
+  const windowDays = business.review_request_window_days ?? 1;
 
   return (
     <div>
@@ -19,11 +20,11 @@ export default async function ImportCustomersPage() {
         title="Import customers"
         icon="upload"
         tone="sky"
-        description="Export your jobs from Excel, Google Sheets, ServiceM8, Jobber or Tradify, upload the file here, then review requests are sent automatically at 8:00am the day after each completed service."
+        description="Export your jobs from Excel, Google Sheets, ServiceM8, Jobber or Tradify, upload the file here, then review requests are scheduled automatically for services within your review request window (set in Settings → Service timing)."
       />
 
       <SectionCard>
-        <ImportCustomersForm />
+        <ImportCustomersForm windowDays={windowDays} />
       </SectionCard>
     </div>
   );
