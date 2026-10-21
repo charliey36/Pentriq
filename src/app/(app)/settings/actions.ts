@@ -25,16 +25,20 @@ export async function saveSettings(
     // `.select('id')` makes the write observable: an update that matches no
     // rows (e.g. blocked by RLS) returns [] with no error, which would
     // otherwise look like a successful save.
-    const { data, error } = await supabase
-      .from('businesses')
-      .update({
-        ...parsed.values,
-        ...((parsed.values.booking_url ?? null) !== (business.booking_url ?? null)
-          ? { booking_url_updated_at: new Date().toISOString() }
-          : {}),
-      })
-      .eq('id', business.id)
-      .select('id');
+    const update = {
+      ...parsed.values,
+      ...((parsed.values.booking_url ?? null) !== (business.booking_url ?? null)
+        ? { booking_url_updated_at: new Date().toISOString() }
+        : {}),
+    };
+    let { data, error } = await supabase.from('businesses').update(update).eq('id', business.id).select('id');
+
+    // Migration 0035 (cooldown columns) not applied yet: keep every other setting saving.
+    if (error && missingColumnName(error)?.startsWith('review_cooldown')) {
+      console.error('[Settings] Cooldown columns missing; apply supabase/migrations/0035_review_cooldown.sql');
+      const { review_cooldown_enabled: _e, review_cooldown_days: _d, ...rest } = update;
+      ({ data, error } = await supabase.from('businesses').update(rest).eq('id', business.id).select('id'));
+    }
 
     if (error) {
       // Full technical detail goes to the server log; the user gets a safe message.

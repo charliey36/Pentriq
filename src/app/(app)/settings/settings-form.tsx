@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useFormState } from 'react-dom';
 import { useActionToast } from '@/components/toast';
 import type { Business } from '@/lib/database.types';
@@ -15,6 +16,7 @@ export function SettingsForm({ business }: { business: Business }) {
     {}
   );
   useActionToast(state, { title: 'Settings saved' });
+  const [cooldownOn, setCooldownOn] = useState(business.review_cooldown_enabled ?? false);
 
   return (
     <form id="business-settings-form" action={formAction} className="space-y-6">
@@ -59,6 +61,25 @@ export function SettingsForm({ business }: { business: Business }) {
               <span className="block text-[13px] text-ink-3">Untick if you do not want Pentriq to email customers asking them to book again.</span>
             </span>
           </label>
+
+          <div className="sm:col-span-2">
+            <label className="flex items-start gap-3 text-sm text-ink-2">
+              <input type="checkbox" name="review_cooldown_enabled" checked={cooldownOn} onChange={(e) => setCooldownOn(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-line-strong" />
+              <span>
+                <span className="font-medium text-ink">Limit repeat review requests</span>
+                <span className="block text-[13px] text-ink-3">When enabled, customers will only receive another review request if they have used your service again AND the cooldown period has expired.</span>
+                <span className="mt-1 block text-[13px] text-ink-4">Useful for businesses that want fresh reviews without repeatedly asking the same customers after every visit.</span>
+              </span>
+            </label>
+            {/* Always in the form (just hidden while off) so the saved number is kept when the toggle is off. */}
+            <div className={cooldownOn ? 'mt-4 w-full sm:w-52' : 'hidden'}>
+              <label htmlFor="review_cooldown_days" className="label">Cooldown period (days)</label>
+              <input id="review_cooldown_days" name="review_cooldown_days" type="number" min={1} max={365} required={cooldownOn}
+                defaultValue={business.review_cooldown_days ?? 60} className="input mt-1.5 tabular-nums" />
+              <p className="field-hint">Customers must wait this many days before receiving another review request.</p>
+            </div>
+          </div>
         </div>
       </SectionCard>
 

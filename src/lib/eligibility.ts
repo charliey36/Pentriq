@@ -24,6 +24,29 @@ export function isRebookingEligible(lastServiceDate: string | null | undefined, 
   return days !== null && days >= intervalDays;
 }
 
+/**
+ * Review request cooldown. True when the last review request was sent fewer
+ * than `cooldownDays` days before `referenceDate` (the new service date), so a
+ * new request should be suppressed. 60-day cooldown, sent 1 Jan: 20 Jan and
+ * 15 Feb are blocked, 10 Mar (68 days later) is allowed.
+ */
+export function isCooldownActive(
+  lastSentAt: string | null | undefined,
+  cooldownDays: number,
+  referenceDate: string = todayIso()
+): boolean {
+  if (!lastSentAt) return false;
+  const sent = Date.parse(lastSentAt);
+  const ref = Date.parse(`${referenceDate}T00:00:00Z`);
+  if (Number.isNaN(sent) || Number.isNaN(ref)) return false;
+  return Math.floor(ref / DAY_MS) - Math.floor(sent / DAY_MS) < cooldownDays;
+}
+
+/** The business's cooldown in days, or null when the cooldown is off (the default). */
+export function cooldownDaysFor(business: { review_cooldown_enabled?: boolean | null; review_cooldown_days?: number | null }): number | null {
+  return business.review_cooldown_enabled ? business.review_cooldown_days ?? 60 : null;
+}
+
 export const todayIso = () => new Date().toISOString().slice(0, 10);
 
 /** Parses YYYY-MM-DD or DD/MM/YYYY into YYYY-MM-DD; null if invalid. */

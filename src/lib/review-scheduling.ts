@@ -28,14 +28,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/database.types';
 import { reviewSendTime } from '@/lib/send-window';
-import { daysSinceService, todayIso } from '@/lib/eligibility';
+import { daysSinceService, isCooldownActive, todayIso } from '@/lib/eligibility';
 import { enrollCustomerInJourney } from '@/lib/journeys';
 
 type Db = SupabaseClient<Database>;
 
 export type ReviewSchedulingOutcome =
   | { scheduled: true; mode: 'held' | 'journey' | 'bare'; messageId: string | null }
-  | { scheduled: false; reason: 'duplicate' | 'unsubscribed' | 'outside_window' | 'error'; error?: string };
+  | { scheduled: false; reason: 'duplicate' | 'unsubscribed' | 'outside_window' | 'cooldown' | 'error'; error?: string };
 
 export type ScheduleReviewOptions = {
   /** The visit that triggered this review, if any. Enables per-visit dedupe + attribution. */
@@ -50,6 +50,12 @@ export type ScheduleReviewOptions = {
    * explicit manual "send now" the owner has chosen regardless of age).
    */
   windowDays?: number;
+  /**
+   * Review request cooldown in days (null/omitted = off). When set, nothing is
+   * scheduled if the customer's last SENT review request is more recent than this.
+   * Explicit manual sends leave it unset.
+   */
+  cooldownDays?: number | null;
   /** Set when the customer is unsubscribed, to short-circuit scheduling. */
   unsubscribedAt?: string | null;
 };
@@ -79,6 +85,21 @@ export async function isDuplicateReviewRequest(
 
   const { data } = await query.limit(1);
   return !!data && data.length > 0;
+}
+
+/** When the customer's most recent review request was actually sent (null if never). */
+export async function lastReviewRequestSentAt(supabase: Db, businessId: string, customerId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('messages')
+    .select('sent_at')
+    .eq('business_id', businessId)
+    .eq('customer_id', customerId)
+    .eq('purpose', 'review_request')
+    .eq('status', 'sent')
+    .not('sent_at', 'is', null)
+    .order('sent_at', { ascending: false })
+    .limit(1);
+  return data?.[0]?.sent_at ?? null;
 }
 
 /**
@@ -181,6 +202,13 @@ export async function extractReviewSchedulingLogic(
     const days = daysSinceService(serviceDate);
     if (days === null || days < 0 || days > options.windowDays) {
       return { scheduled: false, reason: 'outside_window' };
+    }
+  }
+
+  if (options.cooldownDays) {
+    const lastSent = await lastReviewRequestSentAt(supabase, businessId, customerId);
+    if (isCooldownActive(lastSent, options.cooldownDays, serviceDate)) {
+      return { scheduled: false, reason: 'cooldown' };
     }
   }
 

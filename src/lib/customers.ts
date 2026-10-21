@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/database.types';
 import { reviewSendTime } from '@/lib/send-window';
-import { daysSinceService, parseAmount, parseServiceDate } from '@/lib/eligibility';
+import { cooldownDaysFor, daysSinceService, isCooldownActive, parseAmount, parseServiceDate } from '@/lib/eligibility';
 import { normalizePhone } from '@/lib/phone';
 import { resolveImportIdentities, type MatchedBy } from '@/lib/import-identity';
 import type { CsvConfirmedMapping, CsvImportField } from '@/lib/csv-import-mapping';
@@ -102,7 +102,7 @@ type Known = {
  */
 export async function bulkImportCustomers(
   supabase: Db,
-  business: { id: string; delay_hours: number; review_request_window_days: number },
+  business: { id: string; delay_hours: number; review_request_window_days: number; review_cooldown_enabled?: boolean; review_cooldown_days?: number },
   rows: BulkImportRow[],
   autoSend: boolean,
   /** When the owner confirmed they may contact these customers; stored on every NEW customer. */
@@ -375,7 +375,28 @@ export async function bulkImportCustomers(
     (data ?? []).forEach((m) => alreadyQueued.add(m.customer_id));
   }
 
+  // Optional cooldown: skip customers whose last SENT review request is too recent.
+  const lastSent = new Map<string, string>();
+  const cooldownDays = cooldownDaysFor(business);
+  if (cooldownDays) {
+    for (const batch of chunks([...latestVisit.keys()], 100)) {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('customer_id, sent_at')
+        .eq('business_id', business.id)
+        .eq('purpose', 'review_request')
+        .eq('status', 'sent')
+        .not('sent_at', 'is', null)
+        .in('customer_id', batch);
+      if (error) throw fail(error);
+      (data ?? []).forEach((m) => {
+        if (m.sent_at && (!lastSent.has(m.customer_id) || m.sent_at > lastSent.get(m.customer_id)!)) lastSent.set(m.customer_id, m.sent_at);
+      });
+    }
+  }
+
   const toQueue = [...latestVisit.entries()].filter(([customerId, v]) => {
+    if (cooldownDays && isCooldownActive(lastSent.get(customerId), cooldownDays, v.date)) return false;
     const days = daysSinceService(v.date);
     const unsubscribed = Boolean(known.get(customerId)?.unsubscribed_at);
     return !unsubscribed && !alreadyQueued.has(customerId) && days !== null && days >= 0 && days <= business.review_request_window_days;

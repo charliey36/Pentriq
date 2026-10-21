@@ -14,6 +14,7 @@ export const SETTINGS_LIMITS = {
   urlMaxLength: 2048,
   reviewWindowDays: { min: 1, max: 365 },
   rebookingIntervalDays: { min: 1, max: 730 },
+  reviewCooldownDays: { min: 1, max: 365 },
 } as const;
 
 export type SettingsValues = {
@@ -22,6 +23,8 @@ export type SettingsValues = {
   review_request_window_days: number;
   rebooking_reminder_interval_days: number;
   rebooking_reminders_enabled: boolean;
+  review_cooldown_enabled: boolean;
+  review_cooldown_days: number;
   booking_url: string | null;
 };
 
@@ -81,6 +84,20 @@ export function parseSettingsForm(formData: FormData): SettingsParseResult {
     };
   }
 
+  // Cooldown: the days field is only validated (and changed) while the toggle is on;
+  // otherwise the stored value is kept so re-enabling restores it.
+  const cooldownEnabled = formData.get('review_cooldown_enabled') === 'on';
+  const c = SETTINGS_LIMITS.reviewCooldownDays;
+  let cooldownDays = parseDays(formData.get('review_cooldown_days'), c.min, c.max);
+  if (cooldownEnabled && cooldownDays === null) {
+    return {
+      ok: false,
+      field: 'review_cooldown_days',
+      error: `Cooldown period must be a whole number of days between ${c.min} and ${c.max}.`,
+    };
+  }
+  cooldownDays ??= 60;
+
   return {
     ok: true,
     values: {
@@ -89,6 +106,8 @@ export function parseSettingsForm(formData: FormData): SettingsParseResult {
       review_request_window_days: windowDays,
       rebooking_reminder_interval_days: rebookDays,
       rebooking_reminders_enabled: formData.get('rebooking_reminders_enabled') === 'on',
+      review_cooldown_enabled: cooldownEnabled,
+      review_cooldown_days: cooldownDays,
       booking_url: bookingUrl || null,
     },
   };

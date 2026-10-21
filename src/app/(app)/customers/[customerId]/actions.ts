@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { requireBusiness } from '@/lib/business';
 import { todayIso } from '@/lib/eligibility';
 import { extractReviewSchedulingLogic } from '@/lib/review-scheduling';
+import { cooldownDaysFor } from '@/lib/eligibility';
 import { sendManualReviewRequestFor, sendManualRebookingReminderFor } from '@/lib/manual-sends';
 
 export type LogVisitResult = { error?: string; success?: boolean };
@@ -83,6 +84,7 @@ export async function logVisit(
     serviceDate,
     autoSend: false,
     windowDays: business.review_request_window_days,
+    cooldownDays: cooldownDaysFor(business),
     unsubscribedAt: customer?.unsubscribed_at ?? null,
   });
 

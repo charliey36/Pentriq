@@ -55,6 +55,25 @@ const MISSING_COLUMN_ERROR = {
   hint: null,
 };
 
+describe('review cooldown settings', () => {
+  it('is off with 60 days by default (existing behaviour)', () => {
+    const r = parseSettingsForm(form());
+    expect(r.ok && [r.values.review_cooldown_enabled, r.values.review_cooldown_days]).toEqual([false, 60]);
+  });
+  it('saves a custom period when enabled', () => {
+    const r = parseSettingsForm(form({ review_cooldown_enabled: 'on', review_cooldown_days: '90' }));
+    expect(r.ok && [r.values.review_cooldown_enabled, r.values.review_cooldown_days]).toEqual([true, 90]);
+  });
+  it('keeps the stored days when off and ignores a bad hidden value', () => {
+    const r = parseSettingsForm(form({ review_cooldown_days: '45' }));
+    expect(r.ok && [r.values.review_cooldown_enabled, r.values.review_cooldown_days]).toEqual([false, 45]);
+  });
+  it.each(['0', '366', '-3', ''])('rejects %p when enabled', (days) => {
+    const r = parseSettingsForm(form({ review_cooldown_enabled: 'on', review_cooldown_days: days }));
+    expect(r.ok).toBe(false);
+  });
+});
+
 describe('parseSettingsForm (invalid values)', () => {
   it('accepts a valid form and maps every businesses column', () => {
     const r = parseSettingsForm(form());
@@ -66,6 +85,8 @@ describe('parseSettingsForm (invalid values)', () => {
         review_request_window_days: 14,
         rebooking_reminder_interval_days: 90,
         rebooking_reminders_enabled: true,
+        review_cooldown_enabled: false,
+        review_cooldown_days: 60,
         booking_url: null,
       },
     });
@@ -139,6 +160,8 @@ describe('saveSettings action', () => {
       review_request_window_days: 21,
       rebooking_reminder_interval_days: 120,
       rebooking_reminders_enabled: false,
+      review_cooldown_enabled: false,
+      review_cooldown_days: 60,
       booking_url: null,
     });
     expect(revalidatePathMock).toHaveBeenCalledWith('/settings');

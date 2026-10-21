@@ -929,3 +929,7 @@ alter table public.stripe_webhook_events enable row level security;
 create index if not exists businesses_stripe_customer_idx on public.businesses (stripe_customer_id);
 
 notify pgrst, 'reload schema';
+
+-- Optional review request cooldown (migration 0035).
+alter table public.businesses add column if not exists review_cooldown_enabled boolean not null default false;
+alter table public.businesses add column if not exists review_cooldown_days integer not null default 60;
