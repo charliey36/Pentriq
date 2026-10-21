@@ -4,7 +4,7 @@ import { APP_NAME } from '@/lib/brand';
 /** The one and only Pentriq plan. Change the price here (and in Stripe) only. */
 export const PLAN = {
   name: APP_NAME,
-  priceMonthly: 19.99,
+  priceMonthly: 19,
   currency: '£',
   perks: [
     'Unlimited customers and review requests',
