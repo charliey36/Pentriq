@@ -1,6 +1,5 @@
 'use client';
 
-import type { ReactNode } from 'react';
 import { useFormState } from 'react-dom';
 import { useActionToast } from '@/components/toast';
 import type { LoyaltyProgram } from '@/lib/database.types';
@@ -41,7 +40,7 @@ function PointsField({
   );
 }
 
-export function LoyaltyProgramForm({ program, children }: { program: LoyaltyProgram | null; children?: ReactNode }) {
+export function LoyaltyProgramForm({ program }: { program: LoyaltyProgram | null }) {
   const [state, formAction] = useFormState<LoyaltyFormResult, FormData>(saveLoyaltyProgram, {});
   useActionToast(state, { title: 'Loyalty program saved' });
 
@@ -80,8 +79,6 @@ export function LoyaltyProgramForm({ program, children }: { program: LoyaltyProg
           </div>
         </div>
       </SectionCard>
-
-      {children}
 
       <div className="flex flex-wrap items-center gap-4">
         <SubmitButton pendingText="Saving…" icon={<Icon name="check" className="h-4 w-4" strokeWidth={2.2} />}>

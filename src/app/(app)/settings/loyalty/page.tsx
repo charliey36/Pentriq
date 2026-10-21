@@ -35,9 +35,10 @@ export default async function LoyaltySettingsPage() {
         tabs={<SettingsTabs />}
       />
 
-      <LoyaltyProgramForm program={program ?? null}>
-        <ReferralPromotions promotions={promotions ?? []} />
-      </LoyaltyProgramForm>
+      <LoyaltyProgramForm program={program ?? null} />
+
+      {/* Sibling, not a child: a <form> nested inside #loyalty-form is invalid HTML and broke Create Promotion. */}
+      <ReferralPromotions promotions={promotions ?? []} />
     </div>
   );
 }

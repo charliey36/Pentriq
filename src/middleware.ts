@@ -52,6 +52,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/scan-customer-lifecycle') ||
     pathname.startsWith('/api/sync-google-reviews') ||
     pathname.startsWith('/api/publish-weekly-digest') ||
+    pathname.startsWith('/api/test-welcome-email') ||
     pathname.startsWith('/api/stripe/webhook') ||
     pathname === '/robots.txt' ||
     pathname === '/sitemap.xml' ||

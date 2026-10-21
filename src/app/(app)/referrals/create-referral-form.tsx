@@ -30,7 +30,7 @@ export function CreateReferralForm({ customers, promotions }: { customers: Custo
         </div>
         <div>
           <label htmlFor="promotion_id" className="label">
-            Promotion
+            Referral Promotion
           </label>
           <select id="promotion_id" name="promotion_id" required className="input mt-1.5" defaultValue="">
             <option value="" disabled>

@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { renderReviewRequestEmail } from '@/lib/email-templates/review-request';
+import { renderWelcomeEmail } from '@/lib/email-templates/welcome';
 import { APP_NAME, senderDisplayName, getAppUrl } from '@/lib/brand';
 
 function getResendClient() {
@@ -85,7 +86,7 @@ function layout(body: string) {
 <p style="font-size:13px;color:#64748b;margin-top:32px">Questions? Just reply to this email.</p></div>`;
 }
 
-export function buildNotificationEmail(kind: NotificationKind, businessName: string) {
+export function buildNotificationEmail(kind: NotificationKind, businessName: string): { subject: string; html: string; text?: string } {
   const app = getAppUrl();
   const name = escapeHtml(businessName);
   const button = (href: string, label: string) =>
@@ -93,10 +94,7 @@ export function buildNotificationEmail(kind: NotificationKind, businessName: str
 
   switch (kind) {
     case 'welcome':
-      return {
-        subject: `Welcome to ${APP_NAME}`,
-        html: layout(`<p>Welcome, ${name}!</p><p>Add your Google review link and your first customer and we'll send your first review request.</p>${button(`${app}/dashboard`, 'Get started')}`),
-      };
+      return renderWelcomeEmail({ businessName });
     case 'campaign':
       return {
         subject: 'Your campaign has been sent',
@@ -111,13 +109,13 @@ export function buildNotificationEmail(kind: NotificationKind, businessName: str
 }
 
 export async function sendNotificationEmail(to: string, kind: NotificationKind, businessName: string) {
-  const { subject, html } = buildNotificationEmail(kind, businessName);
+  const { subject, html, text } = buildNotificationEmail(kind, businessName);
   if (!process.env.RESEND_API_KEY) {
     console.log(`[email stub] to=${to} subject="${subject}"`);
     return;
   }
   const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
-  const { error } = await getResendClient().emails.send({ from: `${APP_NAME} <${from}>`, to, subject, html });
+  const { error } = await getResendClient().emails.send({ from: `${APP_NAME} <${from}>`, to, subject, html, ...(text ? { text } : {}) });
   if (error) throw new Error(typeof error === 'string' ? error : error.message);
 }
 
@@ -155,10 +153,10 @@ export async function sendReferralEmail(params: { to: string; customerName: stri
   if (error) throw new Error(typeof error === 'string' ? error : error.message);
 }
 
-export async function sendReferralRedeemedEmail(params: { to: string; businessName: string; code: string; points: number }) {
+export async function sendReferralRedeemedEmail(params: { to: string; businessName: string; code: string; reward: string }) {
   const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
   const subject = 'Your referral was successful';
-  const html = layout(`<p>Great news!</p><p>Your referral code <strong>${escapeHtml(params.code)}</strong> has been redeemed.</p><p>You have received:</p><p><strong>${params.points} Loyalty Points</strong></p><p>Thank you for helping grow the business.</p>`);
+  const html = layout(`<p>Great news!</p><p>Your referral code <strong>${escapeHtml(params.code)}</strong> has been redeemed.</p><p>You have received:</p><p><strong>${escapeHtml(params.reward)}</strong></p><p>Thank you for helping grow the business.</p>`);
   if (!process.env.RESEND_API_KEY) { console.log(`[email stub] to=${params.to} subject="${subject}"`); return; }
   const { error } = await getResendClient().emails.send({ from: `${senderDisplayName(params.businessName)} <${from}>`, to: params.to, subject, html });
   if (error) throw new Error(typeof error === 'string' ? error : error.message);

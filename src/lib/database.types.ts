@@ -629,6 +629,10 @@ export type Database = {
           description: string;
           customer_reward: string;
           referrer_reward: string;
+          referrer_reward_type: 'points' | 'custom';
+          referrer_points: number | null;
+          customer_reward_type: 'points' | 'custom';
+          customer_points: number | null;
           created_at: string;
         };
         Insert: {
@@ -638,8 +642,20 @@ export type Database = {
           description?: string;
           customer_reward: string;
           referrer_reward: string;
+          referrer_reward_type?: 'points' | 'custom';
+          referrer_points?: number | null;
+          customer_reward_type?: 'points' | 'custom';
+          customer_points?: number | null;
         };
-        Update: Record<string, never>;
+        Update: {
+          name?: string;
+          customer_reward?: string;
+          referrer_reward?: string;
+          referrer_reward_type?: 'points' | 'custom';
+          referrer_points?: number | null;
+          customer_reward_type?: 'points' | 'custom';
+          customer_points?: number | null;
+        };
         Relationships: [];
       };
       segments: {

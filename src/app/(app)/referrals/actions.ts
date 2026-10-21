@@ -40,7 +40,7 @@ export async function createReferralCode(_prev: ReferralFormResult, formData: Fo
   if (!promotion) return { error: 'Promotion not found.' };
   for (let attempt = 0; attempt < 10; attempt += 1) {
     const code = generateCode();
-    const { error } = await supabase.from('referrals').insert({ business_id: business.id, referrer_customer_id: customerId, code, status: 'active', promotion_id: promotion.id, promotion_name: promotion.name, customer_reward: promotion.name, referrer_reward: promotion.referrer_reward });
+    const { error } = await supabase.from('referrals').insert({ business_id: business.id, referrer_customer_id: customerId, code, status: 'active', promotion_id: promotion.id, promotion_name: promotion.name, customer_reward: promotion.customer_reward, referrer_reward: promotion.referrer_reward });
     if (!error) { revalidatePath('/referrals'); return { success: true, code, qrUrl: qrUrl(code) }; }
     if (!error.message.toLowerCase().includes('duplicate') && error.code !== '23505') {
       return { error: `Could not generate referral code: ${error.message}` };
@@ -80,19 +80,24 @@ export async function validateReferralCode(code: string): Promise<ReferralValida
 export async function redeemReferralCode(referralId: string): Promise<ReferralFormResult> {
   const business = await requireBusiness();
   const supabase = createClient();
-  const { data: referral } = await supabase.from('referrals').select('id,code,referrer_customer_id').eq('id', referralId).eq('business_id', business.id).eq('status', 'active').maybeSingle();
+  const { data: referral } = await supabase.from('referrals').select('id,code,referrer_customer_id,promotion_id,referrer_reward').eq('id', referralId).eq('business_id', business.id).eq('status', 'active').maybeSingle();
   if (!referral) return { error: 'This referral code is no longer active.' };
   const now = new Date().toISOString();
   const { error } = await supabase.from('referrals').update({ status: 'redeemed', redeemed_at: now, reward_granted_at: now }).eq('id', referral.id).eq('status', 'active');
   if (error) return { error: 'Could not redeem this referral code.' };
   const { data: program } = await supabase.from('loyalty_programs').select('points_per_referral').eq('business_id', business.id).eq('is_active', true).maybeSingle();
-  const points = program?.points_per_referral ?? 100;
-  if (program) await supabase.from('loyalty_ledger_entries').insert({ business_id: business.id, customer_id: referral.referrer_customer_id, delta: points, reason: 'referral', reference_type: 'referral', reference_id: referral.id });
+  // The promotion decides the referrer's reward: points go on the ledger, a custom reward is only announced.
+  const { data: promotion } = referral.promotion_id
+    ? await supabase.from('referral_promotions').select('referrer_reward,referrer_reward_type,referrer_points').eq('id', referral.promotion_id).maybeSingle()
+    : { data: null };
+  const rewardLabel = promotion?.referrer_reward ?? referral.referrer_reward ?? `${program?.points_per_referral ?? 100} Loyalty Points`;
+  const points = promotion ? (promotion.referrer_reward_type === 'points' ? promotion.referrer_points ?? 0 : 0) : program?.points_per_referral ?? 100;
+  if (program && points > 0) await supabase.from('loyalty_ledger_entries').insert({ business_id: business.id, customer_id: referral.referrer_customer_id, delta: points, reason: 'referral', reference_type: 'referral', reference_id: referral.id });
   const [{ data: customer }, { data: settings }] = await Promise.all([
     supabase.from('customers').select('name,email').eq('id', referral.referrer_customer_id).maybeSingle(),
     supabase.from('businesses').select('name').eq('id', business.id).maybeSingle(),
   ]);
-  if (customer?.email) await sendReferralRedeemedEmail({ to: customer.email, businessName: settings?.name ?? 'your business', code: referral.code, points });
+  if (customer?.email) await sendReferralRedeemedEmail({ to: customer.email, businessName: settings?.name ?? 'your business', code: referral.code, reward: rewardLabel });
   revalidatePath('/referrals');
   return { success: true };
 }

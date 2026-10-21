@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireBusiness } from '@/lib/business';
+import { parseRewardFields } from '@/lib/referral-rewards';
 
 export type LoyaltyFormResult = { error?: string; success?: boolean };
 
@@ -83,28 +84,66 @@ export async function redeemLoyaltyPoints(customerId: string) {
   return { success: true };
 }
 
+function parsePromotion(formData: FormData) {
+  const name = String(formData.get('name') ?? '').trim().slice(0, 200);
+  if (!name) return { error: 'Give the promotion a name.' } as const;
+  const referrer = parseRewardFields(formData, 'referrer', 'Referrer reward');
+  if ('error' in referrer) return referrer;
+  const customer = parseRewardFields(formData, 'customer', 'Referred customer reward');
+  if ('error' in customer) return customer;
+  return {
+    values: {
+      name,
+      referrer_reward: referrer.reward.label,
+      referrer_reward_type: referrer.reward.type,
+      referrer_points: referrer.reward.points,
+      customer_reward: customer.reward.label,
+      customer_reward_type: customer.reward.type,
+      customer_points: customer.reward.points,
+    },
+  } as const;
+}
+
+function promotionSaveError(error: { message: string }, verb: string) {
+  console.error(`[referral-promotions] could not ${verb} promotion:`, error.message);
+  return /column|schema cache/i.test(error.message)
+    ? 'Promotions need a database update (migration 0034). Apply it in Supabase and try again.'
+    : `Could not ${verb} promotion. Please try again.`;
+}
+
 export async function createReferralPromotion(
   _prev: LoyaltyFormResult,
   formData: FormData
 ): Promise<LoyaltyFormResult> {
   const business = await requireBusiness();
+  const parsed = parsePromotion(formData);
+  if ('error' in parsed) return { error: parsed.error };
+
   const supabase = createClient();
+  const { error } = await supabase.from('referral_promotions').insert({ business_id: business.id, ...parsed.values });
+  if (error) return { error: promotionSaveError(error, 'create') };
 
-  const field = (key: string) => String(formData.get(key) ?? '').trim().slice(0, 200);
-  const name = field('name');
-  const referrerReward = field('referrer_reward');
-  if (!name || !referrerReward) {
-    return { error: 'Promotion name and referrer reward are required.' };
-  }
+  revalidatePath('/settings/loyalty');
+  revalidatePath('/referrals');
+  return { success: true };
+}
 
-  const { error } = await supabase.from('referral_promotions').insert({
-    business_id: business.id,
-    name,
-    // The promotion name is the offer shown to the referred customer.
-    customer_reward: name,
-    referrer_reward: referrerReward,
-  });
-  if (error) return { error: 'Could not create promotion.' };
+export async function updateReferralPromotion(
+  promotionId: string,
+  _prev: LoyaltyFormResult,
+  formData: FormData
+): Promise<LoyaltyFormResult> {
+  const business = await requireBusiness();
+  const parsed = parsePromotion(formData);
+  if ('error' in parsed) return { error: parsed.error };
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from('referral_promotions')
+    .update(parsed.values)
+    .eq('id', promotionId)
+    .eq('business_id', business.id);
+  if (error) return { error: promotionSaveError(error, 'update') };
 
   revalidatePath('/settings/loyalty');
   revalidatePath('/referrals');

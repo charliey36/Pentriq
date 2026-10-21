@@ -348,6 +348,10 @@ create table if not exists public.referral_promotions (
   description text not null default '',
   customer_reward text not null,
   referrer_reward text not null,
+  referrer_reward_type text not null default 'custom' check (referrer_reward_type in ('points', 'custom')),
+  referrer_points integer check (referrer_points is null or referrer_points > 0),
+  customer_reward_type text not null default 'custom' check (customer_reward_type in ('points', 'custom')),
+  customer_points integer check (customer_points is null or customer_points > 0),
   created_at timestamptz not null default now()
 );
 create index if not exists referral_promotions_business_id_idx on public.referral_promotions (business_id);
