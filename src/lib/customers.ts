@@ -431,7 +431,7 @@ export async function bulkImportCustomers(
       purpose: 'review_request',
       channel: 'email' as const,
       status: autoSend ? ('pending' as const) : ('queued' as const),
-      send_at: (autoSend ? reviewSendTime(v.date) : new Date()).toISOString(),
+      send_at: (autoSend ? reviewSendTime(v.date, new Date(), business.review_request_window_days) : new Date()).toISOString(),
       journey_enrollment_id: enrollmentByCustomer.get(customerId) ?? null,
       visit_id: visitIdByKey.get(`${customerId}|${v.serviceId}|${v.date}`) ?? null,
     }));

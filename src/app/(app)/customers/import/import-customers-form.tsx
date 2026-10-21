@@ -123,9 +123,9 @@ export function ImportCustomersForm({ windowDays }: { windowDays: number }) {
         <label className="flex items-start gap-3 text-sm text-ink-2">
           <input type="checkbox" name="auto_send" defaultChecked className="mt-1 h-4 w-4 rounded border-line-strong" />
           <span>
-            <span className="font-medium text-ink">Automatically email review requests for services in the last {windowDays} {windowDays === 1 ? 'day' : 'days'}</span>
+            <span className="font-medium text-ink">Automatically email review requests {windowDays} {windowDays === 1 ? 'day' : 'days'} after each service</span>
             <span className="block text-[13px] text-ink-3">
-              Uses your review request window from Settings → Service timing. Eligible customers are emailed automatically at 8:00am (the day after the service). Untick to hold them on the Customers page and send them yourself.
+              Timing comes from your review request window in Settings → Service timing. Requests are emailed automatically at 8:00am. Untick to hold them on the Customers page and send them yourself.
             </span>
           </span>
         </label>
@@ -183,7 +183,7 @@ export function ImportCustomersForm({ windowDays }: { windowDays: number }) {
           {state.summary.queued > 0 && (
             <Notice variant="success" className="mt-4">
               {state.summary.autoSend
-                ? `${state.summary.queued} review request${state.summary.queued === 1 ? ' is' : 's are'} scheduled for 8:00am the day after service.`
+                ? `${state.summary.queued} review request${state.summary.queued === 1 ? ' is' : 's are'} scheduled for 8:00am, ${windowDays} ${windowDays === 1 ? 'day' : 'days'} after each service.`
                 : `${state.summary.queued} review request${state.summary.queued === 1 ? ' is' : 's are'} held until you send ${state.summary.queued === 1 ? 'it' : 'them'}.`}{' '}
               <a href="/customers" className="font-medium underline">View customers</a>
             </Notice>

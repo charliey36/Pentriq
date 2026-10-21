@@ -21,3 +21,15 @@ describe('review request cooldown', () => {
     expect(cooldownDaysFor({ review_cooldown_enabled: true, review_cooldown_days: 30 })).toBe(30);
   });
 });
+
+import { reviewSendTime } from '@/lib/send-window';
+
+describe('review send time follows the review request window', () => {
+  const now = new Date('2026-03-01T12:00:00Z');
+  it('defaults to 8am the next day', () => {
+    expect(reviewSendTime('2026-03-05', now).toISOString()).toBe('2026-03-06T08:00:00.000Z');
+  });
+  it('sends N days after the service when N is set', () => {
+    expect(reviewSendTime('2026-03-05', now, 3).toISOString()).toBe('2026-03-08T08:00:00.000Z');
+  });
+});

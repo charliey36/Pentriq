@@ -94,14 +94,14 @@ export function SettingsForm({ business }: { business: Business }) {
 
       <SectionCard
         title="Service timing"
-        description="Review requests are sent automatically at 8:00am the day after a completed service."
+        description="Review requests are sent automatically at 8:00am, this many days after a completed service."
       >
         <div className="grid max-w-lg gap-6 sm:grid-cols-2">
           <div>
             <label htmlFor="review_request_window_days" className="label">Review request window (days)</label>
             <input id="review_request_window_days" name="review_request_window_days" type="number" min={1} max={365} required
               defaultValue={business.review_request_window_days ?? 1} className="input mt-1.5 tabular-nums" />
-            <p className="field-hint">Only customers serviced within this many days get review requests. Also used by customer import when it schedules requests automatically.</p>
+            <p className="field-hint">Review requests are emailed this many days after the service. Services older than this are not requested.</p>
           </div>
           <div>
             <label htmlFor="rebooking_reminder_interval_days" className="label">Rebooking reminder after (days)</label>

@@ -37,10 +37,14 @@ export function snapToSendWindow(at: Date): Date {
   return londonToUtc(day.y, day.m, day.d, SEND_WINDOW_START_HOUR);
 }
 
-/** When to email a review request for a service done on `serviceDate` (YYYY-MM-DD): 08:00 the next day, or the next 08:00 if that has passed. */
-export function reviewSendTime(serviceDate: string, now = new Date()): Date {
+/**
+ * When to email a review request for a service done on `serviceDate` (YYYY-MM-DD): 08:00
+ * `delayDays` days later (default 1 = the next day; the business's "Review request window"
+ * setting), or the next 08:00 if that time has already passed.
+ */
+export function reviewSendTime(serviceDate: string, now = new Date(), delayDays = 1): Date {
   const [y, m, d] = serviceDate.split('-').map(Number);
-  const next = new Date(Date.UTC(y, m - 1, d + 1));
+  const next = new Date(Date.UTC(y, m - 1, d + Math.max(1, Math.round(delayDays) || 1)));
   const target = londonToUtc(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate(), SEND_WINDOW_START_HOUR);
   return target.getTime() >= now.getTime() ? target : snapToSendWindow(now);
 }

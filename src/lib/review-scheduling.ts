@@ -56,6 +56,8 @@ export type ScheduleReviewOptions = {
    * Explicit manual sends leave it unset.
    */
   cooldownDays?: number | null;
+  /** Days after the service to send the automatic request (the business's review request window). Default 1. */
+  delayDays?: number;
   /** Set when the customer is unsubscribed, to short-circuit scheduling. */
   unsubscribedAt?: string | null;
 };
@@ -130,7 +132,7 @@ export async function createReviewRequestFromVisit(
       .eq('is_active', true)
       .maybeSingle();
 
-    const sendAt = reviewSendTime(serviceDate);
+    const sendAt = reviewSendTime(serviceDate, new Date(), options.delayDays);
 
     if (journey) {
       await enrollCustomerInJourney(supabase, journey, customerId, sendAt);
