@@ -9,6 +9,7 @@ import { senderDisplayName, getAppUrl } from '@/lib/brand';
 import { buildTrackingUrl } from '@/lib/click-tracking';
 import { sendBlockedReason } from '@/lib/billing';
 import { reviewLinkBlockedReason } from '@/lib/send-guards';
+import { loadPersonalisation, reminderDisabled, REMINDERS_OFF_MESSAGE } from '@/lib/review-personalisation';
 
 /**
  * Sends one queued review request immediately, using the same compliant
@@ -55,6 +56,7 @@ export async function sendQueuedReview(
   
   const blocked = sendBlockedReason(business) ?? reviewLinkBlockedReason(business, message.purpose);
   if (blocked) return { ok: false, error: blocked };
+  if (reminderDisabled(business, message.purpose)) return { ok: false, error: REMINDERS_OFF_MESSAGE };
 
   console.log(`[Send Review] Customer found: ${customer.email}, Business: ${business.name}`);
 
@@ -83,6 +85,7 @@ export async function sendQueuedReview(
       privateFeedbackUrl: `${appUrl}/feedback/${message.id}`,
       unsubscribeUrl: `${appUrl}/api/unsubscribe/${customer.id}`,
       rebookingUrl: rebookingLink(business, customer.id, appUrl),
+      ...(message.purpose === 'review_request' ? await loadPersonalisation(supabase, business, message) : {}),
     });
     
     console.log(`[Send Review] Message rendered, subject: "${rendered.subject}"`);

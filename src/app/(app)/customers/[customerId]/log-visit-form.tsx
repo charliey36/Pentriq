@@ -59,6 +59,13 @@ export function LogVisitForm({ customerId, services }: { customerId: string; ser
       </div>
 
       <div>
+        <label htmlFor="staff_name" className="label">
+          Staff member <span className="font-normal text-ink-4">(optional)</span>
+        </label>
+        <input id="staff_name" name="staff_name" type="text" maxLength={120} className="input mt-1.5" placeholder="e.g. Alex" />
+      </div>
+
+      <div>
         <label htmlFor="notes" className="label">
           Notes <span className="font-normal text-ink-4">(optional)</span>
         </label>

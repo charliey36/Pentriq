@@ -21,6 +21,12 @@ type TemplateContext = {
   loyaltyPointsBalance?: number;
   /** The business's own contact email; shown as "Need help?" when set, hidden otherwise. */
   contactEmail?: string | null;
+  /** Per-business copy and per-appointment values for review emails (see lib/review-personalisation.ts). */
+  customSubject?: string | null;
+  customBody?: string | null;
+  serviceName?: string | null;
+  staffName?: string | null;
+  appointmentDate?: string | null;
 };
 
 function wrapEmailHtml(bodyHtml: string, footerHtml: string): string {
@@ -94,6 +100,11 @@ export function renderMessage(
           privateFeedbackUrl: ctx.privateFeedbackUrl,
           unsubscribeUrl: ctx.unsubscribeUrl,
           businessContact: { email: ctx.contactEmail },
+          customSubject: ctx.customSubject,
+          customBody: ctx.customBody,
+          serviceName: ctx.serviceName,
+          staffName: ctx.staffName,
+          appointmentDate: ctx.appointmentDate,
         });
         return { subject: email.subject, html: email.html, text: email.text };
       }

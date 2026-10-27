@@ -8,6 +8,7 @@ import { SubmitButton } from '@/components/ui/submit-button';
 import { analyzeCsv, importCustomers, type AnalyzeImportResult, type ImportCustomersResult } from './actions';
 import { CSV_IMPORT_FIELDS } from '@/lib/csv-import-mapping';
 import { CONSENT_FIELD, CONSENT_LABEL } from '@/lib/consent';
+import type { CsvPreflight } from '@/lib/csv-preflight';
 
 const resultTones: Record<string, string> = {
   created: 'text-brand-700 dark:text-brand-300',
@@ -30,6 +31,46 @@ const resultLabels: Record<string, string> = {
 /** Rows worth listing: everything except plain creates and plain updates, which the counts already cover. */
 const isNotable = (r: ImportCustomersResultRow) => r.status === 'conflict' || r.status === 'error' || r.status === 'skipped_duplicate' || (r.status === 'updated' && Boolean(r.note));
 type ImportCustomersResultRow = NonNullable<ImportCustomersResult['summary']>['results'][number];
+
+function PreflightPanel({ preflight }: { preflight: CsvPreflight }) {
+  const fieldLabel: Record<string, string> = { name: 'Name', email: 'Email', service: 'Service', date: 'Date', amount: 'Amount' };
+  return (
+    <div className="rounded-xl border border-line bg-surface p-4" aria-live="polite">
+      <p className="font-medium text-ink-2">File check</p>
+      <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+        <div><dt className="text-xs text-ink-3">Rows in file</dt><dd className="text-lg font-semibold tabular-nums text-ink">{preflight.totalRows}</dd></div>
+        <div><dt className="text-xs text-ink-3">Ready to import</dt><dd className="text-lg font-semibold tabular-nums text-brand-700 dark:text-brand-300">{preflight.readyRows}</dd></div>
+        <div><dt className="text-xs text-ink-3">Need fixing</dt><dd className={`text-lg font-semibold tabular-nums ${preflight.problemRows ? 'text-red-700 dark:text-red-300' : 'text-ink'}`}>{preflight.problemRows}</dd></div>
+        <div><dt className="text-xs text-ink-3">Repeated rows</dt><dd className="text-lg font-semibold tabular-nums text-ink">{preflight.duplicateRows}</dd></div>
+      </dl>
+      {preflight.undatedRows > 0 && (
+        <p className="mt-3 text-[13px] text-ink-3">{preflight.undatedRows} ready row{preflight.undatedRows === 1 ? ' has' : 's have'} no service date. Those customers are added, but no review request is created until a dated service exists.</p>
+      )}
+      {preflight.fileMessages.map((m) => (
+        <Notice key={m.text} variant={m.level === 'error' ? 'error' : 'warning'} className="mt-3"><span className="whitespace-pre-line">{m.text}</span></Notice>
+      ))}
+      {preflight.issues.length > 0 && (
+        <div className="scroll-thin mt-4 max-h-72 overflow-auto rounded-xl border border-line">
+          <table className="data-table">
+            <thead className="sticky top-0"><tr><th>Row</th><th>Customer</th><th>Problem</th><th>How to fix</th></tr></thead>
+            <tbody>
+              {preflight.issues.map((issue) => (
+                <tr key={`${issue.row}-${issue.field}`}>
+                  <td className="tabular-nums text-ink-3">{issue.row}</td>
+                  <td>{issue.name || issue.email || '\u2014'}</td>
+                  <td className="font-medium text-red-700 dark:text-red-300">{fieldLabel[issue.field]}: {issue.problem}</td>
+                  <td className="text-ink-2">{issue.fix}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {preflight.issuesTruncated && <p className="mt-2 text-xs text-ink-3">Showing the first {preflight.issues.length} problems. Fix these and analyse again to see the rest.</p>}
+      <p className="mt-3 text-xs text-ink-3">Row numbers match your spreadsheet (the header is row 1).</p>
+    </div>
+  );
+}
 
 export function ImportCustomersForm({ windowDays }: { windowDays: number }) {
   const [analysisState, analyzeAction] = useFormState<AnalyzeImportResult, FormData>(analyzeCsv, {});
@@ -66,13 +107,18 @@ export function ImportCustomersForm({ windowDays }: { windowDays: number }) {
 
         <div className="rounded-xl bg-surface-subtle p-4 text-[13px] leading-6 text-ink-3 ring-1 ring-inset ring-line">
           <p className="font-medium text-ink-2">Pentriq will detect these fields from your headers and sample values:</p>
-          <pre className="mt-2 overflow-x-auto font-mono text-[12px] text-ink-2">{`Name, Email, Date, Service, Phone, Amount`}</pre>
+          <pre className="mt-2 overflow-x-auto font-mono text-[12px] text-ink-2">{`name,email,service,date,phone,amount,staff
+Sam Taylor,sam@example.com,Boiler Repair,2026-10-08,07700 900123,85,Alex
+Priya Shah,priya@example.com,Leak Repair,08/10/2026,,120,Jordan`}</pre>
+          <p className="mt-2">Only <code className="font-mono">name</code> and <code className="font-mono">email</code> are required. Add <code className="font-mono">date</code> (a completed service, YYYY-MM-DD or DD/MM/YYYY) so Pentriq knows when to ask for a review. An optional <code className="font-mono">staff</code> or <code className="font-mono">technician</code> column lets your emails mention who did the work.</p>
           <p className="mt-2">
             Common exports from Vagaro, Booksy, Fresha, Square and similar systems are supported. Review and adjust the detected mappings before importing. Required fields are <code className="font-mono">Name</code> and <code className="font-mono">Email</code>; the others are optional. Existing customers matched by email receive another visit instead of a duplicate record.{' '}
             <a href="/pentriq-customer-template.csv" download className="font-medium text-brand-700 underline dark:text-brand-300">Download sample CSV</a>
           </p>
         </div>
         {analysisState.error && <Notice variant="error">{analysisState.error}</Notice>}
+
+        {analysisState.preflight && <PreflightPanel preflight={analysisState.preflight} />}
 
         {analysisState.mapping && (
           <div className="rounded-xl border border-line bg-surface-subtle p-4">
@@ -148,7 +194,11 @@ export function ImportCustomersForm({ windowDays }: { windowDays: number }) {
           ) : (
             <>
               <button type="submit" formAction={analyzeAction} className="btn btn-secondary">Analyse again</button>
-              <button type="submit" formAction={importAction} className="btn btn-primary">Confirm and import customers</button>
+              <button type="submit" formAction={importAction} disabled={analysisState.preflight ? !analysisState.preflight.canImport : false} className="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50">
+                {analysisState.preflight && analysisState.preflight.problemRows > 0 && analysisState.preflight.readyRows > 0
+                  ? `Import ${analysisState.preflight.readyRows} valid row${analysisState.preflight.readyRows === 1 ? '' : 's'}`
+                  : 'Confirm and import customers'}
+              </button>
             </>
           )}
         </div>

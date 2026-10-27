@@ -35,6 +35,7 @@ function rememberCollapsed(collapsed: boolean) {
  */
 export function SetupChecklist({ steps, initiallyCollapsed = false }: { steps: SetupStep[]; initiallyCollapsed?: boolean }) {
   const completed = steps.filter((step) => step.done).length;
+  const percent = steps.length === 0 ? 100 : Math.round((completed / steps.length) * 100);
   const allDone = completed === steps.length;
   const nextIndex = steps.findIndex((step) => !step.done);
   const [collapsed, setCollapsed] = useState(initiallyCollapsed);
@@ -69,9 +70,9 @@ export function SetupChecklist({ steps, initiallyCollapsed = false }: { steps: S
             </svg>
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink">You&apos;re all set</h2>
+            <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink">You&apos;re all set &mdash; 100% complete 🎉</h2>
             <p className="mt-1 max-w-xl text-sm leading-6 text-ink-3">
-              Your review link is live and customers are flowing in. Pentriq will send requests, follow up and
+              Your first review is in. Pentriq will keep sending requests, follow up with reminders and
               track results automatically from here.
             </p>
           </div>
@@ -102,7 +103,7 @@ export function SetupChecklist({ steps, initiallyCollapsed = false }: { steps: S
           <span className="text-[11px] font-semibold leading-none text-ink tabular-nums">{completed}/{steps.length}</span>
         </ProgressRing>
         <p className="min-w-0 flex-1 text-sm text-ink-2">
-          <span className="font-medium text-ink">Setup {completed}/{steps.length}</span>
+          <span className="font-medium text-ink">Setup {percent}% complete</span>
           {next && <span className="text-ink-3"> &middot; Next: {next.title}</span>}
         </p>
         {next && (
@@ -133,9 +134,9 @@ export function SetupChecklist({ steps, initiallyCollapsed = false }: { steps: S
             </span>
           </ProgressRing>
           <div>
-            <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-ink">Recommended next steps</h2>
+            <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-ink">Get your first review</h2>
             <p className="mt-1 text-[13px] leading-5 text-ink-3">
-              {completed} of {steps.length} done. Do them in any order, whenever you&apos;re ready &mdash; you can use everything
+              {percent}% complete ({completed} of {steps.length}). Most businesses reach their first request in one sitting; you can use everything
               else in Pentriq in the meantime.
             </p>
             <button type="button" className="btn btn-ghost btn-sm mt-3 -ml-2.5" onClick={() => setCollapsedAndRemember(true)}>

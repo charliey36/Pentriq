@@ -66,7 +66,7 @@ async function sendEmail(params: SendMessageParams, fromLabel: string) {
     html: params.html ?? `<p>${escapeHtml(params.text)}</p>`,
     text: params.text,
     headers: params.listUnsubscribeUrl
-      ? { 'List-Unsubscribe': `<${params.listUnsubscribeUrl}>` }
+      ? { 'List-Unsubscribe': `<${params.listUnsubscribeUrl}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' }
       : undefined,
   });
 

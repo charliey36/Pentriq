@@ -29,6 +29,7 @@ export const navGroups: { label: string; items: NavItem[] }[] = [
       { href: '/segments', label: 'Segments', icon: 'funnel' },
       { href: '/referrals', label: 'Referrals', icon: 'userPlus' },
       { href: '/feedback-inbox', label: 'Feedback', icon: 'chat', badge: 'feedback' },
+      { href: '/review-link', label: 'QR & review link', icon: 'star' },
     ],
   },
   {

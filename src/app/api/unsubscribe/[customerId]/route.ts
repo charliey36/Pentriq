@@ -1,6 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { RATE_LIMITS, requesterId, withinLimit } from '@/lib/rate-limit';
+import { unsubscribeCustomer } from '@/lib/unsubscribe';
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const dynamic = 'force-dynamic';
 
@@ -51,35 +54,31 @@ export async function GET(
 
   const supabase = createAdminClient();
 
-  const { data: customer, error: customerError } = await supabase
-    .from('customers')
-    .select('id')
-    .eq('id', customerId)
-    .maybeSingle();
-
-  if (customerError || !customer) {
+  const outcome = await unsubscribeCustomer(supabase, customerId);
+  if (outcome === 'not_found') {
     return new NextResponse(html('We could not find that subscription.'), {
       status: 404,
       headers: { 'Content-Type': 'text/html' },
     });
   }
 
-  await supabase
-    .from('customers')
-    .update({ unsubscribed_at: new Date().toISOString() })
-    .eq('id', customerId);
-
-  // Cancel any review request that hasn't been sent yet so the cron job
-  // skips it on its next run, instead of relying solely on the consent
-  // check at send time.
-  await supabase
-    .from('review_requests')
-    .update({ status: 'cancelled' })
-    .eq('customer_id', customerId)
-    .eq('status', 'pending');
-
   return new NextResponse(
-    html("You've been unsubscribed and won't receive any further review request emails from this business."),
+    html("You've been unsubscribed and won't receive any further emails from this business."),
     { status: 200, headers: { 'Content-Type': 'text/html' } }
   );
+}
+
+/**
+ * RFC 8058 one-click unsubscribe. Mail clients that see
+ * `List-Unsubscribe-Post: List-Unsubscribe=One-Click` POST here directly, with
+ * no page shown. Same effect as the link in the email footer.
+ */
+export async function POST(request: NextRequest, { params }: { params: { customerId: string } }) {
+  const { customerId } = params;
+  if (!UUID.test(customerId)) return new NextResponse('Invalid unsubscribe link.', { status: 400 });
+  if (!(await withinLimit('unsubscribe-ip', requesterId(request.headers), RATE_LIMITS.unsubscribeIp))) {
+    return new NextResponse('Too many requests.', { status: 429, headers: { 'Retry-After': '600' } });
+  }
+  const outcome = await unsubscribeCustomer(createAdminClient(), customerId);
+  return new NextResponse(outcome === 'not_found' ? 'Not found.' : 'Unsubscribed.', { status: outcome === 'not_found' ? 404 : 200 });
 }

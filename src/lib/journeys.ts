@@ -20,7 +20,9 @@ export async function enrollCustomerInJourney(
   supabase: SupabaseClient<Database>,
   journey: Journey,
   customerId: string,
-  firstSendAt?: Date
+  firstSendAt?: Date,
+  /** The visit this sequence is about, so the first email can mention the service, staff member and date. */
+  visitId?: string | null
 ): Promise<void> {
   // Don't double-enroll: if this customer already has an active enrollment
   // in this journey, leave it alone.
@@ -61,6 +63,7 @@ export async function enrollCustomerInJourney(
     journey_enrollment_id: enrollment.id,
     sequence_step: 1,
     send_at: sendAt,
+    ...(visitId ? { visit_id: visitId } : {}),
   });
 }
 
@@ -103,6 +106,16 @@ export async function advanceJourneyEnrollment(
     .from('journey_enrollments')
     .update({ current_step: nextStepIndex })
     .eq('id', enrollmentId);
+
+  // Never schedule the same step twice (e.g. two overlapping cron runs advancing one enrollment).
+  const { data: existingStep } = await supabase
+    .from('messages')
+    .select('id')
+    .eq('journey_enrollment_id', enrollmentId)
+    .eq('sequence_step', nextStepIndex + 1)
+    .neq('status', 'cancelled')
+    .limit(1);
+  if (existingStep && existingStep.length > 0) return;
 
   const sendAt = snapToSendWindow(new Date(Date.now() + nextStep.wait_hours * 60 * 60 * 1000)).toISOString();
 

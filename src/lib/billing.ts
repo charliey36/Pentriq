@@ -1,5 +1,6 @@
 import type { Business } from '@/lib/database.types';
 import { APP_NAME } from '@/lib/brand';
+import { isPaused, PAUSED_MESSAGE, type PauseFields } from '@/lib/pause';
 
 /** The one and only Pentriq plan. Change the price here (and in Stripe) only. */
 export const PLAN = {
@@ -34,7 +35,7 @@ export type BillingState = {
 };
 
 /** The subset of a business row the billing logic needs. */
-export type BillingInput = Pick<Business, 'subscription_status' | 'trial_ends_at' | 'created_at'>;
+export type BillingInput = Pick<Business, 'subscription_status' | 'trial_ends_at' | 'created_at'> & PauseFields;
 
 export function getBillingState(b: BillingInput, now = new Date(), ownerEmail?: string): BillingState {
   if (isBillingOverrideEmail(ownerEmail)) {
@@ -99,6 +100,7 @@ export const TRIAL_NOT_STARTED_MESSAGE =
 
 /** Throws-free guard for send paths: returns an error string when blocked. */
 export function sendBlockedReason(b: BillingInput, now = new Date(), ownerEmail?: string): string | null {
+  if (isPaused(b, now)) return PAUSED_MESSAGE;
   if (canUse(b, 'send_messages', now, ownerEmail)) return null;
   return getBillingState(b, now, ownerEmail).status === 'trial_available' ? TRIAL_NOT_STARTED_MESSAGE : SUBSCRIPTION_REQUIRED_MESSAGE;
 }

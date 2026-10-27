@@ -8,6 +8,7 @@ import { getBillingState, stripeConfigured, TRIAL_DAYS } from '@/lib/billing';
 import { checkoutPriceId, getStripe } from '@/lib/stripe';
 import { getAppUrl } from '@/lib/brand';
 import { captureError } from '@/lib/monitoring';
+import { isPauseOption, isPaused, pauseEnd } from '@/lib/pause';
 
 export type BillingResult = { error?: string; success?: boolean };
 
@@ -140,4 +141,71 @@ export async function openBillingPortal(): Promise<BillingResult> {
     };
   }
   redirect(url);
+}
+
+/**
+ * Pauses a paid subscription instead of cancelling it. Stripe stops collecting
+ * payment (`pause_collection`, invoices voided) and Pentriq stops sending to
+ * customers until the pause ends or the owner resumes. If Stripe fails we do
+ * NOT mark the business paused, so nobody is left paying for a paused account.
+ */
+export async function pauseSubscription(_prev: BillingResult, formData: FormData): Promise<BillingResult> {
+  const business = await requireBusiness();
+  const option = formData.get('option');
+  if (!isPauseOption(option)) return { error: 'Choose how long to pause for.' };
+  const state = getBillingState(business);
+  if (state.status !== 'active' && state.status !== 'past_due') return { error: 'Only an active subscription can be paused.' };
+  if (isPaused(business)) return { error: 'Your subscription is already paused.' };
+
+  const now = new Date();
+  const end = pauseEnd(option, now);
+  if (stripeConfigured() && business.stripe_subscription_id) {
+    try {
+      await getStripe().subscriptions.update(business.stripe_subscription_id, {
+        pause_collection: { behavior: 'void', ...(end ? { resumes_at: Math.floor(end.getTime() / 1000) } : {}) },
+      });
+    } catch (e) {
+      captureError(e, { area: 'stripe:pause-subscription', tags: { business_id: business.id } });
+      return { error: GENERIC_ERROR };
+    }
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from('businesses')
+    .update({ paused_at: now.toISOString(), paused_until: end ? end.toISOString() : null, pause_indefinite: end === null })
+    .eq('id', business.id);
+  if (error) {
+    captureError(error, { area: 'billing:pause-subscription', tags: { business_id: business.id } });
+    return { error: 'Your payment was paused but we could not save the pause. Please contact support.' };
+  }
+
+  // Scheduled sends would otherwise fire in a burst the day the pause ends: stop them now.
+  await admin.from('messages').update({ status: 'cancelled', last_error: 'Subscription paused' }).eq('business_id', business.id).eq('status', 'pending');
+  await admin.from('journey_enrollments').update({ status: 'exited' }).eq('business_id', business.id).eq('status', 'active');
+
+  revalidatePath('/', 'layout');
+  return { success: true };
+}
+
+/** Ends a pause early: payment collection resumes and sending is allowed again. */
+export async function resumeSubscription(): Promise<BillingResult> {
+  const business = await requireBusiness();
+  if (!business.paused_at) return { error: 'Your subscription is not paused.' };
+
+  if (stripeConfigured() && business.stripe_subscription_id) {
+    try {
+      await getStripe().subscriptions.update(business.stripe_subscription_id, { pause_collection: '' });
+    } catch (e) {
+      captureError(e, { area: 'stripe:resume-subscription', tags: { business_id: business.id } });
+      return { error: GENERIC_ERROR };
+    }
+  }
+  const { error } = await createAdminClient()
+    .from('businesses')
+    .update({ paused_at: null, paused_until: null, pause_indefinite: false })
+    .eq('id', business.id);
+  if (error) return { error: 'Could not resume your subscription. Please try again.' };
+  revalidatePath('/', 'layout');
+  return { success: true };
 }

@@ -30,6 +30,7 @@ import type { Database } from '@/lib/database.types';
 import { reviewSendTime } from '@/lib/send-window';
 import { daysSinceService, isCooldownActive, todayIso } from '@/lib/eligibility';
 import { enrollCustomerInJourney } from '@/lib/journeys';
+import { recordBlocks } from '@/lib/safeguards';
 
 type Db = SupabaseClient<Database>;
 
@@ -135,7 +136,7 @@ export async function createReviewRequestFromVisit(
     const sendAt = reviewSendTime(serviceDate, new Date(), options.delayDays);
 
     if (journey) {
-      await enrollCustomerInJourney(supabase, journey, customerId, sendAt);
+      await enrollCustomerInJourney(supabase, journey, customerId, sendAt, visitId);
       return { scheduled: true, mode: 'journey', messageId: null };
     }
 
@@ -197,6 +198,7 @@ export async function extractReviewSchedulingLogic(
   const serviceDate = options.serviceDate ?? todayIso();
 
   if (options.unsubscribedAt) {
+    await recordBlocks(supabase, businessId, [{ customerId, reason: 'opt_out' }]);
     return { scheduled: false, reason: 'unsubscribed' };
   }
 
@@ -210,12 +212,14 @@ export async function extractReviewSchedulingLogic(
   if (options.cooldownDays) {
     const lastSent = await lastReviewRequestSentAt(supabase, businessId, customerId);
     if (isCooldownActive(lastSent, options.cooldownDays, serviceDate)) {
+      await recordBlocks(supabase, businessId, [{ customerId, reason: 'frequency' }]);
       return { scheduled: false, reason: 'cooldown' };
     }
   }
 
   const duplicate = await isDuplicateReviewRequest(supabase, businessId, customerId, options.visitId ?? null);
   if (duplicate) {
+    await recordBlocks(supabase, businessId, [{ customerId, reason: 'duplicate' }]);
     return { scheduled: false, reason: 'duplicate' };
   }
 

@@ -10,6 +10,7 @@ import { buildTrackingUrl } from '@/lib/click-tracking';
 import { sendBlockedReason } from '@/lib/billing';
 import { reviewLinkBlockedReason, REVIEW_LINK_RETRY_MS } from '@/lib/send-guards';
 import { captureError } from '@/lib/monitoring';
+import { loadPersonalisation, reminderDisabled } from '@/lib/review-personalisation';
 
 export const dynamic = 'force-dynamic';
 
@@ -119,6 +120,16 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
+      // Reminders switched off for this business: cancel instead of sending, and end the sequence.
+      if (reminderDisabled(business, message.purpose)) {
+        await supabase.from('messages').update({ status: 'cancelled', last_error: 'Reminders turned off' }).eq('id', message.id);
+        if (message.journey_enrollment_id) {
+          await supabase.from('journey_enrollments').update({ status: 'exited' }).eq('id', message.journey_enrollment_id);
+        }
+        skipped += 1;
+        continue;
+      }
+
       const channel = resolveChannel(message.channel, customer);
 
       if (!channel) {
@@ -149,6 +160,7 @@ export async function GET(request: NextRequest) {
         privateFeedbackUrl,
         unsubscribeUrl,
         rebookingUrl: rebookingLink(business, customer.id, appUrl),
+        ...(message.purpose === 'review_request' ? await loadPersonalisation(supabase, business, message) : {}),
       });
 
       await sendMessage(

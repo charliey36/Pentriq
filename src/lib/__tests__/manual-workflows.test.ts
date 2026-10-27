@@ -209,7 +209,8 @@ describe('Scenario 1: Manual visit logging -> auto review scheduling', () => {
     const today = new Date('2026-10-09T10:00:00Z');
     // Service today, window of 14 days -> eligible.
     expect(daysSinceService('2026-10-09', today)).toBe(0);
-    expect(isReviewEligible('2026-10-09', 14)).toBe(true);
+    // isReviewEligible reads the real clock, so use today's date rather than a fixed one that ages out of the window.
+    expect(isReviewEligible(new Date().toISOString().slice(0, 10), 14)).toBe(true);
   });
 
   it('the scheduled message shows up for the customer (visible in the customer list query)', async () => {

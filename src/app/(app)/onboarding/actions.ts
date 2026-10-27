@@ -7,6 +7,7 @@ import { requireBusiness } from '@/lib/business';
 import { enrollCustomerInJourney } from '@/lib/journeys';
 import { CONSENT_REQUIRED_MESSAGE, hasConsent } from '@/lib/consent';
 import { validateBookingUrl } from '@/lib/booking-url';
+import { suppressedEmails } from '@/lib/safeguards';
 
 export type OnboardingResult = { error?: string };
 
@@ -51,6 +52,7 @@ export async function completeOnboarding(_prev: OnboardingResult, fd: FormData):
       email: customerEmail,
       last_service_date: new Date().toISOString().slice(0, 10),
       consent_confirmed_at: new Date().toISOString(),
+      ...((await suppressedEmails(supabase, business.id, [customerEmail])).has(customerEmail) ? { unsubscribed_at: new Date().toISOString() } : {}),
     })
     .select('*')
     .single();

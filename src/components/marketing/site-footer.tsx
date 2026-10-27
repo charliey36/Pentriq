@@ -10,6 +10,7 @@ const columns: { title: string; links: [string, string][] }[] = [
       ['Features', '/#features'],
       ['How it works', '/#how-it-works'],
       ['Pricing', '/pricing'],
+      ['Review gap calculator', '/tools/review-gap-calculator'],
       ['Blog', '/blog'],
     ],
   },

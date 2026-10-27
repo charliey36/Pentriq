@@ -52,6 +52,13 @@ export type ReviewEmailParams = {
   rebookingLink?: string | null;
   /** Optional business contact details shown in the footer. */
   businessContact?: { email?: string | null; phone?: string | null; website?: string | null };
+  /** Optional per-business copy for the first request (see lib/message-template.ts). Reminders ignore it. */
+  customSubject?: string | null;
+  customBody?: string | null;
+  /** Extra personalisation values; missing ones fall back to readable defaults. */
+  serviceName?: string | null;
+  staffName?: string | null;
+  appointmentDate?: string | null;
   /** Base URL for hosted email assets. '' = relative (preview). Defaults to the app's public URL. */
   appUrl?: string;
 };
@@ -95,7 +102,14 @@ export const FALLBACKS = {
   businessName: 'us',
 } as const;
 
-type CopyVars = { customerName: string; businessName: string; reviewLink: string };
+type CopyVars = {
+  customerName: string;
+  businessName: string;
+  reviewLink: string;
+  serviceName: string;
+  staffName: string;
+  appointmentDate: string;
+};
 
 /** Copy is expressed with {{variables}} so it can later be made editable per business. */
 export const REVIEW_EMAIL_COPY = {
@@ -231,12 +245,20 @@ export function renderReviewRequestEmail(params: ReviewEmailParams = {}): Render
     customerName: rawCustomer || FALLBACKS.customerName,
     businessName: rawBusiness || FALLBACKS.businessName,
     reviewLink: reviewHref,
+    serviceName: clean(params.serviceName) || 'recent service',
+    staffName: clean(params.staffName) || 'our team',
+    appointmentDate: clean(params.appointmentDate) || 'your recent visit',
   };
   const h = (template: string) => fillTemplate(template, vars, escapeHtml);
   const t = (template: string) => fillTemplate(template, vars);
 
-  const subject = subjectFor(variant, rawBusiness);
+  // Custom copy applies to the first request only; blank = the default wording.
+  const customSubject = variant === 'request' ? clean(params.customSubject) : '';
+  const customBody = variant === 'request' ? (params.customBody ?? '').trim() : '';
+  const subject = customSubject ? clean(t(customSubject)) || subjectFor(variant, rawBusiness) : subjectFor(variant, rawBusiness);
   const preheader = t(copy.preheader);
+  // Owner-written text is escaped as a whole, so it can never inject markup.
+  const leadHtml = customBody ? escapeHtml(t(customBody)) : h(copy.lead);
 
   // Keep one clear action: review/feedback for review emails, booking for rebooking.
   const primary = variant === 'rebooking'
@@ -341,7 +363,7 @@ export function renderReviewRequestEmail(params: ReviewEmailParams = {}): Render
           <td class="rf-px" align="center" style="padding:40px 24px 8px;font-family:${FONT};">
             <div aria-hidden="true" style="font-size:22px;line-height:26px;letter-spacing:4px;color:${C.star};padding:0 0 18px;">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
             <h1 class="rf-h1 rf-ink" style="margin:0;font-family:${FONT};font-size:28px;line-height:34px;font-weight:700;letter-spacing:-0.03em;color:${C.ink};">${h(copy.heading)}</h1>
-            <p class="rf-ink2" style="margin:14px 0 0;font-family:${FONT};font-size:17px;line-height:27px;color:${C.ink2};">${h(copy.lead)}</p>
+            <p class="rf-ink2" style="margin:14px 0 0;font-family:${FONT};font-size:17px;line-height:27px;color:${C.ink2};">${leadHtml}</p>
           </td>
         </tr>
 ${
@@ -426,7 +448,7 @@ ${
   const textLines = [
     `Hi ${vars.customerName},`,
     '',
-    t(copy.textIntro),
+    customBody ? t(customBody) : t(copy.textIntro),
     '',
     textAction,
     '',

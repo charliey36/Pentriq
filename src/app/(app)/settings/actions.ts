@@ -7,6 +7,8 @@ import { requireBusiness } from '@/lib/business';
 import { friendlySaveError, isMissingColumnError, missingColumnName } from '@/lib/db-errors';
 import { parseSettingsForm } from '@/lib/settings-validation';
 
+const OPTIONAL_0037_COLUMNS = ['review_reminders_enabled', 'weekly_summary_enabled', 'review_message_subject', 'review_message_body'];
+
 export type SaveSettingsResult = { error?: string; success?: boolean; fieldErrors?: { google_review_url?: string; booking_url?: string; contact_email?: string } };
 
 export async function saveSettings(
@@ -34,10 +36,11 @@ export async function saveSettings(
     };
     let { data, error } = await supabase.from('businesses').update(update).eq('id', business.id).select('id');
 
-    // Migrations 0035/0036 (cooldown, contact email) not applied yet: keep every other setting saving.
-    if (error && (missingColumnName(error)?.startsWith('review_cooldown') || missingColumnName(error) === 'contact_email')) {
-      console.error('[Settings] Optional columns missing; apply supabase/migrations/0035_review_cooldown.sql and 0036_business_contact_email.sql');
-      const { review_cooldown_enabled: _e, review_cooldown_days: _d, contact_email: _c, ...rest } = update;
+    // Migrations 0035-0037 (cooldown, contact email, quick wins) not applied yet: keep every other setting saving.
+    const missing = error ? missingColumnName(error) : undefined;
+    if (error && (missing?.startsWith('review_cooldown') || missing === 'contact_email' || OPTIONAL_0037_COLUMNS.includes(missing ?? ''))) {
+      console.error('[Settings] Optional columns missing; apply supabase/migrations/0035_review_cooldown.sql, 0036_business_contact_email.sql and 0037_quick_wins.sql');
+      const { review_cooldown_enabled: _e, review_cooldown_days: _d, contact_email: _c, review_reminders_enabled: _r, weekly_summary_enabled: _w, review_message_subject: _s, review_message_body: _b, ...rest } = update;
       ({ data, error } = await supabase.from('businesses').update(rest).eq('id', business.id).select('id'));
     }
 

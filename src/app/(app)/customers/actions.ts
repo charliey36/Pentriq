@@ -1,5 +1,6 @@
 'use server';
 
+import { suppressedEmails } from '@/lib/safeguards';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireBusiness } from '@/lib/business';
@@ -73,6 +74,9 @@ export async function addCustomer(
 
   if (!hasConsent(formData)) return { error: CONSENT_REQUIRED_MESSAGE };
 
+  // Someone who opted out is never contacted again, even if the owner adds them back.
+  const optedOut = (await suppressedEmails(supabase, business.id, [email])).has(email);
+
   const { data: customer, error: customerError } = await supabase
     .from('customers')
     .insert({
@@ -82,6 +86,7 @@ export async function addCustomer(
       phone: phone || null,
       last_service_date: serviceDate,
       consent_confirmed_at: new Date().toISOString(),
+      ...(optedOut ? { unsubscribed_at: new Date().toISOString() } : {}),
     })
     .select('*')
     .single();

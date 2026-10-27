@@ -5,11 +5,12 @@ import { createClient } from '@/lib/supabase/server';
 import { requireBusiness } from '@/lib/business';
 import { bulkImportWithRecovery, mapCsvRowsToCustomers, parseCsvWithIssues } from '@/lib/customers';
 import type { BulkImportSummary } from '@/lib/customers';
-import { analyzeCsvMapping, CSV_IMPORT_FIELDS, type CsvConfirmedMapping, type CsvMappingAnalysis } from '@/lib/csv-import-mapping';
+import { analyzeCsvMapping, mappingIndexes, CSV_IMPORT_FIELDS, type CsvConfirmedMapping, type CsvMappingAnalysis } from '@/lib/csv-import-mapping';
 import { CONSENT_REQUIRED_MESSAGE, hasConsent } from '@/lib/consent';
+import { preflightCsv, type CsvPreflight } from '@/lib/csv-preflight';
 
 export type ImportCustomersResult = { error?: string; summary?: BulkImportSummary };
-export type AnalyzeImportResult = { error?: string; mapping?: CsvMappingAnalysis };
+export type AnalyzeImportResult = { error?: string; mapping?: CsvMappingAnalysis; preflight?: CsvPreflight };
 
 async function readCsvFile(formData: FormData): Promise<{ rows?: string[][]; error?: string }> {
   const file = formData.get('file');
@@ -30,7 +31,10 @@ export async function analyzeCsv(_prev: AnalyzeImportResult, formData: FormData)
   const parsed = await readCsvFile(formData);
   if (parsed.error) return { error: parsed.error };
   const analysis = analyzeCsvMapping(parsed.rows!);
-  return 'error' in analysis ? { error: analysis.error } : { mapping: analysis };
+  if ('error' in analysis) return { error: analysis.error };
+  // Check every row against the mapping the owner has chosen (or the detected one the first time).
+  const chosen = confirmedMapping(formData) ?? mappingIndexes(analysis);
+  return { mapping: analysis, preflight: preflightCsv(parsed.rows!, chosen) };
 }
 
 function confirmedMapping(formData: FormData): CsvConfirmedMapping | undefined {

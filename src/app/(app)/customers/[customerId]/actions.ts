@@ -23,6 +23,7 @@ export async function logVisit(
   const priceRaw = String(formData.get('price') ?? '').trim();
   const price = priceRaw ? Number(priceRaw) : null;
   const notes = String(formData.get('notes') ?? '').trim() || null;
+  const staffName = String(formData.get('staff_name') ?? '').trim().slice(0, 120) || null;
 
   if (price !== null && (!Number.isFinite(price) || price < 0 || price > 1_000_000)) {
     return { error: 'Price must be a number between 0 and 1,000,000.' };
@@ -45,6 +46,7 @@ export async function logVisit(
       service_id: serviceId,
       price,
       notes,
+      ...(staffName ? { staff_name: staffName } : {}),
     })
     .select('id')
     .single();

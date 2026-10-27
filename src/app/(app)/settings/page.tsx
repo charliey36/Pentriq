@@ -5,11 +5,19 @@ import { SectionCard } from '@/components/ui/section-card';
 import { SettingsTabs } from '@/components/settings-tabs';
 import { SettingsForm } from './settings-form';
 import { BusinessLogoUploader } from './business-logo-uploader';
+import { createClient } from '@/lib/supabase/server';
 
 export const metadata: Metadata = { title: 'Settings' };
 
 export default async function SettingsPage() {
   const business = await requireBusiness();
+  // Opt-outs (suppression list). Empty if migration 0037 has not been applied yet.
+  const { data: suppressed } = await createClient()
+    .from('email_suppressions')
+    .select('email, created_at')
+    .eq('business_id', business.id)
+    .order('created_at', { ascending: false })
+    .limit(50);
 
   return (
     <div>
@@ -44,6 +52,24 @@ export default async function SettingsPage() {
         </SectionCard>
 
         <SettingsForm business={business} />
+
+        <SectionCard
+          title="Opt-outs"
+          description="Customers who unsubscribed. They are never contacted again, even if you delete and re-import them. Every email has a one-click unsubscribe link."
+        >
+          {suppressed && suppressed.length > 0 ? (
+            <ul className="divide-y divide-line text-sm">
+              {suppressed.map((row) => (
+                <li key={row.email} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                  <span className="text-ink-2">{row.email}</span>
+                  <span className="text-xs text-ink-3">{new Date(row.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-ink-3">No one has unsubscribed yet.</p>
+          )}
+        </SectionCard>
       </div>
     </div>
   );

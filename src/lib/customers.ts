@@ -5,6 +5,7 @@ import { cooldownDaysFor, daysSinceService, isCooldownActive, parseAmount, parse
 import { normalizePhone } from '@/lib/phone';
 import { resolveImportIdentities, type MatchedBy } from '@/lib/import-identity';
 import type { CsvConfirmedMapping, CsvImportField } from '@/lib/csv-import-mapping';
+import { recordBlocks, suppressedEmails, type BlockReason } from '@/lib/safeguards';
 
 type Db = SupabaseClient<Database>;
 
@@ -22,6 +23,8 @@ export type BulkImportRow = {
   date: string;
   phone: string | null;
   amountSpent: string | null;
+  /** Optional staff member / technician who did the work (used to personalise review requests). */
+  staff?: string | null;
 };
 
 export type BulkImportRowResult =
@@ -62,13 +65,46 @@ export type BulkImportSummary = {
   warning?: string;
 };
 
+export type ImportField = 'name' | 'email' | 'service' | 'date' | 'amount';
+
+export type ImportRowCheck =
+  | { ok: true; name: string; email: string; service: string; date: string | null; amount: number | null }
+  | { ok: false; name: string; email: string; field: ImportField; reason: string; fix: string };
+
+/**
+ * The one definition of a valid import row. Used by the import itself and by the
+ * pre-import check, so what the preview promises is exactly what the import does.
+ * `reason` is what went wrong; `fix` tells the owner what to change in their file.
+ */
+export function validateImportRow(r: BulkImportRow): ImportRowCheck {
+  const name = r.name.trim();
+  const email = r.email.trim().toLowerCase();
+  const service = r.service.trim();
+  const rawDate = r.date.trim();
+  const bad = (field: ImportField, reason: string, fix: string): ImportRowCheck => ({ ok: false, name, email, field, reason, fix });
+
+  if (!name) return bad('name', 'Name is required.', 'Add the customer’s name in the name column.');
+  if (!isValidEmail(email)) {
+    return bad('email', 'Invalid email address.', email ? 'Check for typos or spaces, e.g. name@example.com.' : 'Add the customer’s email address; without it we cannot send a request.');
+  }
+  if (!service) return bad('service', 'Service is required.', 'Add the service name, or remove the service column to use “General Service”.');
+  if (service.length > 120) return bad('service', 'Service name is too long (max 120 characters).', 'Shorten the service description to 120 characters or fewer.');
+  // A blank date is allowed: the customer is added (or matched) with no service record.
+  const date = rawDate ? parseServiceDate(/^\d{4}-\d{2}-\d{2}[T ]/.test(rawDate) ? rawDate.slice(0, 10) : rawDate) : null;
+  if (rawDate && !date) return bad('date', 'Invalid date. Use YYYY-MM-DD or DD/MM/YYYY.', 'Write dates like 2026-10-08 or 08/10/2026. In Excel, format the column as Text or Date, then export again.');
+  if (date && (daysSinceService(date) ?? 0) < -1) return bad('date', 'Date cannot be in the future.', 'Only completed services can be imported. Remove upcoming appointments or correct the date.');
+  const amount = date && r.amountSpent?.trim() ? parseAmount(r.amountSpent) : null;
+  if (date && r.amountSpent?.trim() && amount === null) return bad('amount', 'Amount must be a number of 0 or more.', 'Use digits only, e.g. 85 or 85.50 (a £ sign is fine).');
+  return { ok: true, name, email, service, date, amount };
+}
+
 const chunks = <T,>(items: T[], size: number): T[][] => {
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
   return out;
 };
 
-type Valid = { row: number; name: string; email: string; service: string; date: string | null; phone: string | null; amount: number | null };
+type Valid = { row: number; name: string; email: string; service: string; date: string | null; phone: string | null; amount: number | null; staff: string | null };
 const KNOWN_COLUMNS = 'id, name, email, phone, total_spend, visit_count, last_service_date, unsubscribed_at';
 type Known = {
   id: string;
@@ -113,31 +149,24 @@ export async function bulkImportCustomers(
 
   // 1. Validate rows and drop exact duplicates inside the file.
   const valid: Valid[] = [];
+  const blocks: Array<{ customerId?: string | null; reason: BlockReason }> = [];
   const fileKeys = new Set<string>();
   rows.forEach((r, i) => {
     const row = i + 1;
-    const name = r.name.trim();
-    const email = r.email.trim().toLowerCase();
-    const service = r.service.trim();
-    const rawDate = r.date.trim();
-    const error = (reason: string) => results.push({ row, status: 'error', name, email, reason });
-
-    if (!name) return error('Name is required.');
-    if (!isValidEmail(email)) return error('Invalid email address.');
-    if (!service) return error('Service is required.');
-    if (service.length > 120) return error('Service name is too long (max 120 characters).');
-    // A blank date is allowed: the customer is added (or matched) with no service record.
-    const date = rawDate ? parseServiceDate(/^\d{4}-\d{2}-\d{2}[T ]/.test(rawDate) ? rawDate.slice(0, 10) : rawDate) : null;
-    if (rawDate && !date) return error('Invalid date. Use YYYY-MM-DD or DD/MM/YYYY.');
-    if (date && (daysSinceService(date) ?? 0) < -1) return error('Date cannot be in the future.');
-    const amount = date && r.amountSpent?.trim() ? parseAmount(r.amountSpent) : null;
-    if (date && r.amountSpent?.trim() && amount === null) return error('Amount must be a number of 0 or more.');
-
+    const check = validateImportRow(r);
+    if (!check.ok) return void results.push({ row, status: 'error', name: check.name, email: check.email, reason: check.reason });
+    const { name, email, service, date, amount } = check;
     const key = `${email}|${service.toLowerCase()}|${date ?? 'no-date'}`;
-    if (fileKeys.has(key)) return void results.push({ row, status: 'skipped_duplicate', name, email });
+    if (fileKeys.has(key)) {
+      blocks.push({ reason: 'duplicate' });
+      return void results.push({ row, status: 'skipped_duplicate', name, email });
+    }
     fileKeys.add(key);
-    valid.push({ row, name, email, service, date, phone: r.phone?.trim() || null, amount });
+    valid.push({ row, name, email, service, date, phone: r.phone?.trim() || null, amount, staff: r.staff?.trim().slice(0, 120) || null });
   });
+
+  // Opt-outs recorded earlier (even for customers since deleted) are never contacted again.
+  const suppressed = await suppressedEmails(supabase, business.id, valid.map((v) => v.email));
 
   // 2. Load every existing customer a row could match: by email, and by phone.
   const known = new Map<string, Known>(); // customer id → customer
@@ -220,6 +249,7 @@ export async function bulkImportCustomers(
     const fileKey = `${entity.key}|${serviceId}|${v.date}`;
     const alreadyRecorded = Boolean(entity.existingId) && visitKeys.has(`${entity.existingId}|${serviceId}|${v.date}`);
     if (alreadyRecorded || seenInFile.has(fileKey)) {
+      blocks.push({ customerId: entity.existingId ?? null, reason: 'duplicate' });
       results.push({ row: v.row, status: 'skipped_duplicate', name: v.name, email: v.email });
       continue;
     }
@@ -266,6 +296,7 @@ export async function bulkImportCustomers(
             total_spend: a.total,
             visit_count: a.count,
             ...(consentConfirmedAt ? { consent_confirmed_at: consentConfirmedAt } : {}),
+            ...(suppressed.has(e.email.toLowerCase()) ? { unsubscribed_at: new Date().toISOString() } : {}),
           };
         })
       )
@@ -309,6 +340,7 @@ export async function bulkImportCustomers(
           visited_at: `${v.date}T12:00:00Z`,
           price: v.amount,
           notes: 'Imported from CSV',
+          ...(v.staff ? { staff_name: v.staff } : {}),
         }))
       )
       .select('id, customer_id, service_id, visited_at');
@@ -395,12 +427,25 @@ export async function bulkImportCustomers(
     }
   }
 
+  const emailOf = (customerId: string) => (known.get(customerId)?.email ?? [...identity.entities.values()].find((e) => customerIdByKey.get(e.key) === customerId)?.email ?? '').toLowerCase();
   const toQueue = [...latestVisit.entries()].filter(([customerId, v]) => {
-    if (cooldownDays && isCooldownActive(lastSent.get(customerId), cooldownDays, v.date)) return false;
+    // Order matters: an opt-out beats everything, then an already-open request, then the frequency rule.
+    if (known.get(customerId)?.unsubscribed_at || suppressed.has(emailOf(customerId))) {
+      blocks.push({ customerId, reason: 'opt_out' });
+      return false;
+    }
+    if (alreadyQueued.has(customerId)) {
+      blocks.push({ customerId, reason: 'duplicate' });
+      return false;
+    }
+    if (cooldownDays && isCooldownActive(lastSent.get(customerId), cooldownDays, v.date)) {
+      blocks.push({ customerId, reason: 'frequency' });
+      return false;
+    }
     const days = daysSinceService(v.date);
-    const unsubscribed = Boolean(known.get(customerId)?.unsubscribed_at);
-    return !unsubscribed && !alreadyQueued.has(customerId) && days !== null && days >= 0 && days <= business.review_request_window_days;
+    return days !== null && days >= 0 && days <= business.review_request_window_days;
   });
+  await recordBlocks(supabase, business.id, blocks);
 
   // Held = waits in Customers until the owner presses Send. Scheduled = emailed the
   // day after the service at 8:00am, followed by the day-3 / day-7 reminders.
@@ -673,6 +718,10 @@ export function mapCsvRowsToCustomers(rows: string[][], confirmedMapping?: CsvCo
     'workcompleted',
   ]);
 
+  const staffIndex = normalizedHeader.findIndex((h) =>
+    ['staff', 'staffmember', 'technician', 'tech', 'engineer', 'stylist', 'therapist', 'practitioner', 'provider', 'employee', 'assignedto', 'servicedby', 'servedby'].includes(h)
+  );
+
   const dateIndex = find('date', [
     'date',
     'servicedate',
@@ -730,6 +779,7 @@ Supported aliases:
       amountSpent: cell(r, amountIndex) || null,
       service,
       date: cell(r, dateIndex),
+      ...(cell(r, staffIndex) ? { staff: cell(r, staffIndex) } : {}),
     };
   });
 

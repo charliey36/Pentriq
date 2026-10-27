@@ -42,6 +42,15 @@ export type Database = {
           welcome_email_sent_at: string | null;
           campaign_email_sent_at: string | null;
           trial_ending_email_sent_at: string | null;
+          review_reminders_enabled: boolean;
+          review_message_subject: string | null;
+          review_message_body: string | null;
+          weekly_summary_enabled: boolean;
+          weekly_summary_sent_at: string | null;
+          paused_at: string | null;
+          paused_until: string | null;
+          pause_indefinite: boolean;
+          milestones_sent: Record<string, string>;
           created_at: string;
           updated_at: string;
         };
@@ -78,7 +87,28 @@ export type Database = {
           welcome_email_sent_at?: string | null;
           campaign_email_sent_at?: string | null;
           trial_ending_email_sent_at?: string | null;
+          review_reminders_enabled?: boolean;
+          review_message_subject?: string | null;
+          review_message_body?: string | null;
+          weekly_summary_enabled?: boolean;
+          weekly_summary_sent_at?: string | null;
+          paused_at?: string | null;
+          paused_until?: string | null;
+          pause_indefinite?: boolean;
+          milestones_sent?: Record<string, string>;
         };
+        Relationships: [];
+      };
+      email_suppressions: {
+        Row: { id: string; business_id: string; email: string; reason: string; created_at: string };
+        Insert: { id?: string; business_id: string; email: string; reason?: string };
+        Update: { reason?: string };
+        Relationships: [];
+      };
+      review_request_blocks: {
+        Row: { id: string; business_id: string; customer_id: string | null; reason: 'frequency' | 'opt_out' | 'duplicate'; created_at: string };
+        Insert: { id?: string; business_id: string; customer_id?: string | null; reason: 'frequency' | 'opt_out' | 'duplicate' };
+        Update: { reason?: 'frequency' | 'opt_out' | 'duplicate' };
         Relationships: [];
       };
       changelog_entries: {
@@ -433,6 +463,7 @@ export type Database = {
           visited_at: string;
           price: number | null;
           notes: string | null;
+          staff_name: string | null;
           created_at: string;
         };
         Insert: {
@@ -443,12 +474,14 @@ export type Database = {
           visited_at?: string;
           price?: number | null;
           notes?: string | null;
+          staff_name?: string | null;
         };
         Update: {
           service_id?: string | null;
           visited_at?: string;
           price?: number | null;
           notes?: string | null;
+          staff_name?: string | null;
         };
         Relationships: [];
       };

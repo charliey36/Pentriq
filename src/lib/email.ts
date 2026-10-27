@@ -69,6 +69,7 @@ export async function sendReviewRequestEmail(params: {
     text,
     headers: {
       'List-Unsubscribe': `<${params.unsubscribeUrl}>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
     },
   });
 
@@ -170,4 +171,19 @@ export async function sendReferralRedeemedEmail(params: { to: string; businessNa
   if (!process.env.RESEND_API_KEY) { console.log(`[email stub] to=${params.to} subject="${subject}"`); return; }
   const { error } = await getResendClient().emails.send({ from: `${senderDisplayName(params.businessName)} <${from}>`, to: params.to, subject, html });
   if (error) throw new Error(typeof error === 'string' ? error : error.message); notifyEmailSent();
+}
+
+/**
+ * Sends a ready-made email to a business owner (weekly summary, milestones).
+ * Logged instead of sent when RESEND_API_KEY is unset, like the other account emails.
+ */
+export async function sendOwnerEmail(to: string, email: { subject: string; html: string; text?: string }) {
+  if (!process.env.RESEND_API_KEY) {
+    console.log(`[email stub] to=${to} subject="${email.subject}"`);
+    return;
+  }
+  const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
+  const { error } = await getResendClient().emails.send({ from: `${APP_NAME} <${from}>`, to, subject: email.subject, html: email.html, ...(email.text ? { text: email.text } : {}) });
+  if (error) throw new Error(typeof error === 'string' ? error : error.message);
+  notifyEmailSent();
 }

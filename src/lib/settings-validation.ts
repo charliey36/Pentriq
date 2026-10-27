@@ -8,6 +8,7 @@
  */
 import { normalizeContactEmail } from '@/lib/email-templates/support-footer';
 import { isSafeHttpUrl } from '@/lib/email-templates/review-destinations';
+import { validateTemplate } from '@/lib/message-template';
 
 export const SETTINGS_LIMITS = {
   nameMaxLength: 120,
@@ -27,6 +28,11 @@ export type SettingsValues = {
   review_cooldown_days: number;
   booking_url: string | null;
   contact_email: string | null;
+  /** Present only when the form posted the `quick_win_settings` marker, so older callers never switch these off by omission. */
+  review_reminders_enabled?: boolean;
+  weekly_summary_enabled?: boolean;
+  review_message_subject?: string | null;
+  review_message_body?: string | null;
 };
 
 export type SettingsParseResult =
@@ -119,6 +125,14 @@ export function parseSettingsForm(formData: FormData): SettingsParseResult {
   }
   cooldownDays ??= 60;
 
+  // Personalised first request. Blank = use the standard wording.
+  const messageSubject = String(formData.get('review_message_subject') ?? '').trim();
+  const messageBody = String(formData.get('review_message_body') ?? '').trim();
+  if (messageSubject || messageBody) {
+    const check = validateTemplate(messageSubject, messageBody);
+    if (!check.ok) return { ok: false, field: 'review_message_body', error: check.errors[0] };
+  }
+
   return {
     ok: true,
     values: {
@@ -131,6 +145,14 @@ export function parseSettingsForm(formData: FormData): SettingsParseResult {
       review_cooldown_days: cooldownDays,
       booking_url: bookingUrl,
       contact_email: contactEmail,
+      ...(formData.get('quick_win_settings') === '1'
+        ? {
+            review_reminders_enabled: formData.get('review_reminders_enabled') === 'on',
+            weekly_summary_enabled: formData.get('weekly_summary_enabled') === 'on',
+            review_message_subject: messageSubject || null,
+            review_message_body: messageBody || null,
+          }
+        : {}),
     },
   };
 }

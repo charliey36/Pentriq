@@ -27,6 +27,8 @@ import { ProgressRing } from '@/components/ui/progress-ring';
 import { ActivityChart, type ChartSeries } from '@/components/ui/activity-chart';
 import { toneStyle, type Tone } from '@/components/ui/tones';
 import { SetupChecklist, type SetupStep } from '@/components/setup-checklist';
+import { ReviewPipeline } from '@/components/dashboard/review-pipeline';
+import { loadPipelineStats } from '@/lib/pipeline-stats';
 
 export const metadata: Metadata = { title: 'Dashboard' };
 
@@ -156,6 +158,7 @@ export default async function DashboardPage() {
         .eq('status', status)
     )
   );
+  const pipeline = await loadPipelineStats(supabase, business.id);
   const sent = (emailsSentCount.count ?? 0) + (queueSent.count ?? 0);
   const clicks = clicksCount;
   const delivered = deliveredFromSent(sent);
@@ -177,32 +180,43 @@ export default async function DashboardPage() {
   // Recommended next steps, in the order most businesses want to do them. None is required.
   const setupSteps: SetupStep[] = [
     {
-      done: trialStarted,
-      title: 'Start free trial',
-      description: 'Your 30-day trial begins when you start it. No card needed.',
-      href: '/settings/billing',
-      cta: 'Start trial',
+      done: hasProfile,
+      title: 'Add business details',
+      description: 'Your business name is shown on every email and feedback page.',
+      href: '/settings',
+      cta: 'Add details',
     },
     {
-      done: hasReviewUrl && hasProfile,
-      title: 'Add Google review link',
-      description: 'Add your business name and review link so requests send customers to your Google reviews. Review requests are held until this is done.',
+      done: hasReviewUrl,
+      title: 'Configure review platform',
+      description: 'Paste your Google review link so requests send customers straight to your reviews. Requests are held until this is done.',
       href: '/settings',
       cta: 'Open settings',
     },
     {
       done: customerTotal > 0,
-      title: 'Import customers',
-      description: 'Upload a CSV of your existing customers, or add them one by one.',
+      title: 'Import customer data',
+      description: 'Upload a CSV from your booking system (we check it first and show you how to fix any problems), or add customers one by one.',
       href: '/customers/import',
       cta: 'Import customers',
     },
     {
       done: sent > 0,
-      title: 'Send first review request',
-      description: customerTotal === 0 ? 'Add a customer and send them a request in one quick form.' : 'Pick a customer and send their first request, or let Pentriq send them automatically.',
-      href: customerTotal === 0 ? '/onboarding' : '/customers',
-      cta: customerTotal === 0 ? 'Send first request' : 'Choose a customer',
+      title: 'Send first campaign',
+      description: !trialStarted
+        ? 'Start your free trial (no card needed), then send your first request.'
+        : customerTotal === 0
+          ? 'Add a customer and send them a request in one quick form.'
+          : 'Pick a customer and send their first request, or let Pentriq send them automatically.',
+      href: !trialStarted ? '/settings/billing' : customerTotal === 0 ? '/onboarding' : '/customers',
+      cta: !trialStarted ? 'Start trial' : customerTotal === 0 ? 'Send first request' : 'Choose a customer',
+    },
+    {
+      done: pipeline.reviewsCompleted > 0,
+      title: 'Receive first review',
+      description: 'Reminders go out at 3 and 7 days automatically. Your first customer to follow the link completes this step.',
+      href: '/reviews',
+      cta: 'View reviews',
     },
   ];
   // Persist completion so the onboarding card can be hidden for good.
@@ -429,6 +443,8 @@ export default async function DashboardPage() {
           }
         />
       </div>
+
+      <ReviewPipeline stats={pipeline} remindersEnabled={business.review_reminders_enabled ?? true} />
 
       {/* Activity + funnel */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">

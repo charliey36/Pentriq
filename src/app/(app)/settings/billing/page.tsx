@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { requireBusiness } from '@/lib/business';
+import Link from 'next/link';
 import { getBillingState, PLAN } from '@/lib/billing';
+import { isPaused } from '@/lib/pause';
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionCard } from '@/components/ui/section-card';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
@@ -9,7 +11,7 @@ import { Notice } from '@/components/ui/notice';
 import { createClient } from '@/lib/supabase/server';
 import { BillingButton } from './billing-button';
 import { loadStripeBillingDetails, reconcileCheckout } from './stripe-data';
-import { openBillingPortal, startSubscription, claimTrial, type BillingResult } from './actions';
+import { openBillingPortal, startSubscription, claimTrial, resumeSubscription, type BillingResult } from './actions';
 
 export const metadata: Metadata = { title: 'Billing' };
 
@@ -50,6 +52,7 @@ export default async function BillingPage({
   const billing = getBillingState(business);
   const label = LABELS[billing.status] ?? LABELS.trialing;
   const subscribed = billing.status === 'active' || billing.status === 'past_due';
+  const paused = isPaused(business);
 
   return (
     <div>
@@ -106,6 +109,25 @@ export default async function BillingPage({
           </div>
         </SectionCard>
 
+        {paused && (
+          <SectionCard title="Subscription paused" action={<Badge tone="warning" dot>Paused</Badge>}>
+            <p className="text-sm text-ink-2">
+              {business.pause_indefinite || !business.paused_until
+                ? 'Your subscription is paused until you resume it.'
+                : `Your subscription is paused until ${fmtDate(business.paused_until)} and resumes automatically.`}{' '}
+              Nothing is sent to customers while paused, and your data is safe.
+            </p>
+            <div className="mt-4">
+              <BillingButton action={resumeSubscription as (p: BillingResult, f: FormData) => Promise<BillingResult>} label="Resume now" />
+            </div>
+          </SectionCard>
+        )}
+        {subscribed && !paused && (
+          <SectionCard title="Need a break?">
+            <p className="text-sm text-ink-2">Pause for 1 month, 3 months or until you are ready, instead of cancelling. You keep your customers, reviews and history.</p>
+            <Link href="/settings/billing/pause" className="btn btn-secondary mt-4 inline-flex">Pause my subscription</Link>
+          </SectionCard>
+        )}
         {subscribed && (
           <SectionCard title="Payment method">
             <p className="text-sm text-ink-2">

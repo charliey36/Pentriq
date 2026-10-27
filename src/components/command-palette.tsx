@@ -179,6 +179,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
       nav('go-settings', 'Settings', '/settings', 'cog', 'business profile delay google'),
       nav('go-services', 'Services', '/settings/services', 'tag', 'rebooking interval price'),
       nav('go-loyalty', 'Loyalty program', '/settings/loyalty', 'gift', 'points rewards'),
+      nav('go-qr', 'QR code & review link', '/review-link', 'star', 'qr print poster desk invoice receipt'),
       nav('go-how', 'How it works', '/how-it-works', 'lightbulb', 'help guide'),
       {
         id: 'theme',
