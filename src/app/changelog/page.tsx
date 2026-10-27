@@ -20,12 +20,23 @@ const tone: Record<string, BadgeTone> = { New: 'success', Improved: 'info', Infr
 const id = (s: string) => s.replace(/\s/g, '-');
 
 export default async function ChangelogPage() {
-  const db = createAdminClient();
-  const [{ data: entries }, { data: digest }] = await Promise.all([
-    db.from('changelog_entries').select('id, title, description, tag, entry_date').eq('published', true).order('entry_date', { ascending: false }).limit(500),
-    db.from('changelog_digests').select('week_of, summary').order('week_of', { ascending: false }).limit(1).maybeSingle(),
-  ]);
-  const months = groupChangelog((entries ?? []) as ChangelogEntry[]);
+  // The page is prerendered at build time. If the database is unreachable or not configured in the
+  // build environment, show the empty state instead of failing the whole deployment; it refills on the
+  // next revalidation once the app is running with its real configuration.
+  let entries: ChangelogEntry[] | null = null;
+  let digest: { week_of: string; summary: string } | null = null;
+  try {
+    const db = createAdminClient();
+    const [e, d] = await Promise.all([
+      db.from('changelog_entries').select('id, title, description, tag, entry_date').eq('published', true).order('entry_date', { ascending: false }).limit(500),
+      db.from('changelog_digests').select('week_of, summary').order('week_of', { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    entries = (e.data ?? []) as ChangelogEntry[];
+    digest = d.data ?? null;
+  } catch (error) {
+    console.error('[changelog] could not load entries; rendering empty state', error instanceof Error ? error.message : error);
+  }
+  const months = groupChangelog(entries ?? []);
 
   return (
     <PageFrame eyebrow="Changelog" title="What’s new in Pentriq" intro="A running record of what we have shipped, newest first.">
