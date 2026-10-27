@@ -1,5 +1,6 @@
 {
   "crons": [
+    { "path": "/api/sync-bookings", "schedule": "30 7 * * *" },
     { "path": "/api/send-review-requests", "schedule": "0 8 * * *" },
     { "path": "/api/send-messages", "schedule": "0 9 * * *" },
     { "path": "/api/scan-customer-lifecycle", "schedule": "0 3 * * *" },

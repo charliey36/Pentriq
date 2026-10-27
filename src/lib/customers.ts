@@ -138,7 +138,7 @@ type Known = {
  */
 export async function bulkImportCustomers(
   supabase: Db,
-  business: { id: string; delay_hours: number; review_request_window_days: number; review_cooldown_enabled?: boolean; review_cooldown_days?: number },
+  business: { id: string; delay_hours: number; review_request_window_days: number; review_cooldown_enabled?: boolean; review_cooldown_days?: number; /** Automatic syncs re-read recent appointments on purpose; don't count those repeats as blocked duplicates. */ quiet_repeats?: boolean },
   rows: BulkImportRow[],
   autoSend: boolean,
   /** When the owner confirmed they may contact these customers; stored on every NEW customer. */
@@ -158,7 +158,7 @@ export async function bulkImportCustomers(
     const { name, email, service, date, amount } = check;
     const key = `${email}|${service.toLowerCase()}|${date ?? 'no-date'}`;
     if (fileKeys.has(key)) {
-      blocks.push({ reason: 'duplicate' });
+      if (!business.quiet_repeats) blocks.push({ reason: 'duplicate' });
       return void results.push({ row, status: 'skipped_duplicate', name, email });
     }
     fileKeys.add(key);
@@ -249,7 +249,7 @@ export async function bulkImportCustomers(
     const fileKey = `${entity.key}|${serviceId}|${v.date}`;
     const alreadyRecorded = Boolean(entity.existingId) && visitKeys.has(`${entity.existingId}|${serviceId}|${v.date}`);
     if (alreadyRecorded || seenInFile.has(fileKey)) {
-      blocks.push({ customerId: entity.existingId ?? null, reason: 'duplicate' });
+      if (!business.quiet_repeats) blocks.push({ customerId: entity.existingId ?? null, reason: 'duplicate' });
       results.push({ row: v.row, status: 'skipped_duplicate', name: v.name, email: v.email });
       continue;
     }

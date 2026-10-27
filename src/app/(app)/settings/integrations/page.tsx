@@ -17,6 +17,8 @@ import { isTokenEncryptionConfigured } from '@/lib/google-token-crypto';
 import { getAccessToken } from '@/lib/google-review-sync';
 import { GooglePanel, type GooglePanelState } from './google-panel';
 import { GoogleComingSoon } from './google-coming-soon';
+import { BookingPanel, type BookingCard } from './booking-panel';
+import { PROVIDER_LIST } from '@/lib/booking-sync/registry';
 
 export const metadata: Metadata = { title: 'Integrations' };
 
@@ -41,10 +43,20 @@ const GOOGLE_ERRORS: Record<string, string> = {
   google_error: 'Google reported an error during sign-in. Please try again.',
 };
 
+const BOOKING_ERRORS: Record<string, string> = {
+  denied: 'Access was declined, so nothing was connected.',
+  invalid_state: 'The sign-in session expired or was invalid. Please try again.',
+  not_configured: 'This booking system is not set up on this server yet.',
+  encryption_not_configured: 'Secure token storage is not configured on this server (GOOGLE_TOKEN_ENCRYPTION_KEY).',
+  consent_required: 'Please confirm you may contact your customers before connecting.',
+  unknown_provider: 'That booking system is not supported.',
+  exchange_failed: 'Could not complete the connection. Please try again.',
+};
+
 export default async function IntegrationsPage({
   searchParams,
 }: {
-  searchParams?: { google?: string; reason?: string };
+  searchParams?: { google?: string; reason?: string; booking?: string; provider?: string };
 }) {
   const business = await requireBusiness();
 
@@ -88,6 +100,27 @@ export default async function IntegrationsPage({
     }
   }
   const googleFlash = searchParams?.google;
+
+  // Booking systems: token-free view only (tokens never leave the server).
+  const { data: bookingRows } = await createAdminClient()
+    .from('booking_connections')
+    .select('provider, status, account_label, last_synced_at, last_sync_message, last_sync_status')
+    .eq('business_id', business.id);
+  const bookingCards: BookingCard[] = PROVIDER_LIST.map((p) => {
+    const row = bookingRows?.find((r) => r.provider === p.id);
+    return {
+      id: p.id,
+      label: p.label,
+      blurb: p.blurb,
+      configured: p.isConfigured() && isTokenEncryptionConfigured(),
+      status: row?.status ?? null,
+      accountLabel: row?.account_label ?? null,
+      lastSyncedAt: row?.last_synced_at ?? null,
+      lastMessage: row?.last_sync_message ?? null,
+      lastStatus: row?.last_sync_status ?? null,
+    };
+  });
+  const bookingFlash = searchParams?.booking;
 
   // Every organisation gets a key automatically on first visit (shown once).
   const info = await getApiKeyInfo(business.id);
@@ -138,6 +171,16 @@ export default async function IntegrationsPage({
               reviewStats={googleStats}
             />
           )}
+        </SectionCard>
+
+        <SectionCard
+          title="Booking systems"
+          description="Connect once and Pentriq pulls finished appointments every day, creates the customers and schedules their review requests. No CSV uploads."
+        >
+          {bookingFlash === 'connected' && <Notice variant="success" className="mb-4">Connected. Your first sync has run: check Customers to see who was imported.</Notice>}
+          {bookingFlash === 'error' && <Notice variant="error" className="mb-4">{BOOKING_ERRORS[searchParams?.reason ?? ''] ?? BOOKING_ERRORS.exchange_failed}</Notice>}
+          <BookingPanel cards={bookingCards} />
+          <p className="mt-3 text-xs text-ink-3">Only customers with an email address can be imported. Opt-outs, duplicates and your frequency limit are applied exactly as they are for CSV imports. Using another system? Use the endpoint below or upload a CSV.</p>
         </SectionCard>
 
         <SectionCard title="Endpoint" description="Customers are created or updated by email, and a service visit is recorded.">

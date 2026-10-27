@@ -99,6 +99,55 @@ export type Database = {
         };
         Relationships: [];
       };
+      booking_connections: {
+        Row: {
+          id: string;
+          business_id: string;
+          provider: 'square' | 'acuity' | 'calendly';
+          status: 'active' | 'needs_reconnect' | 'disconnected';
+          access_token_enc: string | null;
+          refresh_token_enc: string | null;
+          token_expires_at: string | null;
+          account_label: string | null;
+          consent_confirmed_at: string;
+          last_synced_at: string | null;
+          last_sync_status: string | null;
+          last_sync_message: string | null;
+          last_sync_imported: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          provider: 'square' | 'acuity' | 'calendly';
+          status?: 'active' | 'needs_reconnect' | 'disconnected';
+          access_token_enc?: string | null;
+          refresh_token_enc?: string | null;
+          token_expires_at?: string | null;
+          account_label?: string | null;
+          consent_confirmed_at?: string;
+          last_synced_at?: string | null;
+          last_sync_status?: string | null;
+          last_sync_message?: string | null;
+          last_sync_imported?: number;
+          updated_at?: string;
+        };
+        Update: {
+          status?: 'active' | 'needs_reconnect' | 'disconnected';
+          access_token_enc?: string | null;
+          refresh_token_enc?: string | null;
+          token_expires_at?: string | null;
+          account_label?: string | null;
+          consent_confirmed_at?: string;
+          last_synced_at?: string | null;
+          last_sync_status?: string | null;
+          last_sync_message?: string | null;
+          last_sync_imported?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       email_suppressions: {
         Row: { id: string; business_id: string; email: string; reason: string; created_at: string };
         Insert: { id?: string; business_id: string; email: string; reason?: string };
