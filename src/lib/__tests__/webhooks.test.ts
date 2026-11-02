@@ -123,3 +123,45 @@ describe('emitWebhookEvent', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
+
+describe('delivery retries', () => {
+  const noSleep = async () => undefined;
+
+  it('retries a transient failure and logs a single delivery', async () => {
+    const { db, endpoint } = setup();
+    const statuses = [503, 200];
+    const seenAttempts: string[] = [];
+    const fetchImpl: FetchLike = async (_url, init) => {
+      seenAttempts.push(init.headers['pentriq-attempt']);
+      return { status: statuses.shift() ?? 200 };
+    };
+    const res = await deliver(db, endpoint, 'customer.created', {}, { fetchImpl, lookup: publicLookup, retries: 2, sleep: noSleep });
+    expect(res).toMatchObject({ ok: true, attempts: 2 });
+    expect(seenAttempts).toEqual(['1', '2']);
+    expect(db.rows('webhook_deliveries')).toHaveLength(1);
+    expect(db.rows('webhook_endpoints')[0].consecutive_failures).toBe(0);
+  });
+
+  it('does not retry permanent failures such as 4xx or redirects', async () => {
+    const { db, endpoint } = setup();
+    const fetchImpl = jest.fn(async () => ({ status: 400 }));
+    const res = await deliver(db, endpoint, 'customer.created', {}, { fetchImpl: fetchImpl as never, lookup: publicLookup, retries: 2, sleep: noSleep });
+    expect(res).toMatchObject({ ok: false, error: 'HTTP 400', attempts: 1 });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives up after the retry budget and counts one failure', async () => {
+    const { db, endpoint } = setup();
+    const fetchImpl = jest.fn(async () => { throw new Error('reset'); });
+    const res = await deliver(db, endpoint, 'customer.created', {}, { fetchImpl: fetchImpl as never, lookup: publicLookup, retries: 2, sleep: noSleep });
+    expect(res).toMatchObject({ ok: false, error: 'network_error after 3 attempts', attempts: 3 });
+    expect(db.rows('webhook_endpoints')[0].consecutive_failures).toBe(1);
+  });
+
+  it('caps the retry budget at two extra attempts', async () => {
+    const { db, endpoint } = setup();
+    const fetchImpl = jest.fn(async () => ({ status: 500 }));
+    await deliver(db, endpoint, 'customer.created', {}, { fetchImpl: fetchImpl as never, lookup: publicLookup, retries: 10, sleep: noSleep });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+});

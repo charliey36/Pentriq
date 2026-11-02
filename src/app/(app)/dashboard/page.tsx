@@ -32,6 +32,10 @@ import { toneStyle, type Tone } from '@/components/ui/tones';
 import { SetupChecklist, type SetupStep } from '@/components/setup-checklist';
 import { ReviewPipeline } from '@/components/dashboard/review-pipeline';
 import { loadPipelineStats } from '@/lib/pipeline-stats';
+import { loadIntelligence } from '@/lib/intelligence/load';
+import { HealthScoreCard } from '@/components/intelligence/health-score-card';
+import { NextActions } from '@/components/intelligence/next-actions';
+import { AskPentriqButton } from '@/components/intelligence/ask-button';
 
 export const metadata: Metadata = { title: 'Dashboard' };
 
@@ -91,6 +95,11 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
     clickTimestamps,
     uniqueClicked,
     reviewsReceived,
+    queueSent,
+    queuePending,
+    pipeline,
+    revenue,
+    intel,
   ] = await Promise.all([
     supabase
       .from('customers')
@@ -141,6 +150,23 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
     getClickTimestamps(supabase, business.id, sinceIso, ROW_CAP),
     countUniqueClicked(supabase, business.id),
     countReviewsReceived(supabase, business.id),
+    // Requests sent from the Review queue / import pipeline live in `messages`.
+    supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('business_id', business.id)
+      .in('purpose', [...REVIEW_PURPOSES])
+      .eq('status', 'sent'),
+    supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('business_id', business.id)
+      .in('purpose', [...REVIEW_PURPOSES])
+      .eq('status', 'pending'),
+    loadPipelineStats(supabase, business.id),
+    computeRevenueAttribution(supabase, business.id).catch(() => ({ totalAttributed: 0, attributedVisitCount: 0 })),
+    // Health score and ranked next actions (memoised per request, shared with the insights page logic).
+    loadIntelligence(business),
   ]);
 
   const hasReviewUrl = Boolean(business.google_review_url);
@@ -150,19 +176,6 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
   // Setup is recommended, never required: a brand-new business lands on the dashboard (and sees
   // the setup guide below) instead of being sent to a form, so it can import customers, set up
   // its review link or just look around first.
-  // Requests sent from the Review queue / import pipeline live in `messages`.
-  const [queueSent, queuePending] = await Promise.all(
-    (['sent', 'pending'] as const).map((status) =>
-      supabase
-        .from('messages')
-        .select('id', { count: 'exact', head: true })
-        .eq('business_id', business.id)
-        .in('purpose', [...REVIEW_PURPOSES])
-        .eq('status', status)
-    )
-  );
-  const pipeline = await loadPipelineStats(supabase, business.id);
-  const revenue = await computeRevenueAttribution(supabase, business.id).catch(() => ({ totalAttributed: 0, attributedVisitCount: 0 }));
   const sent = (emailsSentCount.count ?? 0) + (queueSent.count ?? 0);
   const clicks = clicksCount;
   const delivered = deliveredFromSent(sent);
@@ -229,50 +242,15 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
     await supabase.from('businesses').update({ onboarding_completed_at: new Date().toISOString() }).eq('id', business.id);
   }
 
-  // Plain-language highlights derived from the numbers above (rule-based, in
-  // priority order): things needing attention first, then momentum.
-  const insights: Insight[] = [];
-  if (newFeedback > 0) {
-    insights.push({
-      icon: 'chat',
-      text: `${newFeedback} new private feedback ${newFeedback === 1 ? 'message needs' : 'messages need'} a reply`,
-      href: '/feedback-inbox',
-    });
+  // Highlights come from the ranked next-best-actions engine (same list as Insights), so the hero always
+  // shows the three things most worth doing, not just the latest numbers.
+  const insights: Insight[] = intel.actions.map((action) => ({ icon: action.icon as IconName, text: action.title, href: action.href }));
+  if (insights.length === 0 && sentTrend && sentTrend.current > 0) {
+    insights.push({ icon: 'mail', text: `${sentTrend.current} review request${sentTrend.current === 1 ? '' : 's'} sent in the last 7 days`, href: '/activity?type=message' });
   }
-  if (failed > 0) {
-    insights.push({
-      icon: 'warning',
-      text: `${failed} review request${failed === 1 ? '' : 's'} failed after retries`,
-      href: '/customers',
-    });
-  }
-  if (clicksTrend && clicksTrend.previous > 0 && clicksTrend.current !== clicksTrend.previous) {
+  if (insights.length < 3 && clicksTrend && clicksTrend.previous > 0 && clicksTrend.current > clicksTrend.previous) {
     const pct = Math.round(((clicksTrend.current - clicksTrend.previous) / clicksTrend.previous) * 100);
-    insights.push({
-      icon: pct > 0 ? 'arrowUp' : 'arrowDown',
-      text: `Link clicks ${pct > 0 ? 'up' : 'down'} ${Math.abs(pct)}% vs the previous 7 days`,
-      href: '/analytics',
-    });
-  } else if (sentTrend && sentTrend.current > 0) {
-    insights.push({
-      icon: 'mail',
-      text: `${sentTrend.current} review request${sentTrend.current === 1 ? '' : 's'} sent in the last 7 days`,
-      href: '/customers',
-    });
-  }
-  if (pending > 0) {
-    insights.push({
-      icon: 'clock',
-      text: `${pending} request${pending === 1 ? ' is' : 's are'} scheduled to send soon`,
-      href: '/customers',
-    });
-  }
-  if (customersTrend && customersTrend.current > 0) {
-    insights.push({
-      icon: 'users',
-      text: `${customersTrend.current} new customer${customersTrend.current === 1 ? '' : 's'} in the last 7 days`,
-      href: '/customers',
-    });
+    insights.push({ icon: 'arrowUp', text: `Link clicks up ${pct}% vs the previous 7 days`, href: '/analytics' });
   }
   const highlights = insights.slice(0, 3);
 
@@ -343,11 +321,18 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
                 <Icon name="upload" className="h-4 w-4" />
                 Import CSV
               </Link>
+              <Link
+                href="/insights"
+                className="inline-flex items-center gap-2 rounded-[10px] border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-medium text-white backdrop-blur transition duration-200 hover:-translate-y-px hover:bg-white/20"
+              >
+                <Icon name="sparkles" className="h-4 w-4" />
+                {intel.health.score === null ? 'Insights' : `Health score ${intel.health.score}`}
+              </Link>
             </div>
           </div>
 
           <div className="rounded-2xl border border-white/15 bg-white/10 p-2 shadow-[inset_0_1px_0_0_rgb(255_255_255/0.15)] backdrop-blur-md">
-            <p className="eyebrow px-3 pb-1.5 pt-2.5 text-emerald-100/70">Highlights</p>
+            <p className="eyebrow px-3 pb-1.5 pt-2.5 text-emerald-100/70">Do next</p>
             {highlights.length > 0 ? (
               <ul>
                 {highlights.map((item) => (
@@ -451,6 +436,16 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
               : 'Needs at least one sent request'
           }
         />
+      </div>
+
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <NextActions actions={intel.actions} limit={4} className="reveal lg:col-span-2" />
+        <div className="space-y-3">
+          <HealthScoreCard report={intel.health} compact className="reveal" />
+          <div className="flex justify-end">
+            <AskPentriqButton />
+          </div>
+        </div>
       </div>
 
       <ImpactCard

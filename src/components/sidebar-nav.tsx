@@ -21,19 +21,27 @@ export const navGroups: { label: string; items: NavItem[] }[] = [
     label: 'Overview',
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
+      { href: '/insights', label: 'Insights', icon: 'sparkles' },
+      { href: '/reports', label: 'Executive report', icon: 'report' },
+      { href: '/activity', label: 'Activity', icon: 'activity' },
       { href: '/analytics', label: 'Analytics', icon: 'chart' },
-      { href: '/reviews', label: 'Reviews Analytics', icon: 'star', badge: 'reviews' },
     ],
   },
   {
-    label: 'Audience',
+    label: 'Reputation',
+    items: [
+      { href: '/reviews', label: 'Reviews', icon: 'star', badge: 'reviews' },
+      { href: '/feedback-inbox', label: 'Feedback', icon: 'chat', badge: 'feedback' },
+      { href: '/review-link', label: 'QR & review link', icon: 'link' },
+    ],
+  },
+  {
+    label: 'Customers',
     items: [
       { href: '/customers', label: 'Customers', icon: 'users' },
-      { href: '/customers/import', label: 'Import', icon: 'upload' },
       { href: '/segments', label: 'Segments', icon: 'funnel' },
       { href: '/referrals', label: 'Referrals', icon: 'userPlus' },
-      { href: '/feedback-inbox', label: 'Feedback', icon: 'chat', badge: 'feedback' },
-      { href: '/review-link', label: 'QR & review link', icon: 'star' },
+      { href: '/customers/import', label: 'Import', icon: 'upload' },
     ],
   },
   {

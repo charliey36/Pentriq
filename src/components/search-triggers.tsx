@@ -10,7 +10,7 @@ export function SidebarSearch() {
   return (
     <button
       type="button"
-      onClick={open}
+      onClick={() => open()}
       className="group flex w-full items-center gap-2.5 rounded-xl border border-line bg-surface/60 px-3 py-2 text-left text-[13px] text-ink-3 shadow-xs transition duration-200 hover:border-brand-500/40 hover:bg-surface hover:text-ink"
     >
       <Icon name="search" className="h-4 w-4 text-ink-4 transition-colors group-hover:text-brand-600" />
@@ -27,7 +27,7 @@ export function HeaderSearchButton() {
   const { open } = useCommandPalette();
 
   return (
-    <button type="button" onClick={open} aria-label="Search or jump to…" title="Search (⌘K)" className="btn btn-ghost btn-icon">
+    <button type="button" onClick={() => open()} aria-label="Search or jump to…" title="Search (⌘K)" className="btn btn-ghost btn-icon">
       <Icon name="search" className="h-[18px] w-[18px]" />
     </button>
   );

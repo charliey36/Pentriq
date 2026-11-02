@@ -67,7 +67,7 @@ class MiniQuery implements PromiseLike<any> {
     return this;
   }
   update(p: Row) { this.op = 'update'; this.payload = p; return this; }
-  delete() { this.op = 'delete'; return this; }
+  delete(o?: { count?: string }) { this.op = 'delete'; if (o?.count) this.count = true; return this; }
   eq(c: string, v: unknown) { this.filters.push((r) => r[c] === v); return this; }
   neq(c: string, v: unknown) { this.filters.push((r) => r[c] !== v); return this; }
   in(c: string, vs: unknown[]) { this.filters.push((r) => vs.includes(r[c])); return this; }
@@ -100,7 +100,7 @@ class MiniQuery implements PromiseLike<any> {
     if (this.op === 'delete') {
       const gone = hit();
       this.db.tables[this.t] = rows.filter((r) => !gone.includes(r));
-      return { data: null, error: null };
+      return { data: null, count: this.count ? gone.length : null, error: null };
     }
     if (this.op === 'update') {
       const m = hit();

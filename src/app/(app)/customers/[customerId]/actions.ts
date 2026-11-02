@@ -8,6 +8,8 @@ import { todayIso } from '@/lib/eligibility';
 import { extractReviewSchedulingLogic } from '@/lib/review-scheduling';
 import { cooldownDaysFor } from '@/lib/eligibility';
 import { sendManualReviewRequestFor, sendManualRebookingReminderFor } from '@/lib/manual-sends';
+import { emitWebhookEvent } from '@/lib/webhooks';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export type LogVisitResult = { error?: string; success?: boolean };
 
@@ -98,6 +100,14 @@ export async function logVisit(
     windowDays: business.review_request_window_days,
     cooldownDays: cooldownDaysFor(business),
     unsubscribedAt: customer?.unsubscribed_at ?? null,
+  });
+
+  await emitWebhookEvent(createAdminClient(), business.id, 'visit.logged', {
+    customer_id: customerId,
+    visit_id: visit.id,
+    service_id: serviceId,
+    price,
+    visited_at: new Date().toISOString(),
   });
 
   revalidatePath(`/customers/${customerId}`);

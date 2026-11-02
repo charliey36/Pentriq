@@ -539,3 +539,58 @@
     animation-delay: calc(var(--i, 0) * 70ms);
   }
 }
+
+/* ==========================================================================
+   Print (executive report, any page saved as PDF)
+   --------------------------------------------------------------------------
+   App chrome is hidden with Tailwind's `print:hidden`; here we force the
+   light palette (even from dark mode), drop decorative motion and shadows,
+   and keep cards from splitting across pages.
+   ========================================================================== */
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  :root,
+  .dark {
+    --bg: 255 255 255;
+    --surface: 255 255 255;
+    --surface-2: 248 250 252;
+    --surface-3: 241 245 249;
+    --card-bottom: 255 255 255;
+    --line: 226 232 240;
+    --line-strong: 203 213 225;
+    --ink: 11 18 32;
+    --ink-2: 45 56 78;
+    --ink-3: 94 106 129;
+    --ink-4: 130 141 161;
+    --shadow-card: none;
+    --shadow-hero: none;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .card {
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  .reveal,
+  .animate-fade-in,
+  .animate-fade-in-up,
+  .bar-grow,
+  .ring-anim,
+  .draw-line {
+    animation: none !important;
+  }
+
+  a[href]::after {
+    content: none !important;
+  }
+}

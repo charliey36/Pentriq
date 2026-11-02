@@ -12,11 +12,12 @@ const tabs: { href: string; label: string; capability: Capability }[] = [
   { capability: 'settings.write', href: '/settings/reputation', label: 'Reputation' },
   { capability: 'integrations.manage', href: '/settings/integrations', label: 'Integrations' },
   { capability: 'team.manage', href: '/settings/team', label: 'Team' },
+  { capability: 'team.manage', href: '/settings/security', label: 'Security & audit' },
   { capability: 'billing.manage', href: '/settings/billing', label: 'Billing' },
   { capability: 'data.export', href: '/settings/privacy', label: 'Data & privacy' },
 ];
 
-/** Section navigation shared by the three Settings pages. */
+/** Section navigation shared by every Settings page. */
 export function SettingsTabs() {
   const pathname = usePathname();
   const allowed: Record<Capability, boolean> = {

@@ -28,13 +28,15 @@ import { Notice } from '@/components/ui/notice';
 import { AlertsPanel, type AlertItem } from './alerts-panel';
 import { MonthlyGainedChart, RatingDistributionChart, RatingTrendChart, ReviewGrowthChart, VelocityTrendChart } from './review-charts';
 import { ReviewList, type ReviewItem } from './review-list';
+import { analyseReviewThemes } from '@/lib/intelligence/review-themes';
 import { SyncButton } from './sync-button';
 
-export const metadata: Metadata = { title: 'Reviews Analytics' };
+export const metadata: Metadata = { title: 'Reviews' };
 export const dynamic = 'force-dynamic';
 
 const PAGE_SIZE = 1000;
-const MAX_LISTED = 50;
+/** The list filters and pages on the client; this bounds what is sent to the browser. */
+const MAX_LISTED = 500;
 
 const RANGE_LINKS = [
   { key: '7d', label: 'Last 7 days' },
@@ -57,7 +59,7 @@ const TONE_DOT = { good: 'bg-brand-500', bad: 'bg-red-500', neutral: 'bg-line-st
 export default async function ReviewsAnalyticsPage({
   searchParams,
 }: {
-  searchParams?: { tab?: string; range?: string; from?: string; to?: string };
+  searchParams?: { tab?: string; range?: string; from?: string; to?: string; filter?: string };
 }) {
   const business = await requireBusiness();
   const connection = await getPublicConnection(business.id);
@@ -152,7 +154,7 @@ export default async function ReviewsAnalyticsPage({
   return (
     <div>
       <PageHeader
-        title="Reviews Analytics"
+        title="Reviews"
         icon="star"
         tone="amber"
         description="Track your reputation: review growth, rating trends, insights and alerts."
@@ -246,6 +248,30 @@ export default async function ReviewsAnalyticsPage({
               ))}
             </ul>
           </SectionCard>
+          {live && reviews.length > 0 && (() => {
+            const t = analyseReviewThemes(reviews);
+            if (t.themes.length === 0) return null;
+            return (
+              <SectionCard className="mb-6" title="What customers talk about" description={`Themes across ${t.withText} written reviews, grouped inside Pentriq (no review text leaves the app).`}>
+                <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {t.themes.slice(0, 9).map((theme) => (
+                    <li key={theme.topic} className="rounded-xl border border-line bg-surface-subtle/60 p-3.5">
+                      <p className="flex items-center justify-between gap-2 text-[13px] font-semibold text-ink">
+                        {theme.label}
+                        <span className={`rounded-full px-2 py-px text-2xs font-semibold ${theme.netSentiment >= 40 ? 'bg-brand-500/10 text-brand-700 dark:text-brand-300' : theme.netSentiment < 0 ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300' : 'bg-surface-muted text-ink-3'}`}>
+                          {theme.netSentiment >= 40 ? 'Praised' : theme.netSentiment < 0 ? 'Concern' : 'Mixed'}
+                        </span>
+                      </p>
+                      <p className="mt-1 text-xs text-ink-3">
+                        {theme.mentions} mentions · {theme.averageRating.toFixed(1)}★ average · {theme.positive} positive, {theme.negative} negative
+                      </p>
+                      {theme.example && <p className="mt-2 text-xs italic leading-5 text-ink-3">&ldquo;{theme.example}&rdquo;</p>}
+                    </li>
+                  ))}
+                </ul>
+              </SectionCard>
+            );
+          })()}
           {live && (() => {
             const m = monthlyInsights(reviews, today);
             return (
@@ -271,9 +297,14 @@ export default async function ReviewsAnalyticsPage({
       )}
 
       {tab === 'reviews' && (
-        <SectionCard title="Recent reviews" description={live ? 'Newest first.' : undefined}>
+        <SectionCard title="Reviews" description={live ? 'Newest first. Filter to the ones that still need a reply.' : undefined}>
           {live && reviews.length > 0 ? (
-            <ReviewList reviews={reviews.slice(0, MAX_LISTED)} canReply aiEnabled={Boolean(process.env.GEMINI_API_KEY)} />
+            <ReviewList
+              reviews={reviews.slice(0, MAX_LISTED)}
+              canReply
+              aiEnabled={Boolean(process.env.GEMINI_API_KEY)}
+              initialFilter={searchParams?.filter === 'unreplied' || searchParams?.filter === 'negative' || searchParams?.filter === 'positive' ? searchParams.filter : 'all'}
+            />
           ) : (
             <EmptyState
               icon="star"

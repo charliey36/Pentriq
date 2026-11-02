@@ -95,10 +95,12 @@ const Row = memo(function Row({ row, selected, onToggle, onOpen }: { row: Custom
  * with bulk send/cancel, and CSV export of the current view (owners and admins only; `canExport`).
  * Everything runs client-side over the rows the server already loaded.
  */
-export function CustomersTable({ rows, canExport = false }: { rows: CustomerRow[]; canExport?: boolean }) {
+export function CustomersTable({ rows, canExport = false, initialState }: { rows: CustomerRow[]; canExport?: boolean; initialState?: ListState }) {
   const router = useRouter();
   const { push } = useToast();
-  const [state, setState] = useState<ListState>(() => parseListState(new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search)));
+  // The server parses the URL and passes it in, so the first client render matches the server HTML
+  // (reading window.location here made the two disagree and caused a hydration mismatch on deep links).
+  const [state, setState] = useState<ListState>(() => initialState ?? parseListState(new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search)));
   const [limit, setLimit] = useState(PAGE_SIZE);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();

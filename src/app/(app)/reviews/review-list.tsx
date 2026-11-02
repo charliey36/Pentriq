@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { Avatar } from '@/components/ui/avatar';
 import { Notice } from '@/components/ui/notice';
 import { Spinner } from '@/components/ui/submit-button';
@@ -159,12 +159,102 @@ function ReviewRow({ review, canReply, aiEnabled }: { review: ReviewItem; canRep
   );
 }
 
-export function ReviewList({ reviews, canReply, aiEnabled = false }: { reviews: ReviewItem[]; canReply: boolean; aiEnabled?: boolean }) {
+export type ReviewFilter = 'all' | 'unreplied' | 'negative' | 'positive';
+const FILTERS: Array<{ key: ReviewFilter; label: string }> = [
+  { key: 'all', label: 'All' },
+  { key: 'unreplied', label: 'Needs a reply' },
+  { key: 'negative', label: '1–3★' },
+  { key: 'positive', label: '4–5★' },
+];
+const STEP = 25;
+
+/**
+ * Reviews with triage controls: filter to the ones that need a reply (or by rating), search the text, and
+ * load more progressively instead of rendering hundreds of rows at once.
+ */
+export function ReviewList({
+  reviews,
+  canReply,
+  aiEnabled = false,
+  initialFilter = 'all',
+}: {
+  reviews: ReviewItem[];
+  canReply: boolean;
+  aiEnabled?: boolean;
+  initialFilter?: ReviewFilter;
+}) {
+  const [filter, setFilter] = useState<ReviewFilter>(initialFilter);
+  const [query, setQuery] = useState('');
+  const [limit, setLimit] = useState(STEP);
+
+  const counts = useMemo(
+    () => ({
+      all: reviews.length,
+      unreplied: reviews.filter((r) => !r.reply_text).length,
+      negative: reviews.filter((r) => r.rating <= 3).length,
+      positive: reviews.filter((r) => r.rating >= 4).length,
+    }),
+    [reviews]
+  );
+
+  const visible = useMemo(() => {
+    const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    return reviews.filter((r) => {
+      if (filter === 'unreplied' && r.reply_text) return false;
+      if (filter === 'negative' && r.rating > 3) return false;
+      if (filter === 'positive' && r.rating < 4) return false;
+      if (terms.length === 0) return true;
+      const hay = `${r.reviewer_name} ${r.comment ?? ''}`.toLowerCase();
+      return terms.every((t) => hay.includes(t));
+    });
+  }, [reviews, filter, query]);
+
   return (
-    <ul className="divide-y divide-line/70">
-      {reviews.map((r) => (
-        <ReviewRow key={r.id} review={r} canReply={canReply} aiEnabled={aiEnabled} />
-      ))}
-    </ul>
+    <div>
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <div role="group" aria-label="Filter reviews" className="inline-flex gap-1 rounded-xl border border-line bg-surface-subtle/80 p-1">
+          {FILTERS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              aria-pressed={filter === f.key}
+              onClick={() => {
+                setFilter(f.key);
+                setLimit(STEP);
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                filter === f.key ? 'bg-surface text-ink shadow-xs ring-1 ring-inset ring-line-strong' : 'text-ink-3 hover:bg-surface hover:text-ink'
+              }`}
+            >
+              {f.label}
+              <span className={`rounded-full px-1.5 text-2xs font-semibold tabular-nums ${f.key === 'unreplied' && counts.unreplied > 0 ? 'bg-amber-500 text-white' : 'bg-surface-muted text-ink-3'}`}>
+                {counts[f.key]}
+              </span>
+            </button>
+          ))}
+        </div>
+        <label className="relative min-w-[200px] flex-1">
+          <span className="sr-only">Search reviews</span>
+          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search reviews…" className="input py-2" />
+        </label>
+      </div>
+
+      {visible.length === 0 ? (
+        <p className="py-8 text-center text-sm text-ink-3">{filter === 'unreplied' && !query ? 'Every review has a reply. Nice work.' : 'No reviews match.'}</p>
+      ) : (
+        <ul className="divide-y divide-line/70">
+          {visible.slice(0, limit).map((r) => (
+            <ReviewRow key={r.id} review={r} canReply={canReply} aiEnabled={aiEnabled} />
+          ))}
+        </ul>
+      )}
+      {visible.length > limit && (
+        <div className="mt-5 flex justify-center">
+          <button type="button" onClick={() => setLimit((n) => n + STEP)} className="btn btn-secondary btn-sm">
+            Show {Math.min(STEP, visible.length - limit)} more of {visible.length - limit}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

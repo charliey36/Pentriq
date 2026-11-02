@@ -53,6 +53,8 @@ export type Database = {
           paused_until: string | null;
           pause_indefinite: boolean;
           milestones_sent: Record<string, string>;
+          /** Retention policy for message history and tracking events, in days (migration 0044). NULL = keep. */
+          data_retention_days: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -100,6 +102,7 @@ export type Database = {
           paused_until?: string | null;
           pause_indefinite?: boolean;
           milestones_sent?: Record<string, string>;
+          data_retention_days?: number | null;
         };
         Relationships: [];
       };
@@ -396,6 +399,18 @@ export type Database = {
       webhook_deliveries: {
         Row: { id: string; business_id: string; endpoint_id: string | null; event_type: string; status: 'succeeded' | 'failed'; http_status: number | null; error: string | null; duration_ms: number | null; created_at: string };
         Insert: { id?: string; business_id: string; endpoint_id?: string | null; event_type: string; status: 'succeeded' | 'failed'; http_status?: number | null; error?: string | null; duration_ms?: number | null };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      saved_views: {
+        Row: { id: string; business_id: string; created_by: string | null; scope: 'customers' | 'segments' | 'activity' | 'feedback'; name: string; query: string; shared: boolean; created_at: string };
+        Insert: { id?: string; business_id: string; created_by?: string | null; scope: 'customers' | 'segments' | 'activity' | 'feedback'; name: string; query?: string; shared?: boolean };
+        Update: { name?: string; query?: string; shared?: boolean };
+        Relationships: [];
+      };
+      audit_log: {
+        Row: { id: number; business_id: string | null; actor_id: string | null; actor_email: string | null; action: string; target_type: string | null; target_id: string | null; metadata: Record<string, unknown>; ip_hash: string | null; created_at: string };
+        Insert: { business_id?: string | null; actor_id?: string | null; actor_email?: string | null; action: string; target_type?: string | null; target_id?: string | null; metadata?: Record<string, unknown>; ip_hash?: string | null };
         Update: Record<string, never>;
         Relationships: [];
       };

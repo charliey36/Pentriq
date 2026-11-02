@@ -33,6 +33,7 @@ export const STORAGE_KEYS = {
   theme: `${APP_SLUG}-theme`,
   sidebarOpen: `${APP_SLUG}-sidebar-open`,
   setupDismissed: `${APP_SLUG}-setup-dismissed`,
+  recentCommands: `${APP_SLUG}-recent-commands`,
 } as const;
 
 /**

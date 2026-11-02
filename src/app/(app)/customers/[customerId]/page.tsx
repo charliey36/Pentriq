@@ -13,7 +13,16 @@ import { Icon } from '@/components/ui/icons';
 import { LogVisitForm } from './log-visit-form';
 import { TagEditor } from './tag-editor';
 import { CustomerActionsMenu } from '../customer-actions-menu';
-import { formatUKCurrency, formatUKDate } from '@/lib/uk-defaults';
+import { formatUKCurrency, formatUKDate, UK_TIMEZONE } from '@/lib/uk-defaults';
+import { analyseCustomer } from '@/lib/intelligence/customer-insights';
+import { CustomerInsightCard } from '@/components/intelligence/customer-insight-card';
+import { InsightActions } from './insight-actions';
+import { buildActivity } from '@/lib/activity-feed';
+import { COUNTED_CLICK_TYPES } from '@/lib/click-analytics';
+import type { IconName } from '@/components/ui/icons';
+
+const TIMELINE_ICON: Record<string, IconName> = { message: 'mail', click: 'cursor', visit: 'calendar', feedback: 'chat', customer: 'userPlus' };
+const timelineFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: UK_TIMEZONE });
 
 export const metadata: Metadata = { title: 'Customer' };
 
@@ -34,17 +43,77 @@ export default async function CustomerDetailPage({ params }: { params: { custome
 
   if (!customer) notFound();
 
-  const [{ data: services }, { data: tags }, { data: loyaltyProgram }, { data: ledgerEntries }, { visits, rebookingStatus, lifetimeValue }] =
-    await Promise.all([
-      supabase.from('services').select('*').eq('business_id', business.id).eq('is_active', true),
-      supabase.from('customer_tags').select('*').eq('customer_id', customer.id),
-      supabase.from('loyalty_programs').select('*').eq('business_id', business.id).maybeSingle(),
-      supabase.from('loyalty_ledger_entries').select('delta').eq('customer_id', customer.id),
-      getCustomerVisitsWithRebookingStatus(supabase, customer.id),
-    ]);
+  const [
+    { data: services },
+    { data: allServices },
+    { data: tags },
+    { data: loyaltyProgram },
+    { data: ledgerEntries },
+    { visits, rebookingStatus, lifetimeValue },
+    { data: messages },
+    { data: clicks },
+    { data: feedback },
+  ] = await Promise.all([
+    supabase.from('services').select('*').eq('business_id', business.id).eq('is_active', true),
+    // Inactive services still name past visits and drive the learned rhythm.
+    supabase.from('services').select('id, name, recurrence_interval_days').eq('business_id', business.id),
+    supabase.from('customer_tags').select('*').eq('customer_id', customer.id),
+    supabase.from('loyalty_programs').select('*').eq('business_id', business.id).maybeSingle(),
+    supabase.from('loyalty_ledger_entries').select('delta').eq('customer_id', customer.id),
+    getCustomerVisitsWithRebookingStatus(supabase, customer.id),
+    supabase
+      .from('messages')
+      .select('id, customer_id, purpose, channel, status, sent_at, created_at')
+      .eq('business_id', business.id)
+      .eq('customer_id', customer.id)
+      .in('status', ['sent', 'failed'])
+      .order('created_at', { ascending: false })
+      .limit(50),
+    supabase
+      .from('interaction_events')
+      .select('id, customer_id, occurred_at')
+      .eq('business_id', business.id)
+      .eq('customer_id', customer.id)
+      .in('event_type', [...COUNTED_CLICK_TYPES])
+      .order('occurred_at', { ascending: false })
+      .limit(50),
+    supabase
+      .from('private_feedback')
+      .select('id, customer_id, rating, created_at, status')
+      .eq('business_id', business.id)
+      .eq('customer_id', customer.id)
+      .order('created_at', { ascending: false })
+      .limit(20),
+  ]);
 
-  const servicesById = new Map((services ?? []).map((s) => [s.id, s]));
+  const servicesById = new Map((allServices ?? services ?? []).map((s) => [s.id, s]));
   const loyaltyBalance = (ledgerEntries ?? []).reduce((sum, e) => sum + e.delta, 0);
+
+  const insight = analyseCustomer({
+    name: customer.name,
+    createdAt: customer.created_at,
+    visits,
+    services: allServices ?? [],
+    unsubscribed: Boolean(customer.unsubscribed_at),
+    archived: Boolean(customer.archived_at),
+    lastFeedbackRating: feedback?.find((f) => typeof f.rating === 'number')?.rating ?? null,
+    lastContactedAt: messages?.find((m) => m.status === 'sent')?.sent_at ?? null,
+    hasClickedReview: (clicks ?? []).length > 0,
+    loyaltyBalance: loyaltyProgram?.is_active ? loyaltyBalance : null,
+    loyaltyRedemptionPoints: loyaltyProgram?.is_active ? loyaltyProgram.redemption_points : null,
+  });
+
+  const timeline = buildActivity({
+    customers: [{ id: customer.id, name: customer.name, created_at: customer.created_at, source: customer.source }],
+    messages: messages ?? [],
+    clicks: clicks ?? [],
+    visits: visits.slice(0, 50),
+    feedback: feedback ?? [],
+    reviews: [],
+    audit: [],
+    customerNames: new Map([[customer.id, customer.name]]),
+    serviceNames: new Map((allServices ?? []).map((s) => [s.id, s.name])),
+  }).slice(0, 25);
 
   const statusBadge = rebookingStatus.isLapsed ? (
     <Badge tone="danger" dot>
@@ -94,6 +163,13 @@ export default async function CustomerDetailPage({ params }: { params: { custome
           </span>
         }
       />
+
+      <div className="mb-6">
+        <CustomerInsightCard
+          insight={insight}
+          actionsSlot={<InsightActions customerId={customer.id} actions={insight.actions.map((a) => a.id)} />}
+        />
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
@@ -177,6 +253,38 @@ export default async function CustomerDetailPage({ params }: { params: { custome
         </div>
 
         <div className="space-y-6">
+          <SectionCard title="Timeline" description="Every message, click, visit and piece of feedback." flush>
+            {timeline.length === 0 ? (
+              <p className="px-5 py-6 text-[13px] text-ink-3 sm:px-6">Nothing yet.</p>
+            ) : (
+              <ol className="relative px-5 py-4 sm:px-6">
+                <span aria-hidden="true" className="absolute bottom-6 left-[34px] top-6 w-px bg-line sm:left-[38px]" />
+                {timeline.map((event) => (
+                  <li key={event.id} className="relative flex gap-3 py-2">
+                    <span
+                      className={`relative z-[1] flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ring-4 ring-surface ${
+                        event.sentiment === 'negative'
+                          ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                          : event.sentiment === 'positive'
+                            ? 'bg-brand-500/15 text-brand-700 dark:text-brand-400'
+                            : 'bg-surface-muted text-ink-3'
+                      }`}
+                    >
+                      <Icon name={TIMELINE_ICON[event.kind] ?? 'info'} className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-[13px] font-medium leading-5 text-ink">{event.title}</span>
+                      <span className="block text-2xs text-ink-4">
+                        {timelineFormat.format(new Date(event.at))}
+                        {event.detail ? ` · ${event.detail}` : ''}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </SectionCard>
+
           <SectionCard title="Tags" description="Use tags to build segments, like vip or newsletter.">
             <TagEditor customerId={customer.id} tags={tags ?? []} />
           </SectionCard>
