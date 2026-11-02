@@ -16,6 +16,23 @@ class FakeDb {
   from(t: string) {
     return new Q(this, t);
   }
+  /** Mirrors migration 0039 import_apply_visits: insert visits and bump customer totals together. */
+  async rpc(fn: string, args: { p_business_id: string; p_visits: Row[] }) {
+    if (fn !== 'import_apply_visits') return { data: null, error: { message: `unknown rpc ${fn}` } };
+    if (this.failInsert?.('visits', args.p_visits)) return { data: null, error: { message: 'simulated database failure' } };
+    const created: Row[] = args.p_visits.map((p) => ({ id: this.nextId('visits'), business_id: args.p_business_id, ...p }));
+    for (const v of created) {
+      const c = this.tables.customers.find((x) => x.id === v.customer_id && x.business_id === args.p_business_id);
+      if (c) {
+        c.visit_count = (c.visit_count ?? 0) + 1;
+        c.total_spend = Number(c.total_spend ?? 0) + Number(v.price ?? 0);
+        const d = String(v.visited_at).slice(0, 10);
+        if (!c.last_service_date || d > c.last_service_date) c.last_service_date = d;
+      }
+    }
+    this.tables.visits.push(...created);
+    return { data: created, error: null };
+  }
 }
 class Q implements PromiseLike<any> {
   private op: 'select' | 'insert' | 'update' = 'select';
@@ -329,5 +346,27 @@ describe('bulkImportWithRecovery — one bad row never sinks the import', () => 
     expect(s.customersCreated).toBe(1);
     expect(s.queued).toBe(0);
     expect(db.tables.messages).toHaveLength(0);
+  });
+});
+
+describe('bulkImportCustomers — atomic totals (migration 0039)', () => {
+  it('a failed visit write leaves totals untouched, and the retry counts the spend exactly once', async () => {
+    const db = seed();
+    db.failInsert = (t) => t === 'visits';
+    await expect(run(db, [csv('Alice', 'alice@x.com', null, daysAgo(2), '75', 'Colour')])).rejects.toThrow();
+    expect(customer(db, 'cust-alice')).toMatchObject({ visit_count: 2, total_spend: 250 });
+
+    db.failInsert = null;
+    await run(db, [csv('Alice', 'alice@x.com', null, daysAgo(2), '75', 'Colour')]);
+    expect(customer(db, 'cust-alice')).toMatchObject({ visit_count: 3, total_spend: 325 });
+  });
+
+  it('a brand-new customer whose visit write failed is not double-counted on retry', async () => {
+    const db = seed();
+    db.failInsert = (t) => t === 'visits';
+    await expect(run(db, [csv('Dan', 'dan@x.com', null, daysAgo(1), '60')])).rejects.toThrow();
+    db.failInsert = null;
+    await run(db, [csv('Dan', 'dan@x.com', null, daysAgo(1), '60')]);
+    expect(db.tables.customers.find((c) => c.email === 'dan@x.com')).toMatchObject({ visit_count: 1, total_spend: 60 });
   });
 });

@@ -12,6 +12,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Customer } from '@/lib/database.types';
 import { computeLifetimeValue } from '@/lib/visits';
+import { fetchAll } from '@/lib/fetch-all';
 
 export type SegmentField = 'days_since_last_visit' | 'lifetime_value' | 'visit_count' | 'tag';
 export type SegmentOperator = 'gt' | 'lt' | 'gte' | 'lte' | 'eq';
@@ -62,26 +63,40 @@ function matchesCondition(metrics: CustomerMetrics, condition: SegmentCondition)
  * Fine for SMB-scale data volumes; would need to move to a SQL-level
  * query (or a materialized rollup) before this approach stops scaling.
  */
+export type SegmentInputs = {
+  customers: Customer[];
+  visits: { customer_id: string; visited_at: string; price: number | null }[];
+  tags: { customer_id: string; tag: string }[];
+};
+
+/** Loads everything segment rules need, once, with paging past the 1000-row response cap. */
+export async function loadSegmentInputs(supabase: SupabaseClient<Database>, businessId: string): Promise<SegmentInputs> {
+  const [customers, visits, tags] = await Promise.all([
+    fetchAll((from, to) => supabase.from('customers').select('*').eq('business_id', businessId).order('id').range(from, to)),
+    fetchAll((from, to) => supabase.from('visits').select('customer_id, visited_at, price').eq('business_id', businessId).order('id').range(from, to)),
+    fetchAll((from, to) => supabase.from('customer_tags').select('customer_id, tag').eq('business_id', businessId).order('customer_id').order('tag').range(from, to)).catch(() => []),
+  ]);
+  return { customers, visits, tags };
+}
+
+/** Pass `inputs` when evaluating several segments so the data is loaded once, not once per segment. */
 export async function evaluateSegment(
   supabase: SupabaseClient<Database>,
   businessId: string,
-  conditions: SegmentCondition[]
+  conditions: SegmentCondition[],
+  inputs?: SegmentInputs
 ): Promise<Customer[]> {
-  const [{ data: customers }, { data: visits }, { data: tags }] = await Promise.all([
-    supabase.from('customers').select('*').eq('business_id', businessId),
-    supabase.from('visits').select('customer_id, visited_at, price').eq('business_id', businessId),
-    supabase.from('customer_tags').select('customer_id, tag').eq('business_id', businessId),
-  ]);
+  const { customers, visits, tags } = inputs ?? (await loadSegmentInputs(supabase, businessId));
 
   const visitsByCustomer = new Map<string, { visited_at: string; price: number | null }[]>();
-  for (const visit of visits ?? []) {
+  for (const visit of visits) {
     const list = visitsByCustomer.get(visit.customer_id) ?? [];
     list.push(visit);
     visitsByCustomer.set(visit.customer_id, list);
   }
 
   const tagsByCustomer = new Map<string, string[]>();
-  for (const tag of tags ?? []) {
+  for (const tag of tags) {
     const list = tagsByCustomer.get(tag.customer_id) ?? [];
     list.push(tag.tag);
     tagsByCustomer.set(tag.customer_id, list);
@@ -89,7 +104,7 @@ export async function evaluateSegment(
 
   const now = Date.now();
 
-  const metricsList: CustomerMetrics[] = (customers ?? []).map((customer) => {
+  const metricsList: CustomerMetrics[] = customers.map((customer) => {
     const customerVisits = visitsByCustomer.get(customer.id) ?? [];
     const mostRecent = customerVisits
       .slice()

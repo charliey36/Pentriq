@@ -11,8 +11,8 @@ export const maxDuration = 60;
  * call it every 6 hours from Vercel Pro or an external scheduler): synchronises Google reviews
  * for every connected business — fetches new/modified reviews, recalculates
  * statistics, stores the daily snapshot and raises alerts. Protected by
- * CRON_SECRET like the other scheduled endpoints (`?secret=` or
- * `Authorization: Bearer`; Vercel Cron sends the latter automatically).
+ * CRON_SECRET like the other scheduled endpoints (`Authorization: Bearer`, which
+ * Vercel Cron sends automatically).
  */
 export async function GET(request: NextRequest) {
   const expectedSecret = process.env.CRON_SECRET;

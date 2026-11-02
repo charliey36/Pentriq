@@ -98,8 +98,8 @@ async function callModel(model: string, prompt: string): Promise<string> {
  * attempt number, outcome, elapsed time). Rethrows the last error if all
  * attempts fail, or immediately rethrows non-retryable errors.
  */
-async function callModelWithRetries(model: string, prompt: string): Promise<string> {
-  const maxAttempts = RETRY_DELAYS_MS.length + 1;
+async function callModelWithRetries(model: string, prompt: string, retryDelays: number[] = RETRY_DELAYS_MS): Promise<string> {
+  const maxAttempts = retryDelays.length + 1;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const attemptStart = Date.now();
@@ -122,7 +122,7 @@ async function callModelWithRetries(model: string, prompt: string): Promise<stri
         throw error;
       }
 
-      const delayMs = RETRY_DELAYS_MS[attempt - 1];
+      const delayMs = retryDelays[attempt - 1];
       console.log(`[gemini] model=${model} retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxAttempts})`);
       await sleep(delayMs);
     }
@@ -144,7 +144,9 @@ async function callModelWithRetries(model: string, prompt: string): Promise<stri
  * Throws an Error with a short, user-friendly message — callers can show
  * `error.message` directly in the UI.
  */
-export async function generateGeminiText(prompt: string): Promise<string> {
+export async function generateGeminiText(prompt: string, options: { quick?: boolean } = {}): Promise<string> {
+  // Interactive callers (a user waiting on a button) use one short retry per model instead of ~17s of backoff.
+  const delays = options.quick ? [1000] : RETRY_DELAYS_MS;
   const trimmed = prompt.trim();
   if (!trimmed) {
     throw new Error('Prompt must not be empty.');
@@ -154,7 +156,7 @@ export async function generateGeminiText(prompt: string): Promise<string> {
   console.log(`[gemini] request started selectedModel=${PRIMARY_MODEL}`);
 
   try {
-    const text = await callModelWithRetries(PRIMARY_MODEL, trimmed);
+    const text = await callModelWithRetries(PRIMARY_MODEL, trimmed, delays);
     console.log(`[gemini] request completed model=${PRIMARY_MODEL} totalTimeMs=${Date.now() - overallStart}`);
     return text;
   } catch (primaryError) {
@@ -165,7 +167,7 @@ export async function generateGeminiText(prompt: string): Promise<string> {
     console.log(`[gemini] primary model ${PRIMARY_MODEL} exhausted retries, falling back to ${FALLBACK_MODEL}`);
 
     try {
-      const text = await callModelWithRetries(FALLBACK_MODEL, trimmed);
+      const text = await callModelWithRetries(FALLBACK_MODEL, trimmed, delays);
       console.log(`[gemini] request completed model=${FALLBACK_MODEL} totalTimeMs=${Date.now() - overallStart}`);
       return text;
     } catch (fallbackError) {

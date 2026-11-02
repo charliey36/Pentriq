@@ -8,6 +8,7 @@ import { getStripe } from '@/lib/stripe';
 import { stripeConfigured } from '@/lib/billing';
 import { decryptToken } from '@/lib/google-token-crypto';
 import { revokeToken } from '@/lib/google-business';
+import { recordAudit } from '@/lib/audit';
 import { DELETE_CONFIRMATION } from './constants';
 
 export type DeleteAccountResult = { error?: string };
@@ -93,6 +94,8 @@ export async function deleteAccount(_prev: DeleteAccountResult, fd: FormData): P
     console.error('[account-delete] deleteUser failed:', userError.message);
     return { error: 'Could not delete your account. Nothing further has been removed; please try again or contact support.' };
   }
+  // Kept after deletion on purpose (no business_id, so it is not cascaded away): ids only, no personal data.
+  await recordAudit({ action: 'account.deleted', actorId: user.id, targetType: 'business', targetId: business.id });
   // Belt and braces in case the cascade is missing on an older database.
   await admin.from('businesses').delete().eq('id', business.id);
 

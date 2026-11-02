@@ -23,14 +23,18 @@ const baseConfig = {
   },
   async headers() {
     return [
+      // The review widget is meant to be embedded on other sites, so it alone omits the framing restriction.
+      { source: '/widget/:path*', headers: [{ key: 'X-Content-Type-Options', value: 'nosniff' }, { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' }, { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' }] },
       {
-        source: '/:path*',
+        source: '/:path((?!widget/).*)',
         headers: [
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
           { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
+          // Report-only: surfaces violations in the browser console without breaking Stripe/Sentry/Google. Promote to enforcing once clean.
+          { key: 'Content-Security-Policy-Report-Only', value: "default-src 'self'; base-uri 'self'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; frame-ancestors 'self'; object-src 'none'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://js.stripe.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://api.stripe.com" },
         ],
       },
     ];

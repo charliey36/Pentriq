@@ -32,6 +32,8 @@ export type SendMessageParams = {
   html?: string;
   text: string;
   listUnsubscribeUrl?: string;
+  /** The business's own contact email: customer replies go here instead of the platform's sending address. */
+  replyTo?: string | null;
 };
 
 export class MessageSendError extends Error {}
@@ -65,6 +67,7 @@ async function sendEmail(params: SendMessageParams, fromLabel: string) {
     subject: params.subject ?? '',
     html: params.html ?? `<p>${escapeHtml(params.text)}</p>`,
     text: params.text,
+    ...(params.replyTo ? { replyTo: params.replyTo } : {}),
     headers: params.listUnsubscribeUrl
       ? { 'List-Unsubscribe': `<${params.listUnsubscribeUrl}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' }
       : undefined,
@@ -98,10 +101,8 @@ export interface SmsProvider {
  * message server-side instead of delivering it, and marks the send
  * successful so the rest of the pipeline (retry logic, status tracking,
  * journey advancement) can be fully exercised and tested without a live
- * Twilio account. Swapped out automatically once TWILIO_ACCOUNT_SID /
- * TWILIO_AUTH_TOKEN / TWILIO_FROM_NUMBER are all set (see
- * `createSmsProvider`), at which point it should be replaced with a real
- * Twilio REST API call using those credentials.
+ * Twilio account. Replaced by `TwilioSmsProvider` automatically once
+ * TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_FROM_NUMBER are all set.
  */
 class LoggingStubSmsProvider implements SmsProvider {
   async send(params: { to: string; body: string; whatsapp: boolean }): Promise<void> {
@@ -112,21 +113,50 @@ class LoggingStubSmsProvider implements SmsProvider {
   }
 }
 
-function createSmsProvider(): SmsProvider {
-  const hasTwilioCredentials =
-    process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER;
+type FetchLike = (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
 
-  if (!hasTwilioCredentials) {
-    return new LoggingStubSmsProvider();
+/**
+ * Twilio Programmable Messaging over its REST API (no SDK dependency).
+ * WhatsApp uses Twilio's `whatsapp:` address prefix; TWILIO_FROM_NUMBER is the
+ * sender for both (for WhatsApp it must be a WhatsApp-enabled sender).
+ * Not yet exercised against a live Twilio account: verify with a test number first.
+ */
+export class TwilioSmsProvider implements SmsProvider {
+  constructor(
+    private readonly accountSid: string,
+    private readonly authToken: string,
+    private readonly from: string,
+    private readonly fetchImpl: FetchLike = fetch as unknown as FetchLike
+  ) {}
+
+  async send(params: { to: string; body: string; whatsapp: boolean }): Promise<void> {
+    const prefix = params.whatsapp ? 'whatsapp:' : '';
+    const form = new URLSearchParams({ To: `${prefix}${params.to}`, From: `${prefix}${this.from}`, Body: params.body });
+    const res = await this.fetchImpl(`https://api.twilio.com/2010-04-01/Accounts/${this.accountSid}/Messages.json`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${this.accountSid}:${this.authToken}`).toString('base64')}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: form.toString(),
+    });
+    if (!res.ok) {
+      let reason = `HTTP ${res.status}`;
+      try {
+        const j = JSON.parse(await res.text()) as { message?: string; code?: number };
+        if (j.message) reason = `${j.message}${j.code ? ` (code ${j.code})` : ''}`;
+      } catch { /* keep HTTP status */ }
+      logEvent('sms', 'send_failed', { whatsapp: params.whatsapp, reason }, 'error');
+      throw new MessageSendError(`SMS provider rejected the message: ${reason}`);
+    }
+    logEvent('sms', 'sent', { whatsapp: params.whatsapp, length: params.body.length });
   }
+}
 
-  // Real Twilio wiring intentionally left unimplemented: this environment
-  // has no Twilio account to test against, and shipping an untested REST
-  // call would be worse than a clearly-logged stub. Once credentials exist,
-  // implement SmsProvider here using the `twilio` package's REST client
-  // (accountSid, authToken, from: TWILIO_FROM_NUMBER) and this function
-  // will pick it up automatically — no other code needs to change.
-  return new LoggingStubSmsProvider();
+export function createSmsProvider(env: NodeJS.ProcessEnv = process.env, fetchImpl?: FetchLike): SmsProvider {
+  const { TWILIO_ACCOUNT_SID: sid, TWILIO_AUTH_TOKEN: token, TWILIO_FROM_NUMBER: from } = env;
+  if (!sid || !token || !from) return new LoggingStubSmsProvider();
+  return new TwilioSmsProvider(sid, token, from, fetchImpl);
 }
 
 const smsProvider = createSmsProvider();

@@ -10,6 +10,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Visit } from '@/lib/database.types';
 import { computeLifetimeValue } from '@/lib/visits';
+import { chunkIds, fetchAll } from '@/lib/fetch-all';
 
 export type HealthScore = {
   score: number; // 0-100
@@ -109,28 +110,35 @@ export async function computeRevenueAttribution(
   supabase: SupabaseClient<Database>,
   businessId: string
 ): Promise<{ totalAttributed: number; attributedVisitCount: number }> {
-  const { data: clicks } = await supabase
-    .from('interaction_events')
-    .select('customer_id, occurred_at, message_id')
-    .eq('business_id', businessId)
-    .eq('event_type', 'click');
+  // Paged reads: a single query is silently capped at 1000 rows, which would understate revenue.
+  const clicks = await fetchAll((from, to) =>
+    supabase.from('interaction_events').select('customer_id, occurred_at, message_id').eq('business_id', businessId).eq('event_type', 'click').order('id').range(from, to)
+  );
 
-  const messageIds = [...new Set((clicks ?? []).map((c) => c.message_id).filter(Boolean))] as string[];
-  const { data: rebookingMessages } = messageIds.length
-    ? await supabase.from('messages').select('id').in('id', messageIds).eq('purpose', 'rebooking_reminder')
-    : { data: [] };
+  const messageIds = [...new Set(clicks.map((c) => c.message_id).filter(Boolean))] as string[];
+  const rebookingMessages: Array<{ id: string }> = [];
+  for (const chunk of chunkIds(messageIds, 100)) {
+    const { data } = await supabase.from('messages').select('id').in('id', chunk).eq('purpose', 'rebooking_reminder');
+    rebookingMessages.push(...(data ?? []));
+  }
 
-  const rebookingMessageIds = new Set((rebookingMessages ?? []).map((m) => m.id));
-  const rebookingClicks = (clicks ?? []).filter((c) => c.message_id && rebookingMessageIds.has(c.message_id));
+  const rebookingMessageIds = new Set(rebookingMessages.map((m) => m.id));
+  const rebookingClicks = clicks.filter((c) => c.message_id && rebookingMessageIds.has(c.message_id));
 
   if (rebookingClicks.length === 0) {
     return { totalAttributed: 0, attributedVisitCount: 0 };
   }
 
-  const { data: visits } = await supabase
-    .from('visits')
-    .select('customer_id, visited_at, price')
-    .eq('business_id', businessId);
+  const visits = await fetchAll((from, to) =>
+    supabase.from('visits').select('customer_id, visited_at, price').eq('business_id', businessId).order('id').range(from, to)
+  );
+
+  const visitsByCustomer = new Map<string, typeof visits>();
+  for (const v of visits) {
+    const list = visitsByCustomer.get(v.customer_id);
+    if (list) list.push(v);
+    else visitsByCustomer.set(v.customer_id, [v]);
+  }
 
   let totalAttributed = 0;
   let attributedVisitCount = 0;
@@ -140,9 +148,8 @@ export async function computeRevenueAttribution(
     if (!click.customer_id) continue;
     const clickTime = new Date(click.occurred_at).getTime();
 
-    const matchingVisit = (visits ?? []).find(
+    const matchingVisit = (visitsByCustomer.get(click.customer_id) ?? []).find(
       (v) =>
-        v.customer_id === click.customer_id &&
         new Date(v.visited_at).getTime() >= clickTime &&
         new Date(v.visited_at).getTime() - clickTime <= sevenDaysMs
     );

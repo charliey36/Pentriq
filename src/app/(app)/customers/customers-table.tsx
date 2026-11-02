@@ -211,8 +211,8 @@ export function CustomersTable({ rows }: { rows: CustomerRow[] }) {
       {rows.length > 0 && (
         <div className="border-t border-line bg-surface-subtle px-5 py-3 text-xs text-ink-3 sm:px-6">
           {isFiltering
-            ? `Showing ${visible.length.toLocaleString('en-US')} of ${rows.length.toLocaleString('en-US')} customers`
-            : `${rows.length.toLocaleString('en-US')} ${rows.length === 1 ? 'customer' : 'customers'}`}
+            ? `Showing ${visible.length.toLocaleString('en-GB')} of ${rows.length.toLocaleString('en-GB')} customers`
+            : `${rows.length.toLocaleString('en-GB')} ${rows.length === 1 ? 'customer' : 'customers'}`}
         </div>
       )}
     </section>

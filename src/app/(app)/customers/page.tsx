@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/icons';
 import { AddCustomerPanel } from './add-customer-panel';
 import { CustomersTable, type CustomerRow } from './customers-table';
 import { SendHeldButton } from './review-row-actions';
+import { fetchAll } from '@/lib/fetch-all';
 import { formatUKDate, formatUKDateTime } from '@/lib/uk-defaults';
 
 export const metadata: Metadata = { title: 'Customers' };
@@ -27,15 +28,16 @@ export default async function CustomersPage({
   const business = await requireBusiness();
   const supabase = createClient();
 
-  const { data: customers, error } = await supabase
-    .from('customers')
-    .select('id, name, email, created_at, review_requests(status, send_at, sent_at)')
-    .eq('business_id', business.id)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    throw new Error(`Failed to load customers: ${error.message}`);
-  }
+  // Paged read: a single query is capped at 1000 rows, which used to hide customers beyond that and misreport the total.
+  const customers = await fetchAll((from, to) =>
+    supabase
+      .from('customers')
+      .select('id, name, email, created_at, review_requests(status, send_at, sent_at)')
+      .eq('business_id', business.id)
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(from, to)
+  );
 
   // Latest review request per customer from the import / scheduling pipeline.
   const { data: reviewMessages } = await supabase
@@ -53,7 +55,7 @@ export default async function CustomersPage({
   // Dates are formatted here (server) and passed down as strings: formatting
   // in the client component would differ between server and browser locale
   // and trigger hydration mismatches.
-  const rows: CustomerRow[] = (customers ?? []).map((customer) => {
+  const rows: CustomerRow[] = customers.map((customer) => {
     const request = Array.isArray(customer.review_requests)
       ? customer.review_requests[0]
       : customer.review_requests;
@@ -101,7 +103,7 @@ export default async function CustomersPage({
         title="Customers"
         icon="users"
         tone="sky"
-        description={`${rows.length.toLocaleString('en-US')} ${
+        description={`${rows.length.toLocaleString('en-GB')} ${
           rows.length === 1 ? 'customer' : 'customers'
         }. Review requests are sent automatically at 8:00am, ${business.review_request_window_days ?? 1} ${(business.review_request_window_days ?? 1) === 1 ? 'day' : 'days'} after a completed service.`}
         actions={

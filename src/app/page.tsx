@@ -13,6 +13,8 @@ import { ThemeToggleButton } from '@/components/theme-toggle-button';
 import { Icon, type IconName } from '@/components/ui/icons';
 import { toneStyle, type Tone } from '@/components/ui/tones';
 import { ProductPreview } from '@/components/marketing/product-preview';
+import { INDUSTRIES } from '@/lib/industries';
+import { PLAN } from '@/lib/billing';
 
 export const metadata: Metadata = pageMetadata({
   title: APP_TITLE,
@@ -148,7 +150,7 @@ export default async function HomePage() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-60" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-500" />
               </span>
-              AI-powered reputation management
+              Reviews and rebooking for local businesses
             </p>
 
             <h1 className="mx-auto mt-7 max-w-4xl animate-fade-in-up text-balance text-[42px] font-semibold leading-[1.04] tracking-[-0.045em] text-ink [animation-delay:60ms] sm:text-6xl lg:text-[76px]">
@@ -159,14 +161,14 @@ export default async function HomePage() {
             </h1>
 
             <p className="mx-auto mt-6 max-w-2xl animate-fade-in-up text-pretty text-base leading-7 text-ink-3 [animation-delay:120ms] sm:text-lg sm:leading-8">
-              Pentriq is an AI-powered reputation management platform that helps you collect, monitor,
-              analyse and improve customer reviews &mdash; and brings customers back for their next
-              visit &mdash; so your reputation and repeat revenue grow without the manual follow-up.
+              Pentriq asks every customer for a Google review at the right moment, gives them a private way
+              to tell you if something went wrong, and reminds them when it is time to rebook. Built for UK
+              salons, clinics, garages and local trades.
             </p>
 
             <div className="mt-9 flex animate-fade-in-up flex-wrap items-center justify-center gap-3 [animation-delay:180ms]">
               <Link href="/signup" className="btn btn-primary btn-lg">
-                Get started
+                Start your free trial
                 <Icon name="arrowRight" className="h-4 w-4" strokeWidth={2} />
               </Link>
               <a href="#how-it-works" className="btn btn-secondary btn-lg">
@@ -187,11 +189,10 @@ export default async function HomePage() {
               ))}
             </ul>
 
-            {/* Early-access offer: limited-time 30-day free trial, claimable on account creation. */}
+            {/* The trial starts automatically when setup is finished; no card is taken. */}
             <p className="mx-auto mt-6 max-w-2xl animate-fade-in-up text-sm text-ink-3 [animation-delay:200ms]">
-              <span className="font-semibold text-brand-600 dark:text-brand-400">Early access:</span>{' '}
-              for a limited time, new businesses can claim a <span className="font-semibold">30-day free trial</span>{' '}
-              &mdash; available as soon as you create your account.
+              <span className="font-semibold text-brand-600 dark:text-brand-400">30-day free trial.</span>{' '}
+              No card needed. Then {PLAN.currency}{PLAN.priceMonthly} a month, cancel any time.
             </p>
 
             <div className="relative mx-auto mt-16 max-w-5xl animate-fade-in-up [animation-delay:240ms]">
@@ -255,6 +256,20 @@ export default async function HomePage() {
                   </span>
                   <h3 className="mt-6 text-[17px] font-semibold tracking-[-0.02em] text-ink">{feature.title}</h3>
                   <p className="mt-2 text-sm leading-6 text-ink-3">{feature.description}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        {/* Industries */}
+        <section aria-labelledby="home-industries" className="px-4 pb-20 sm:px-6 sm:pb-28 lg:px-8">
+          <div className="mx-auto max-w-6xl">
+            <SectionHeading eyebrow="Industries" title="Built for local service businesses" />
+            <ul id="home-industries" className="mt-10 flex flex-wrap justify-center gap-3">
+              {INDUSTRIES.map((i) => (
+                <li key={i.slug}>
+                  <Link href={`/for/${i.slug}`} className="inline-block rounded-full border border-line bg-surface px-4 py-2 text-sm font-medium text-ink-2 transition-colors hover:text-ink">{i.plural}</Link>
                 </li>
               ))}
             </ul>

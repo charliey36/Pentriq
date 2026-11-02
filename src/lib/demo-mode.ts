@@ -7,26 +7,22 @@
  */
 
 /**
- * Detect if an email is a demo/test account.
- * Demo accounts are typically used for seeding and testing:
- * - *.example.com addresses
- * - demo@pentriq.app
- * - test@ addresses
- * - localhost emails
+ * Detect if an email is a demo/test account: ONLY reserved documentation/test domains
+ * (RFC 2606 / 6761, e.g. example.com, anything.test, localhost) and the dedicated demo mailbox.
+ *
+ * It must never match on substrings of real addresses: an earlier version treated any address
+ * containing "demo" or "test" (contest.winner@gmail.com, latest@..., demolition-ltd.co.uk) as a demo
+ * and faked a successful send, so real customers silently never received their review request.
  */
+const DEMO_DOMAINS = ['example.com', 'example.org', 'example.net', 'example', 'test', 'invalid', 'localhost'];
+
 export function isDemoEmail(email: string | null | undefined): boolean {
-  if (!email) return false;
-  
-  const lowerEmail = email.toLowerCase();
-  
-  return (
-    lowerEmail.includes('@example.com') ||
-    lowerEmail === 'demo@pentriq.app' ||
-    lowerEmail.startsWith('test@') ||
-    lowerEmail.endsWith('@localhost') ||
-    lowerEmail.includes('demo') && lowerEmail.includes('@') ||
-    lowerEmail.includes('test') && lowerEmail.includes('@') && !lowerEmail.includes('test.com')
-  );
+  const value = (email ?? '').trim().toLowerCase();
+  const at = value.lastIndexOf('@');
+  if (at < 1) return false;
+  if (value === 'demo@pentriq.app') return true;
+  const domain = value.slice(at + 1);
+  return DEMO_DOMAINS.some((d) => domain === d || domain.endsWith(`.${d}`));
 }
 
 /**

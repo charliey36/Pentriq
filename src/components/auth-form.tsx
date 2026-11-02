@@ -21,6 +21,18 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
+  // Shown only when Google sign-in is switched on for the Supabase project (NEXT_PUBLIC_GOOGLE_SIGNIN=1).
+  const googleEnabled = process.env.NEXT_PUBLIC_GOOGLE_SIGNIN === '1';
+
+  async function signInWithGoogle() {
+    setError(null);
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=/onboarding` },
+    });
+    if (oauthError) setError(oauthError.message);
+  }
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
@@ -33,7 +45,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
           },
         });
         if (signUpError) throw signUpError;
@@ -43,10 +55,11 @@ export function AuthForm({ mode }: { mode: Mode }) {
         // message asking them to check their inbox.
         const { data: sessionData } = await supabase.auth.getSession();
         if (sessionData.session) {
-          router.push('/dashboard');
+          // New accounts go straight to the guided first send (it also starts the free trial).
+          router.push('/onboarding');
           router.refresh();
         } else {
-          setMessage('Account created. Check your email to confirm, then log in.');
+          setMessage('Account created. Check your email for a confirmation link (look in spam if it does not arrive), then you can finish setup.');
         }
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -93,12 +106,12 @@ export function AuthForm({ mode }: { mode: Mode }) {
             name="password"
             type={showPassword ? 'text' : 'password'}
             required
-            minLength={6}
+            minLength={mode === 'signup' ? 8 : 6}
             autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="input py-2.5 pr-11"
-            placeholder={mode === 'signup' ? 'At least 6 characters' : 'Your password'}
+            placeholder={mode === 'signup' ? 'At least 8 characters' : 'Your password'}
           />
           <button
             type="button"
@@ -123,6 +136,14 @@ export function AuthForm({ mode }: { mode: Mode }) {
       {error && <Notice variant="error">{error}</Notice>}
       {message && <Notice variant="success">{message}</Notice>}
 
+      {mode === 'signup' && (
+        <p className="text-xs leading-5 text-ink-4">
+          By creating an account you agree to our{' '}
+          <Link href="/terms" className="underline underline-offset-2 hover:text-ink-2">Terms</Link> and{' '}
+          <Link href="/privacy" className="underline underline-offset-2 hover:text-ink-2">Privacy Policy</Link>.
+        </p>
+      )}
+
       <button type="submit" disabled={loading} aria-busy={loading} className="btn btn-primary btn-lg w-full">
         {loading ? (
           <>
@@ -135,6 +156,16 @@ export function AuthForm({ mode }: { mode: Mode }) {
           'Log in'
         )}
       </button>
+      {googleEnabled && (
+        <>
+          <div className="flex items-center gap-3 text-xs text-ink-4" aria-hidden="true">
+            <span className="h-px flex-1 bg-line" /> or <span className="h-px flex-1 bg-line" />
+          </div>
+          <button type="button" onClick={signInWithGoogle} disabled={loading} className="btn btn-secondary btn-lg w-full">
+            Continue with Google
+          </button>
+        </>
+      )}
     </form>
   );
 }

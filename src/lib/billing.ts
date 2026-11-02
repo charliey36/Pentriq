@@ -8,18 +8,29 @@ export const PLAN = {
   priceMonthly: 19,
   currency: '£',
   perks: [
-    'Unlimited customers and review requests',
-    'Automatic email follow-up reminders',
-    'Private feedback inbox',
-    'Analytics and reporting',
+    'Unlimited customers and review requests, no per-message fees',
+    'Automatic Google review requests with two follow-up reminders',
+    'Private feedback inbox on every request',
+    'Rebooking and win-back reminders for lapsed customers',
+    'Google reviews sync, rating alerts and reply from Pentriq',
+    'Loyalty points, referral codes and customer segments',
+    'CSV import, plus Square, Acuity and Calendly sync',
+    'QR code and a reviews widget for your website',
+    'Analytics, weekly summary email and full data export',
   ],
+
 };
 
 export const TRIAL_DAYS = 30;
-export const BILLING_OVERRIDE_EMAIL = 'charlieyoults123@gmail.com';
-
-export function isBillingOverrideEmail(email: string | null | undefined): boolean {
-  return email?.trim().toLowerCase() === BILLING_OVERRIDE_EMAIL;
+/**
+ * Accounts that never need to pay (the operator's own / internal accounts). Comma-separated list in
+ * the BILLING_OVERRIDE_EMAILS environment variable. Deliberately NOT hard-coded: a deployment with
+ * the variable unset has no free-access accounts at all.
+ */
+export function isBillingOverrideEmail(email: string | null | undefined, env: NodeJS.ProcessEnv = process.env): boolean {
+  const raw = env.BILLING_OVERRIDE_EMAILS;
+  if (!raw || !email) return false;
+  return raw.split(',').map((v) => v.trim().toLowerCase()).filter(Boolean).includes(email.trim().toLowerCase());
 }
 
 export type BillingState = {
@@ -96,7 +107,7 @@ export const SUBSCRIPTION_REQUIRED_MESSAGE =
   'Your free trial has ended. Subscribe in Settings → Billing to keep sending messages.';
 
 export const TRIAL_NOT_STARTED_MESSAGE =
-  'Start your 30-day free trial (or subscribe) in Settings → Billing to begin sending messages.';
+  'Finish setup to start your 30-day free trial (or subscribe in Settings → Billing) and begin sending messages.';
 
 /** Throws-free guard for send paths: returns an error string when blocked. */
 export function sendBlockedReason(b: BillingInput, now = new Date(), ownerEmail?: string): string | null {

@@ -1,0 +1,104 @@
+# Harvey configuration for selling Pentriq to UK local service businesses.
+# Copy to the root of your harvey checkout as harvey.local.yaml (it wins over harvey.yaml).
+# Every value marked CHANGE ME must be filled in by you before the first campaign.
+# Nothing here sends anything: require_approval stays true so each email waits in the Outbox.
+
+persona:
+  name: "CHANGE ME (your first name)"
+  company: "Pentriq"
+  role: "Founder"
+  email: "CHANGE_ME@your-dedicated-sending-domain.example"   # NOT pentriq.cloud: use a separate, warmed-up domain
+  linkedin: ""
+  tone: "friendly, plain-spoken, brief, UK English"
+
+product:
+  name: "Pentriq"
+  description: >-
+    Pentriq helps UK local service businesses get more Google reviews and more repeat customers.
+    It sends each customer a review request automatically after their visit, with two gentle follow-ups
+    that stop when they respond. Every request also offers a private feedback option, so problems reach
+    the owner first. It reminds customers when it is time to rebook, and shows which reminders led to
+    return visits. Setup takes a few minutes, with presets for salons, barbers, dentists, vets, garages,
+    heating engineers, groomers and trainers.
+  pricing: "£19 a month, one plan, no per-message fees. 30-day free trial, no card needed."
+  key_benefits:
+    - "Asks every customer for a Google review automatically, so happy customers are not missed"
+    - "Private feedback option on every request, so concerns reach you before they become public reviews"
+    - "Rebooking reminders bring customers back at the right time"
+  objection_responses:
+    "too expensive": "It is a flat £19 a month with no per-message charges, and the dashboard shows an estimate of the revenue that followed each reminder, so you can see whether it pays for itself. The first 30 days are free."
+    "already have a solution": "That makes sense. What is the one thing you wish it did better? Pentriq is aimed at the review request and rebooking side, so it may sit alongside what you use."
+    "not interested": "No problem at all, thanks for letting me know."
+    "no time": "Understood. Setup is a few minutes: pick your trade, paste your Google review link, add a first customer."
+  offer:
+    primary: "Pentriq at £19 a month"
+    entry: "30-day free trial, no card needed"
+    goal: "start_trial"
+    booking_method: "calendar_link"
+    booking_url: "https://pentriq.cloud/signup"
+    meeting_duration: "10 minutes"
+    meeting_owner: "CHANGE ME"
+
+icp:
+  industries:
+    - "Hair salon"
+    - "Barber"
+    - "Beauty salon"
+    - "Dental practice"
+    - "Physiotherapy clinic"
+    - "Veterinary practice"
+    - "Garage"
+    - "Heating engineer"
+    - "Dog groomer"
+    - "Personal trainer"
+  company_size: "1-20 employees"
+  titles:
+    - "Owner"
+    - "Director"
+    - "Practice Manager"
+    - "Salon Owner"
+    - "Managing Director"
+  geography:
+    - "United Kingdom"
+  hiring_signals: []
+
+channels:
+  email:
+    enabled: true
+    provider: "gmail"
+    max_daily_sends: 20          # a ceiling, not a target; start low
+    require_approval: true       # keep this on: review every email in the Outbox
+    send_to_risky: false
+    max_bounce_rate: 0.03
+    link_domains: ["pentriq.cloud"]
+    warmup:
+      start_date: ""             # CHANGE ME: the day your warmup service started (YYYY-MM-DD)
+      min_days: 14
+      start_sends: 5
+      daily_increase: 3
+    send_window:
+      start: "09:00"
+      end: "17:00"
+      weekdays_only: true
+      recipient_timezone: false  # everyone is UK; use usage.quiet_hours.timezone
+  linkedin:
+    enabled: false
+
+usage:
+  max_daily_claude_percent: 50   # leave plenty of quota for your own work
+  heartbeat_interval_minutes: 15
+  quiet_hours:
+    start: "19:00"
+    end: "08:00"
+    timezone: "Europe/London"
+
+compliance:
+  postal_address: "CHANGE ME: a postal address you receive mail at (street, PO box or virtual mailbox)"
+  opt_out_line: 'Not interested? Reply "no thanks" and I won''t email again.'
+  do_not_contact:
+    - "pentriq.cloud"            # never email yourself or your existing customers; add their domains/addresses here
+  precleared:
+    enabled: true                # checks each recipient against UK PECR before the first cold email
+    sender_country: "GB"
+    address_source: "published"  # CHANGE ME if wrong: published | bought | scraped | given | unknown
+    prospect_country: "GB"

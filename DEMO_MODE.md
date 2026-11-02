@@ -21,9 +21,7 @@ Real customers (after you add a proper domain) continue to send via Resend norma
 These emails are treated as demo accounts:
 - `*.example.com` (seed data)
 - `demo@pentriq.app` (test account)
-- `test@*` (test accounts)
-- `*@localhost` (development)
-- Any email with "demo" or "test" in it
+- `*.test`, `*.invalid`, `localhost` (reserved test domains)
 
 ## Console Output
 

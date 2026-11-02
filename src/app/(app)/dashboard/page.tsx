@@ -2,7 +2,10 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { getAuthUser, isAdminEmail, requireBusiness } from '@/lib/business';
-import { getBillingState } from '@/lib/billing';
+import { getBillingState, PLAN } from '@/lib/billing';
+import { computeRevenueAttribution } from '@/lib/health';
+import { monthsBetween, summariseImpact } from '@/lib/impact';
+import { ImpactCard } from '@/components/dashboard/impact-card';
 import { SETUP_COLLAPSED_COOKIE } from '@/lib/brand';
 import { createClient } from '@/lib/supabase/server';
 import { bucketDaily, splitPeriods } from '@/lib/trends';
@@ -159,6 +162,7 @@ export default async function DashboardPage() {
     )
   );
   const pipeline = await loadPipelineStats(supabase, business.id);
+  const revenue = await computeRevenueAttribution(supabase, business.id).catch(() => ({ totalAttributed: 0, attributedVisitCount: 0 }));
   const sent = (emailsSentCount.count ?? 0) + (queueSent.count ?? 0);
   const clicks = clicksCount;
   const delivered = deliveredFromSent(sent);
@@ -291,7 +295,7 @@ export default async function DashboardPage() {
   const businessLabel = business.name?.trim() || 'your business';
   const summary =
     sent > 0
-      ? `${sent.toLocaleString('en-US')} review requests sent \u00b7 ${clickRate}% clicked through to your review page.`
+      ? `${sent.toLocaleString('en-GB')} review requests sent \u00b7 ${clickRate}% clicked through to your review page.`
       : 'Add your first customer and Pentriq takes it from there \u2014 requests, reminders and tracking.';
 
   return (
@@ -438,12 +442,26 @@ export default async function DashboardPage() {
           icon="chart"
           hint={
             sent > 0
-              ? `${clicks.toLocaleString('en-US')} clicks from ${delivered.toLocaleString('en-US')} delivered emails`
+              ? `${clicks.toLocaleString('en-GB')} clicks from ${delivered.toLocaleString('en-GB')} delivered emails`
               : 'Needs at least one sent request'
           }
         />
       </div>
 
+      <ImpactCard
+        summary={summariseImpact({
+          attributedRevenue: revenue.totalAttributed,
+          attributedVisits: revenue.attributedVisitCount,
+          reviewsCompleted: pipeline.reviewsCompleted,
+          requestsSent: pipeline.requestsSent,
+          monthlyPrice: PLAN.priceMonthly,
+          monthsActive: monthsBetween(new Date(business.created_at), new Date()),
+        })}
+        attributedRevenue={revenue.totalAttributed}
+        reviewsCompleted={pipeline.reviewsCompleted}
+        monthlyPrice={PLAN.priceMonthly}
+        currency={PLAN.currency}
+      />
       <ReviewPipeline stats={pipeline} remindersEnabled={business.review_reminders_enabled ?? true} />
 
       {/* Activity + funnel */}
@@ -501,14 +519,14 @@ export default async function DashboardPage() {
                     <span className="h-2 w-2 rounded-full bg-brand-200 dark:bg-brand-700" />
                     Sent
                   </dt>
-                  <dd className="font-semibold tabular-nums text-ink">{sent.toLocaleString('en-US')}</dd>
+                  <dd className="font-semibold tabular-nums text-ink">{sent.toLocaleString('en-GB')}</dd>
                 </div>
                 <div className="flex items-center justify-between" title="Accepted by the email provider. Bounce tracking isn't connected yet, so this equals Sent.">
                   <dt className="flex items-center gap-2 text-ink-3">
                     <span className="h-2 w-2 rounded-full bg-sky-400" />
                     Delivered
                   </dt>
-                  <dd className="font-semibold tabular-nums text-ink">{delivered.toLocaleString('en-US')}</dd>
+                  <dd className="font-semibold tabular-nums text-ink">{delivered.toLocaleString('en-GB')}</dd>
                 </div>
                 <div className="flex items-center justify-between" title="Open tracking isn't supported.">
                   <dt className="flex items-center gap-2 text-ink-3">
@@ -523,9 +541,9 @@ export default async function DashboardPage() {
                     Clicked
                   </dt>
                   <dd className="font-semibold tabular-nums text-ink">
-                    {clicks.toLocaleString('en-US')}
+                    {clicks.toLocaleString('en-GB')}
                     {uniqueClicked > 0 && uniqueClicked !== clicks && (
-                      <span className="ml-1.5 text-xs font-normal text-ink-4">({uniqueClicked.toLocaleString('en-US')} unique)</span>
+                      <span className="ml-1.5 text-xs font-normal text-ink-4">({uniqueClicked.toLocaleString('en-GB')} unique)</span>
                     )}
                   </dd>
                 </div>
@@ -534,7 +552,7 @@ export default async function DashboardPage() {
                     <span className="h-2 w-2 rounded-full bg-violet-500" />
                     Reviews received
                   </dt>
-                  <dd className="font-semibold tabular-nums text-ink">{reviewsReceived.toLocaleString('en-US')}</dd>
+                  <dd className="font-semibold tabular-nums text-ink">{reviewsReceived.toLocaleString('en-GB')}</dd>
                 </div>
                 {(pending > 0 || failed > 0) && (
                   <div className="flex flex-wrap gap-2 border-t border-line pt-3">

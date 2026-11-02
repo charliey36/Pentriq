@@ -37,7 +37,7 @@ function backoffMinutesFor(attempt: number) {
  * exponential backoff up to max_attempts before giving up permanently.
  *
  * Protected by CRON_SECRET so it can't be triggered by random visitors —
- * pass it as either `?secret=...` or an `Authorization: Bearer ...` header.
+ * pass it as an `Authorization: Bearer ...` header.
  * Configure Vercel Cron (see vercel.json) or any external scheduler to hit
  * this on an interval (e.g. every 5 minutes).
  */

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { requireBusiness } from '@/lib/business';
 import { createClient } from '@/lib/supabase/server';
-import { evaluateSegment, type SegmentCondition } from '@/lib/segments';
+import { evaluateSegment, loadSegmentInputs, type SegmentCondition } from '@/lib/segments';
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionCard } from '@/components/ui/section-card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -43,12 +43,15 @@ export default async function SegmentsPage() {
     .eq('business_id', business.id);
   const customerTotal = totalCustomers ?? 0;
 
+  // Load once and reuse for every segment (previously the whole customer/visit tables were re-read per segment).
+  const inputs = (segments ?? []).length > 0 ? await loadSegmentInputs(supabase, business.id) : undefined;
   const segmentsWithCounts = await Promise.all(
     (segments ?? []).map(async (segment) => {
       const members = await evaluateSegment(
         supabase,
         business.id,
-        segment.rule_definition as SegmentCondition[]
+        segment.rule_definition as SegmentCondition[],
+        inputs
       );
       return { ...segment, memberCount: members.length };
     })
@@ -97,7 +100,7 @@ export default async function SegmentsPage() {
 
                   <p className="mt-6 flex items-baseline gap-1.5">
                     <span className="text-4xl font-semibold tracking-[-0.035em] text-ink tabular-nums">
-                      {segment.memberCount.toLocaleString('en-US')}
+                      {segment.memberCount.toLocaleString('en-GB')}
                     </span>
                     <span className="text-[13px] text-ink-3">
                       {segment.memberCount === 1 ? 'customer' : 'customers'}
