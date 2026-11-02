@@ -1,3 +1,4 @@
+import { emitWebhookEvent } from '@/lib/webhooks';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { processServiceVisit } from '@/lib/review-automation';
 import { parseServiceDate } from '@/lib/eligibility';
@@ -45,6 +46,7 @@ export async function importServiceVisit(businessId: string, input: ServiceImpor
     if (error || !created) throw new Error('Could not create customer.');
     customerId = created.id;
     customerCreated = true;
+    await emitWebhookEvent(db as never, businessId, 'customer.created', { customer_id: created.id, name, email, source: 'api' });
   }
 
   // Same customer + date + amount = same visit (safe for retries).

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { requireBusiness } from '@/lib/business';
+import { requireAccess } from '@/lib/business';
+import { can } from '@/lib/permissions';
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/ui/page-header';
 import { Icon } from '@/components/ui/icons';
@@ -25,7 +26,7 @@ export default async function CustomersPage({
 }: {
   searchParams?: { add?: string };
 }) {
-  const business = await requireBusiness();
+  const { business, role } = await requireAccess();
   const supabase = createClient();
 
   // Paged read: a single query is capped at 1000 rows, which used to hide customers beyond that and misreport the total.
@@ -67,6 +68,7 @@ export default async function CustomersPage({
         name: customer.name,
         email: customer.email,
         addedLabel: formatDate(customer.created_at),
+      addedAt: customer.created_at,
         status: review.status === 'queued' ? 'held' : review.status,
         requestLabel:
           review.status === 'sent' && review.sent_at
@@ -85,6 +87,7 @@ export default async function CustomersPage({
       name: customer.name,
       email: customer.email,
       addedLabel: formatDate(customer.created_at),
+      addedAt: customer.created_at,
       status: request?.status ?? null,
       requestLabel: request
         ? request.status === 'sent' && request.sent_at
@@ -119,7 +122,7 @@ export default async function CustomersPage({
 
       <AddCustomerPanel defaultOpen={wantsAdd || rows.length === 0} autoFocus={wantsAdd} />
 
-      <CustomersTable rows={rows} />
+      <CustomersTable rows={rows} canExport={can(role, 'data.export')} />
     </div>
   );
 }

@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Icon, type IconName } from '@/components/ui/icons';
+import { useRole } from '@/components/role-context';
+import { can, type Capability } from '@/lib/permissions';
 
 type NavItem = {
   href: string;
@@ -10,6 +12,8 @@ type NavItem = {
   icon: IconName;
   /** Shows an unread count next to the label. */
   badge?: 'feedback' | 'reviews';
+  /** Hidden from roles without this capability (the server enforces it regardless). */
+  capability?: Capability;
 };
 
 export const navGroups: { label: string; items: NavItem[] }[] = [
@@ -35,7 +39,7 @@ export const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: 'Workspace',
     items: [
-      { href: '/settings', label: 'Settings', icon: 'cog' },
+      { href: '/settings', label: 'Settings', icon: 'cog', capability: 'settings.write' },
       { href: '/how-it-works', label: 'How it works', icon: 'lightbulb' },
     ],
   },
@@ -62,9 +66,13 @@ export function isActivePath(pathname: string, href: string) {
 export function SidebarNav({ feedbackCount = 0, reviewAlertCount = 0 }: { feedbackCount?: number; reviewAlertCount?: number }) {
   const pathname = usePathname();
   const router = useRouter();
+  const role = useRole();
+  const groups = navGroups
+    .map((g) => ({ ...g, items: g.items.filter((i) => !i.capability || role === null || can(role, i.capability)) }))
+    .filter((g) => g.items.length > 0);
 
   // The most specific matching item wins, so /customers/import doesn't also light up Customers.
-  const allHrefs = navGroups.flatMap((g) => g.items.map((i) => i.href));
+  const allHrefs = groups.flatMap((g) => g.items.map((i) => i.href));
   const activeHref = allHrefs
     .filter((h) => isActivePath(pathname, h))
     .sort((a, b) => b.length - a.length)[0];
@@ -80,7 +88,7 @@ export function SidebarNav({ feedbackCount = 0, reviewAlertCount = 0 }: { feedba
 
   return (
     <nav aria-label="Main" className="scroll-thin flex-1 overflow-y-auto px-3 pb-4 pt-2">
-      {navGroups.map((group) => (
+      {groups.map((group) => (
         <div key={group.label} className="mt-5 first:mt-2">
           <p className="eyebrow px-3 pb-2 text-ink-4">{group.label}</p>
           <ul className="space-y-1">

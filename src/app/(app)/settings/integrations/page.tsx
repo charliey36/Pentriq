@@ -20,6 +20,8 @@ import { GooglePanel, type GooglePanelState } from './google-panel';
 import { GoogleComingSoon } from './google-coming-soon';
 import { BookingPanel, type BookingCard } from './booking-panel';
 import { PROVIDER_LIST } from '@/lib/booking-sync/registry';
+import { WEBHOOK_EVENTS } from '@/lib/webhooks';
+import { WebhookPanel, type WebhookState } from './webhook-panel';
 
 export const metadata: Metadata = { title: 'Integrations' };
 
@@ -130,6 +132,12 @@ export default async function IntegrationsPage({
   const base = getAppUrl();
   const endpoint = `${base}/api/integrations/service-completed`;
 
+  const [{ data: hook }, { data: hookDeliveries }] = await Promise.all([
+    createAdminClient().from('webhook_endpoints').select('url, events, is_active, disabled_reason, last_success_at').eq('business_id', business.id).maybeSingle(),
+    createAdminClient().from('webhook_deliveries').select('id, event_type, status, http_status, error, duration_ms, created_at').eq('business_id', business.id).order('created_at', { ascending: false }).limit(15),
+  ]);
+  const webhook: WebhookState = hook ? { url: hook.url, events: hook.events, isActive: hook.is_active, disabledReason: hook.disabled_reason, lastSuccessAt: hook.last_success_at } : null;
+
   const { data: events } = await createAdminClient()
     .from('integration_events')
     .select('id, status, message, source, created_at')
@@ -194,6 +202,25 @@ export default async function IntegrationsPage({
 
         <SectionCard title="API key" description="Send it in the x-api-key header. Treat it like a password.">
           <ApiKeyPanel initialKey={newKey} prefix={info?.key_prefix ?? null} />
+        </SectionCard>
+
+        <SectionCard
+          title="Outgoing webhooks"
+          description="Tell Zapier, Make, n8n or your own system the moment something happens in Pentriq. Every request is signed so you can trust it."
+        >
+          <WebhookPanel initial={webhook} available={[...WEBHOOK_EVENTS]} />
+          {hookDeliveries && hookDeliveries.length > 0 && (
+            <ul className="mt-5 divide-y divide-line border-t border-line text-sm" aria-label="Recent webhook deliveries">
+              {hookDeliveries.map((d) => (
+                <li key={d.id} className="flex flex-wrap items-baseline gap-x-3 py-2">
+                  <span aria-label={d.status}>{d.status === 'succeeded' ? '✅' : '❌'}</span>
+                  <code className="text-xs">{d.event_type}</code>
+                  <span className="flex-1 text-ink-3">{d.status === 'succeeded' ? `HTTP ${d.http_status}` : d.error}{d.duration_ms != null && ` · ${d.duration_ms} ms`}</span>
+                  <time className="text-xs text-ink-4" dateTime={d.created_at}>{new Date(d.created_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</time>
+                </li>
+              ))}
+            </ul>
+          )}
         </SectionCard>
 
         <SectionCard

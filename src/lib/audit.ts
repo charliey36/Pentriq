@@ -17,7 +17,10 @@ export type AuditAction =
   | 'team.invitation_revoked'
   | 'team.joined'
   | 'team.role_changed'
-  | 'team.member_removed';
+  | 'team.member_removed'
+  | 'webhook.configured'
+  | 'webhook.secret_rotated'
+  | 'webhook.deleted';
 
 export type AuditEntry = {
   action: AuditAction;

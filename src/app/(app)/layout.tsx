@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { LegalLinks } from '@/components/legal-links';
 import { getBillingState } from '@/lib/billing';
-import { requireBusiness } from '@/lib/business';
+import { requireAccess } from '@/lib/business';
+import { RoleProvider } from '@/components/role-context';
 import { createClient } from '@/lib/supabase/server';
 import { ensureSchemaValidated } from '@/lib/schema-validation';
 import { logout } from '@/app/(app)/actions';
@@ -22,7 +23,7 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const business = await requireBusiness();
+  const { business, role } = await requireAccess();
   const supabase = createClient();
   
   const billing = getBillingState(business);
@@ -49,6 +50,7 @@ export default async function AppLayout({
   ]);
 
   return (
+    <RoleProvider role={role}>
     <SidebarProvider>
       <ToastProvider>
         <CommandPaletteProvider>
@@ -105,5 +107,6 @@ export default async function AppLayout({
         </CommandPaletteProvider>
       </ToastProvider>
     </SidebarProvider>
+    </RoleProvider>
   );
 }

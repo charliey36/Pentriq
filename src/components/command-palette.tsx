@@ -17,6 +17,8 @@ import { searchCustomers, type CustomerSearchResult } from '@/app/(app)/search-a
 import { useTheme } from '@/components/theme-context';
 import { Avatar } from '@/components/ui/avatar';
 import { Icon, type IconName } from '@/components/ui/icons';
+import { useRole } from '@/components/role-context';
+import { can, type Capability } from '@/lib/permissions';
 
 type Command = {
   id: string;
@@ -47,6 +49,15 @@ const GROUP_ORDER: Command['group'][] = ['Customers', 'Actions', 'Go to', 'Prefe
  * Focus stays in the search field while arrow keys move the highlight
  * (aria-activedescendant), Enter runs, Escape closes and restores focus.
  */
+const COMMAND_CAPABILITY: Record<string, Capability> = {
+  'go-settings': 'settings.write',
+  'go-services': 'settings.write',
+  'go-loyalty': 'settings.write',
+  'go-team': 'team.manage',
+  'go-integrations': 'integrations.manage',
+  'go-billing': 'billing.manage',
+};
+
 export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { theme, toggle } = useTheme();
@@ -125,7 +136,8 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
     [router]
   );
 
-  const commands = useMemo<Command[]>(() => {
+  const role = useRole();
+  const allCommands = useMemo<Command[]>(() => {
     const nav = (id: string, label: string, href: string, icon: IconName, keywords = ''): Command => ({
       id,
       group: 'Go to',
@@ -179,6 +191,9 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
       nav('go-settings', 'Settings', '/settings', 'cog', 'business profile delay google'),
       nav('go-services', 'Services', '/settings/services', 'tag', 'rebooking interval price'),
       nav('go-loyalty', 'Loyalty program', '/settings/loyalty', 'gift', 'points rewards'),
+      nav('go-team', 'Team & roles', '/settings/team', 'users', 'invite members staff admin permissions access'),
+      nav('go-integrations', 'Integrations & API key', '/settings/integrations', 'bolt', 'google square acuity calendly api webhook zapier'),
+      nav('go-billing', 'Billing', '/settings/billing', 'lock', 'subscription plan invoice card pause cancel'),
       nav('go-qr', 'QR code & review link', '/review-link', 'star', 'qr print poster desk invoice receipt'),
       nav('go-how', 'How it works', '/how-it-works', 'lightbulb', 'help guide'),
       {
@@ -207,6 +222,12 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
       },
     ];
   }, [go, theme, toggle]);
+
+  // Hide commands the signed-in role cannot use (the pages and actions enforce it too).
+  const commands = useMemo(
+    () => allCommands.filter((c) => !COMMAND_CAPABILITY[c.id] || role === null || can(role, COMMAND_CAPABILITY[c.id] as Capability)),
+    [allCommands, role]
+  );
 
   const results = useMemo<Command[]>(() => {
     const term = query.trim().toLowerCase();

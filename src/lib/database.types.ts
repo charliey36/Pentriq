@@ -387,6 +387,24 @@ export type Database = {
         Update: { error?: string | null };
         Relationships: [];
       };
+      webhook_endpoints: {
+        Row: { id: string; business_id: string; url: string; secret_encrypted: string; events: string[]; is_active: boolean; consecutive_failures: number; disabled_reason: string | null; last_success_at: string | null; created_at: string };
+        Insert: { id?: string; business_id: string; url: string; secret_encrypted: string; events?: string[]; is_active?: boolean };
+        Update: { url?: string; secret_encrypted?: string; events?: string[]; is_active?: boolean; consecutive_failures?: number; disabled_reason?: string | null; last_success_at?: string | null };
+        Relationships: [];
+      };
+      webhook_deliveries: {
+        Row: { id: string; business_id: string; endpoint_id: string | null; event_type: string; status: 'succeeded' | 'failed'; http_status: number | null; error: string | null; duration_ms: number | null; created_at: string };
+        Insert: { id?: string; business_id: string; endpoint_id?: string | null; event_type: string; status: 'succeeded' | 'failed'; http_status?: number | null; error?: string | null; duration_ms?: number | null };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      team_invitations: {
+        Row: { id: string; business_id: string; email: string; role: 'admin' | 'staff'; token_hash: string; invited_by: string | null; expires_at: string; accepted_at: string | null; revoked_at: string | null; created_at: string };
+        Insert: { id?: string; business_id: string; email: string; role: 'admin' | 'staff'; token_hash: string; invited_by?: string | null; expires_at: string };
+        Update: { accepted_at?: string | null; revoked_at?: string | null };
+        Relationships: [];
+      };
       business_members: {
         Row: {
           id: string;

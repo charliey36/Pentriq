@@ -222,3 +222,18 @@ Priority score = impact (Low 1, Medium 2, High 3, Critical 4) divided by effort 
 
 ### What I deliberately did not do
 Rewrite the UI wholesale, add speculative AI features beyond the review-reply drafting from earlier, or rework crons into a queue. Each needs either production data to tune against, a product or pricing decision, or infrastructure that is not in this repository, and doing them blind would add risk without evidence of benefit. Estimated business value and performance gains are therefore not quantified here: the honest figure for index and health-check work is "unmeasured"; the measurable gain from this pass is that multi-user accounts can now be sold and operated.
+
+## 11. Implementation pass: customers workspace, role-aware UI, outbound webhooks
+
+| Change | Files |
+|---|---|
+| **Customers screen rebuilt**: multi-term search (`/` focuses it), sortable columns with `aria-sort`, status filters with counts, shareable URL state (`?q=&status=&sort=&dir=`, validated), 50-row pages instead of rendering every customer, row selection with bulk send/cancel (server re-validates ids, scopes to the business, caps at 25), CSV export of the current view for owners/admins only (shares the formula-injection-safe writer with the account export) | `src/lib/customer-list.ts`, `customers-table.tsx`, `customers/actions.ts` |
+| **Role-aware UI**: `RoleProvider` in the app layout; sidebar, Settings tabs and command palette hide what the role cannot use; palette gained Team, Integrations and Billing commands. Server checks remain authoritative | `role-context.tsx`, `sidebar-nav.tsx`, `settings-tabs.tsx`, `command-palette.tsx` |
+| **Outbound webhooks**: signed (HMAC-SHA256 with timestamp), HTTPS-only, SSRF-guarded (literal and resolved addresses), no redirects, encrypted secret shown once, 3 s timeout, delivery log, auto-off after 10 consecutive failures, test/rotate/delete, audit events. Emitted for `customer.created` and `feedback.received` | `src/lib/webhooks.ts`, `settings/integrations/webhook-*.tsx`, migration `0043`, `docs/WEBHOOKS.md` |
+| Typed rows for `team_invitations`, `webhook_endpoints`, `webhook_deliveries` | `database.types.ts` |
+
+Verification: `tsc` clean; 60 suites / 687 tests pass (43 new: list logic, URL-state sanitising, CSV injection, bulk id sanitising, SSRF matrix, signature verification, delivery, auto-disable, emit); `next build` succeeds.
+
+**Apply migration `0043` before using the webhook panel** (the Integrations page reads the new tables and will error without them). Webhooks also need `GOOGLE_TOKEN_ENCRYPTION_KEY`.
+
+Not verified: any of the UI in a browser against real data (no database available), the bulk send against a live mailer, and webhook delivery to a real receiver. Not done: retries with backoff, webhooks for CSV/booking imports, per-event payload versioning, server-side pagination of the customers query (the page still loads all rows, now rendered 50 at a time), and anything from the "needs a decision or infrastructure" list in section 10.

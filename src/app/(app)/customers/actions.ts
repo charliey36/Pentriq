@@ -3,7 +3,11 @@
 import { suppressedEmails } from '@/lib/safeguards';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { emitWebhookEvent } from '@/lib/webhooks';
+import { requireCapability } from '@/lib/business-access';
 import { requireBusiness } from '@/lib/business';
+import { cleanMessageIds } from '@/lib/customer-list';
 import { sendQueuedReview } from '@/lib/review-queue';
 import { exitJourneyEnrollment } from '@/lib/journeys';
 import { parseServiceDate } from '@/lib/eligibility';
@@ -95,6 +99,8 @@ export async function addCustomer(
     return { error: `Failed to add customer: ${customerError?.message ?? 'unknown error'}` };
   }
 
+  await emitWebhookEvent(createAdminClient(), business.id, 'customer.created', { customer_id: customer.id, name, email, source: 'manual' });
+
   revalidatePath('/customers');
   revalidatePath('/dashboard');
   return { success: true };
@@ -155,4 +161,43 @@ export async function cancelReview(messageId: string): Promise<ReviewActionResul
   if (m?.journey_enrollment_id) await exitJourneyEnrollment(supabase, m.journey_enrollment_id);
   revalidatePath('/customers');
   return { message: 'Cancelled.' };
+}
+
+
+/** Send the selected scheduled/held review requests now (at most 25 per call). Each is re-checked server-side against the business. */
+export async function sendSelectedReviews(messageIds: string[]): Promise<ReviewActionResult> {
+  const { business } = await requireCapability('customers.write');
+  const ids = cleanMessageIds(messageIds);
+  if (ids.length === 0) return { message: 'Nothing to send.' };
+  const supabase = createClient();
+  let sent = 0;
+  const errors: string[] = [];
+  for (const id of ids) {
+    const res = await sendQueuedReview(supabase, business.id, id);
+    if (res.ok) sent += 1;
+    else errors.push(res.error ?? 'error');
+  }
+  revalidatePath('/customers');
+  revalidatePath('/dashboard');
+  return { message: `Sent ${sent} of ${ids.length}.${errors.length ? ` ${errors.length} failed: ${errors[0]}` : ''}` };
+}
+
+/** Cancel the selected scheduled/held review requests (and their follow-up reminders). */
+export async function cancelSelectedReviews(messageIds: string[]): Promise<ReviewActionResult> {
+  const { business } = await requireCapability('customers.write');
+  const ids = cleanMessageIds(messageIds);
+  if (ids.length === 0) return { message: 'Nothing to cancel.' };
+  const supabase = createClient();
+  const { data: rows } = await supabase
+    .from('messages')
+    .select('id, journey_enrollment_id')
+    .in('id', ids)
+    .eq('business_id', business.id)
+    .in('status', ['queued', 'pending']);
+  const found = rows ?? [];
+  if (found.length === 0) return { message: 'Nothing to cancel.' };
+  await supabase.from('messages').update({ status: 'cancelled' }).in('id', found.map((r) => r.id)).eq('business_id', business.id).in('status', ['queued', 'pending']);
+  for (const r of found) if (r.journey_enrollment_id) await exitJourneyEnrollment(supabase, r.journey_enrollment_id);
+  revalidatePath('/customers');
+  return { message: `Cancelled ${found.length}.` };
 }

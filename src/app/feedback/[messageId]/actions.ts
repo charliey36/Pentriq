@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { exitJourneyEnrollment } from '@/lib/journeys';
 import { RATE_LIMITS, requesterId, withinLimit } from '@/lib/rate-limit';
 import { headers } from 'next/headers';
+import { emitWebhookEvent } from '@/lib/webhooks';
 
 export type SubmitFeedbackResult = { error?: string; success?: boolean };
 
@@ -76,6 +77,8 @@ export async function submitPrivateFeedback(
   if (message.journey_enrollment_id) {
     await exitJourneyEnrollment(supabase, message.journey_enrollment_id);
   }
+
+  await emitWebhookEvent(supabase, message.business_id, 'feedback.received', { customer_id: message.customer_id, rating, comment });
 
   return { success: true };
 }
