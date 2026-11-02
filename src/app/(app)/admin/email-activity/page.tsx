@@ -15,7 +15,8 @@ const RANGES = [['today', 'Today'], ['7d', '7 Days'], ['30d', '30 Days']] as con
 const STATUSES = [['all', 'All'], ['successful', 'Successful'], ['failed', 'Failed']] as const;
 const TONE: Record<EmailActivityItem['status'], 'success' | 'info' | 'danger' | 'neutral'> = { delivered: 'success', sent: 'info', failed: 'danger', other: 'neutral' };
 
-export default async function EmailActivityPage({ searchParams }: { searchParams?: { range?: string; status?: string } }) {
+export default async function EmailActivityPage({ searchParams: searchParamsPromise }: { searchParams?: Promise<{ range?: string; status?: string }> }) {
+  const searchParams = await searchParamsPromise;
   const range = parseRange(searchParams?.range);
   const status = parseStatus(searchParams?.status);
   const result = await getRecentEmails();

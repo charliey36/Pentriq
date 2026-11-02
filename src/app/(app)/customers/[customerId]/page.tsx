@@ -21,7 +21,8 @@ function formatDate(value: string) {
   return formatUKDate(new Date(value));
 }
 
-export default async function CustomerDetailPage({ params }: { params: { customerId: string } }) {
+export default async function CustomerDetailPage({ params: paramsPromise }: { params: Promise<{ customerId: string }> }) {
+  const params = await paramsPromise;
   const business = await requireBusiness();
   const supabase = createClient();
 

@@ -9,7 +9,8 @@ export function generateStaticParams() {
   return POSTS.map((p) => ({ slug: p.slug }));
 }
 
-export default function Image({ params }: { params: { slug: string } }) {
+export default async function Image({ params: paramsPromise }: { params: Promise<{ slug: string }> }) {
+  const params = await paramsPromise;
   const post = getPost(params.slug);
   return new ImageResponse(
     (

@@ -15,5 +15,5 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npx tsc --noEmit
       - run: npm test
+      # Production dependencies must have no high or critical advisories. Remaining dev-only/low findings are listed in docs/PRODUCT_AUDIT.md.
       - run: npm audit --omit=dev --audit-level=high
-        continue-on-error: true

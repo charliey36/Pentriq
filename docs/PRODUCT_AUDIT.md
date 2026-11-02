@@ -237,3 +237,30 @@ Verification: `tsc` clean; 60 suites / 687 tests pass (43 new: list logic, URL-s
 **Apply migration `0043` before using the webhook panel** (the Integrations page reads the new tables and will error without them). Webhooks also need `GOOGLE_TOKEN_ENCRYPTION_KEY`.
 
 Not verified: any of the UI in a browser against real data (no database available), the bulk send against a live mailer, and webhook delivery to a real receiver. Not done: retries with backoff, webhooks for CSV/booking imports, per-event payload versioning, server-side pagination of the customers query (the page still loads all rows, now rendered 50 at a time), and anything from the "needs a decision or infrastructure" list in section 10.
+
+## 12. Dependency vulnerabilities
+
+GitHub reported 35 advisories on the default branch (3 critical, 12 high). Local `npm audit` at the start of this pass: 1 critical, 2 high, 27 moderate, 5 low.
+
+| Advisory group | Fix |
+|---|---|
+| **next** (critical; ~25 advisories incl. RCE in image optimisation, server-action DoS/SSRF, cache poisoning, middleware bypass). Next 14.2.35 is the last 14.x and none of these are fixed there | Upgraded **14.2.35 -> 15.5.28** (React 18.3.1 kept; Next 15 supports it) |
+| postcss (high; 4 advisories) pinned at 8.4.31 inside Next | `overrides.next.postcss = 8.5.32` |
+| source-map-js (high), postcss-selector-parser, others | `npm audit fix` |
+| uuid via gaxios via @google/genai | `overrides.gaxios.uuid = 11.1.1` |
+| glob/minimatch via @sentry/bundler-plugins | `overrides.@sentry/bundler-plugins.glob = 14.0.3` |
+| resend / @react-email/render | resend 4.0.0 -> 4.8.0 |
+
+**Result: 0 critical, 0 high.** Production dependencies: 4 low. All dependencies: 24 (7 low, 17 moderate).
+
+Not fixed, and why:
+- **jest toolchain (dev only, moderate):** `minimatch < 11` via `glob@7` inside `@jest/reporters` / `test-exclude`. glob 7 cannot run on minimatch 11, and Jest 29 and 30 both depend on it. Dev-only: never in the production bundle or Docker image, and only matters if the test runner is fed untrusted glob patterns. `npm audit fix --force` offers to "fix" it by downgrading to Jest 25, which is wrong.
+- **deepmerge (low) via html-to-text via resend:** no patched deepmerge release exists. It merges html-to-text's own options, not user input.
+
+### Next 15 migration changes
+- `params` and `searchParams` are promises: 14 dynamic pages/routes and 11 pages updated; tests pass `Promise.resolve(...)`.
+- `cookies()` / `headers()` are async: the Supabase server client uses async cookie handlers so `createClient()` stays synchronous for its 100+ callers; 6 `headers()`/`cookies()` call sites now `await`.
+- `experimental.instrumentationHook` removed (stable in 15).
+- CI now fails on high/critical advisories in production dependencies (`continue-on-error` removed).
+
+Verified: `tsc` clean, 687 tests pass, `next build` succeeds, and a production server returned correct statuses for public pages, dynamic routes, health, invite page, auth redirects and headers. **Not verified: signing in, since no Supabase project was available.** The cookie adapter change in `src/lib/supabase/server.ts` is the part to test first (log in, log out, refresh a page, submit a form).

@@ -19,8 +19,9 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { customerId: string } }
+  { params: paramsPromise }: { params: Promise<{ customerId: string }> }
 ) {
+  const params = await paramsPromise;
   const { customerId } = params;
 
   const uuidPattern =
@@ -73,7 +74,8 @@ export async function GET(
  * `List-Unsubscribe-Post: List-Unsubscribe=One-Click` POST here directly, with
  * no page shown. Same effect as the link in the email footer.
  */
-export async function POST(request: NextRequest, { params }: { params: { customerId: string } }) {
+export async function POST(request: NextRequest, { params: paramsPromise }: { params: Promise<{ customerId: string }> }) {
+  const params = await paramsPromise;
   const { customerId } = params;
   if (!UUID.test(customerId)) return new NextResponse('Invalid unsubscribe link.', { status: 400 });
   if (!(await withinLimit('unsubscribe-ip', requesterId(request.headers), RATE_LIMITS.unsubscribeIp))) {

@@ -22,10 +22,11 @@ function formatDateTime(value: string) {
 }
 
 export default async function CustomersPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams?: { add?: string };
+  searchParams?: Promise<{ add?: string }>;
 }) {
+  const searchParams = await searchParamsPromise;
   const { business, role } = await requireAccess();
   const supabase = createClient();
 

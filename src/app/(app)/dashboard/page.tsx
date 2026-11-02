@@ -67,7 +67,8 @@ const quickActions: { href: string; label: string; description: string; icon: Ic
   { href: '/feedback-inbox', label: 'Review private feedback', description: 'Reply to what customers shared', icon: 'chat', tone: 'rose' },
 ];
 
-export default async function DashboardPage({ searchParams }: { searchParams?: { denied?: string } }) {
+export default async function DashboardPage({ searchParams: searchParamsPromise }: { searchParams?: Promise<{ denied?: string }> }) {
+  const searchParams = await searchParamsPromise;
   const business = await requireBusiness();
   const supabase = createClient();
 
@@ -144,7 +145,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
   ]);
 
   const hasReviewUrl = Boolean(business.google_review_url);
-  const setupCollapsed = cookies().get(SETUP_COLLAPSED_COOKIE)?.value === '1';
+  const setupCollapsed = (await cookies()).get(SETUP_COLLAPSED_COOKIE)?.value === '1';
 
   const customerTotal = customersCount.count ?? 0;
   // Setup is recommended, never required: a brand-new business lands on the dashboard (and sees

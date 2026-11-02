@@ -25,7 +25,8 @@ function sameState(a: string | undefined, b: string | null): boolean {
  * store the tokens ENCRYPTED, and run the first sync straight away so the owner sees customers
  * and scheduled review requests in the same session.
  */
-export async function GET(request: NextRequest, { params }: { params: { provider: string } }) {
+export async function GET(request: NextRequest, { params: paramsPromise }: { params: Promise<{ provider: string }> }) {
+  const params = await paramsPromise;
   const business = await requireBusiness();
   const done = (query: string) => {
     const res = NextResponse.redirect(new URL(`/settings/integrations?${query}`, request.url));

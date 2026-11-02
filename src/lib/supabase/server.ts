@@ -9,19 +9,19 @@ import { monitoredFetch } from '@/lib/supabase/monitored-fetch';
  * stays logged in across requests.
  */
 export function createClient() {
-  const cookieStore = cookies();
-
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       global: { fetch: monitoredFetch },
       cookies: {
-        getAll() {
-          return cookieStore.getAll();
+        // Next 15 made cookies() async. The adapter accepts promises, so createClient() itself stays synchronous.
+        async getAll() {
+          return (await cookies()).getAll();
         },
-        setAll(cookiesToSet) {
+        async setAll(cookiesToSet) {
           try {
+            const cookieStore = await cookies();
             cookiesToSet.forEach(({ name, value, options }) => {
               cookieStore.set(name, value, options);
             });

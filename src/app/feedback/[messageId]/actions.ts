@@ -37,7 +37,7 @@ export async function submitPrivateFeedback(
   }
 
   if (
-    !(await withinLimit('feedback-ip', requesterId(headers()), RATE_LIMITS.feedbackIp)) ||
+    !(await withinLimit('feedback-ip', requesterId(await headers()), RATE_LIMITS.feedbackIp)) ||
     !(await withinLimit('feedback-target', messageId, RATE_LIMITS.feedbackTarget))
   ) {
     return { error: 'Too many submissions. Please try again later.' };

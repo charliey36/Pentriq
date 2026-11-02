@@ -15,13 +15,13 @@ export async function acceptInvite(token: string, _prev: AcceptResult): Promise<
   if (!user) redirect(`/login?next=${encodeURIComponent(`/invite/${token}`)}`);
 
   // Token guessing is infeasible (256-bit), but keep the endpoint from being hammered anyway.
-  if (!(await withinLimit('invite-accept', requesterId(headers()), { limit: 20, windowSeconds: 600 }))) {
+  if (!(await withinLimit('invite-accept', requesterId(await headers()), { limit: 20, windowSeconds: 600 }))) {
     return { error: 'Too many attempts. Please wait a few minutes and try again.' };
   }
 
   const result = await acceptInvitation(createAdminClient() as never, { token, userId: user.id, userEmail: user.email });
   if (!result.ok) return { error: result.error };
 
-  await recordAudit({ action: 'team.joined', businessId: result.businessId, actorId: user.id, actorEmail: user.email, targetType: 'user', targetId: user.id, ip: requesterId(headers()) });
+  await recordAudit({ action: 'team.joined', businessId: result.businessId, actorId: user.id, actorEmail: user.email, targetType: 'user', targetId: user.id, ip: requesterId(await headers()) });
   redirect('/dashboard');
 }

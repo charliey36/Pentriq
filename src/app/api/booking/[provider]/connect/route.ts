@@ -15,7 +15,8 @@ const STATE_COOKIE = 'booking_oauth_state';
  * "I may contact my customers" box. Stores a random CSRF state in a short-lived httpOnly cookie
  * and sends the browser to the provider's consent screen.
  */
-export async function GET(request: NextRequest, { params }: { params: { provider: string } }) {
+export async function GET(request: NextRequest, { params: paramsPromise }: { params: Promise<{ provider: string }> }) {
+  const params = await paramsPromise;
   await requireCapability('integrations.manage');
   const back = (reason: string) => NextResponse.redirect(new URL(`/settings/integrations?booking=error&reason=${reason}`, request.url));
 

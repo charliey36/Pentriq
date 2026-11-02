@@ -61,7 +61,7 @@ describe('isValidReviewUrl', () => {
 describe('/api/track-message/[messageId] (legacy URL)', () => {
   it('records the click and 302-redirects to the Google review URL', async () => {
     const db = seed();
-    const res = await trackMessage(req(`/api/track-message/${ID}`), { params: { messageId: ID } });
+    const res = await trackMessage(req(`/api/track-message/${ID}`), { params: Promise.resolve({ messageId: ID }) });
     expect(res.status).toBe(302);
     expect(res.headers.get('location')).toBe(GOOGLE);
     expect(db.rows('interaction_events')).toEqual([
@@ -71,7 +71,7 @@ describe('/api/track-message/[messageId] (legacy URL)', () => {
 
   it('shows the branded page (not a 404) when no review URL is configured, still counting the click', async () => {
     const db = seed(null);
-    const res = await trackMessage(req(`/api/track-message/${ID}`), { params: { messageId: ID } });
+    const res = await trackMessage(req(`/api/track-message/${ID}`), { params: Promise.resolve({ messageId: ID }) });
     expect(res.status).toBeGreaterThanOrEqual(300);
     expect(res.status).toBeLessThan(400);
     expect(res.headers.get('location')).toBe('https://pentriq.cloud/review-unavailable?reason=not-configured');
@@ -80,16 +80,16 @@ describe('/api/track-message/[messageId] (legacy URL)', () => {
 
   it('treats a malformed review URL as not configured', async () => {
     seed('not a url');
-    const res = await trackMessage(req(`/api/track-message/${ID}`), { params: { messageId: ID } });
+    const res = await trackMessage(req(`/api/track-message/${ID}`), { params: Promise.resolve({ messageId: ID }) });
     expect(res.headers.get('location')).toContain('/review-unavailable?reason=not-configured');
   });
 
   it('sends unknown / malformed ids to the branded page without recording anything', async () => {
     const db = seed();
     db.tables.messages = [];
-    const unknown = await trackMessage(req(`/api/track-message/${ID}`), { params: { messageId: ID } });
+    const unknown = await trackMessage(req(`/api/track-message/${ID}`), { params: Promise.resolve({ messageId: ID }) });
     expect(unknown.headers.get('location')).toContain('/review-unavailable?reason=invalid-link');
-    const bad = await trackMessage(req('/api/track-message/nope'), { params: { messageId: 'nope' } });
+    const bad = await trackMessage(req('/api/track-message/nope'), { params: Promise.resolve({ messageId: 'nope' }) });
     expect(bad.headers.get('location')).toContain('/review-unavailable?reason=invalid-link');
     expect(db.rows('interaction_events')).toHaveLength(0);
   });
@@ -98,7 +98,7 @@ describe('/api/track-message/[messageId] (legacy URL)', () => {
 describe('/api/track/[reviewRequestId] (legacy URL)', () => {
   it('records the click against the review request and redirects to Google', async () => {
     const db = seed();
-    const res = await trackLegacy(req(`/api/track/${ID}`), { params: { reviewRequestId: ID } });
+    const res = await trackLegacy(req(`/api/track/${ID}`), { params: Promise.resolve({ reviewRequestId: ID }) });
     expect(res.status).toBe(302);
     expect(res.headers.get('location')).toBe(GOOGLE);
     expect(db.rows('interaction_events')[0]).toEqual(
@@ -109,7 +109,7 @@ describe('/api/track/[reviewRequestId] (legacy URL)', () => {
 
   it('shows the branded page when no review URL is configured', async () => {
     seed('');
-    const res = await trackLegacy(req(`/api/track/${ID}`), { params: { reviewRequestId: ID } });
+    const res = await trackLegacy(req(`/api/track/${ID}`), { params: Promise.resolve({ reviewRequestId: ID }) });
     expect(res.headers.get('location')).toContain('/review-unavailable?reason=not-configured');
   });
 });

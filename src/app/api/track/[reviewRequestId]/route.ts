@@ -9,10 +9,12 @@ export const dynamic = 'force-dynamic';
  * customers' inboxes keep working; new emails link to /r/{token}. Delegates to
  * the shared handler (bot filtering, de-duplication, event logging, redirect).
  */
-export async function GET(request: NextRequest, { params }: { params: { reviewRequestId: string } }) {
+export async function GET(request: NextRequest, { params: paramsPromise }: { params: Promise<{ reviewRequestId: string }> }) {
+  const params = await paramsPromise;
   return handleReviewLinkRequest(request, { by: 'review_request_id', value: params.reviewRequestId });
 }
 
-export async function HEAD(request: NextRequest, { params }: { params: { reviewRequestId: string } }) {
+export async function HEAD(request: NextRequest, { params: paramsPromise }: { params: Promise<{ reviewRequestId: string }> }) {
+  const params = await paramsPromise;
   return handleReviewLinkRequest(request, { by: 'review_request_id', value: params.reviewRequestId });
 }
