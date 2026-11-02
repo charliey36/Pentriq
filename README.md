@@ -54,8 +54,9 @@ implementation notes.
 
 ### Review collection
 - Email/password auth (Supabase Auth), with team support: a business can
-  have more than one user via the `business_members` table (no UI to invite
-  teammates yet, but the schema and RLS model support it).
+  have more than one user via the `business_members` table. Owners and admins
+  invite teammates from Settings -> Team (single-use, email-bound links that
+  expire after 7 days). Roles: owner, admin, staff (see `src/lib/permissions.ts`).
 - Settings: business name, Google review URL, send delay.
 - Customers: add name + email + phone, or **bulk CSV import** (name/email
   columns, dedup against existing customers, per-row error reporting).

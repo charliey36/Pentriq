@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { AuthForm } from '@/components/auth-form';
 import { Notice } from '@/components/ui/notice';
 import { AuthShell } from '@/components/auth-shell';
+import { safeNextPath } from '@/lib/safe-redirect';
 
 export const metadata: Metadata = pageMetadata({
   title: 'Log in',
@@ -11,7 +12,7 @@ export const metadata: Metadata = pageMetadata({
   path: '/login',
 });
 
-export default function LoginPage({ searchParams }: { searchParams: { reset?: string } }) {
+export default function LoginPage({ searchParams }: { searchParams: { reset?: string; next?: string } }) {
   return (
     <AuthShell
       title="Welcome back"
@@ -19,14 +20,14 @@ export default function LoginPage({ searchParams }: { searchParams: { reset?: st
       footer={
         <>
           Don&apos;t have an account?{' '}
-          <Link href="/signup" className="font-medium text-brand-700 hover:underline dark:text-brand-400">
+          <Link href={searchParams.next ? `/signup?next=${encodeURIComponent(safeNextPath(searchParams.next))}` : '/signup'} className="font-medium text-brand-700 hover:underline dark:text-brand-400">
             Sign up
           </Link>
         </>
       }
     >
       {searchParams.reset && <div className="mb-5"><Notice variant="success">Password updated. Log in with your new password.</Notice></div>}
-      <AuthForm mode="login" />
+      <AuthForm mode="login" next={searchParams.next ? safeNextPath(searchParams.next) : undefined} />
     </AuthShell>
   );
 }

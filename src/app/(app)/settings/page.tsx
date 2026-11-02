@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { requireBusiness } from '@/lib/business';
+import { requireCapability } from '@/lib/business-access';
+
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionCard } from '@/components/ui/section-card';
 import { SettingsTabs } from '@/components/settings-tabs';
@@ -10,7 +11,7 @@ import { createClient } from '@/lib/supabase/server';
 export const metadata: Metadata = { title: 'Settings' };
 
 export default async function SettingsPage() {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('settings.write');
   // Opt-outs (suppression list). Empty if migration 0037 has not been applied yet.
   const { data: suppressed } = await createClient()
     .from('email_suppressions')

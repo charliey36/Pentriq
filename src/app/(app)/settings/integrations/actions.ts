@@ -1,7 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { requireBusiness } from '@/lib/business';
+import { requireCapability } from '@/lib/business-access';
+
 import { handleServiceCompleted } from '@/lib/service-import';
 import { generateApiKey } from '@/lib/api-keys';
 import { recordAudit } from '@/lib/audit';
@@ -9,7 +10,7 @@ import { getAuthUser } from '@/lib/business';
 
 /** Replaces the organisation's API key (the old one stops working immediately). */
 export async function regenerateApiKey(): Promise<{ key?: string; error?: string }> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('integrations.manage');
   try {
     const key = await generateApiKey(business.id);
     const user = await getAuthUser();
@@ -22,7 +23,7 @@ export async function regenerateApiKey(): Promise<{ key?: string; error?: string
 
 /** Sends a sample payload through the same pipeline the endpoint uses. */
 export async function testImport(): Promise<{ message: string }> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('integrations.manage');
   const { status, body } = await handleServiceCompleted(
     business.id,
     {

@@ -8,6 +8,7 @@ import { provisionBusiness } from '@/lib/provision-business';
 import { setErrorContext } from '@/lib/monitoring';
 import { isBillingOverrideEmail } from '@/lib/billing';
 import type { Business } from '@/lib/database.types';
+import type { Role } from '@/lib/permissions';
 
 /**
  * Gets the currently logged-in user's business row. Every authenticated page
@@ -36,7 +37,9 @@ export const getAuthUser = cache(async (): Promise<{ id: string; email: string |
   return { id: claims.sub, email: typeof claims.email === 'string' ? claims.email : null };
 });
 
-async function loadBusiness(): Promise<Business> {
+type Membership = { business: Business; role: Role };
+
+async function loadBusiness(): Promise<Membership> {
   const supabase = createClient();
   const user = await getAuthUser();
 
@@ -49,17 +52,17 @@ async function loadBusiness(): Promise<Business> {
   // (previously two sequential queries). RLS applies to the embedded row too.
   const { data: membership, error: membershipError } = await supabase
     .from('business_members')
-    .select('business_id, businesses(*)')
+    .select('business_id, role, businesses(*)')
     .eq('user_id', user.id)
     .maybeSingle()
-    .returns<{ business_id: string; businesses: Business | null } | null>();
+    .returns<{ business_id: string; role: Role; businesses: Business | null } | null>();
 
   if (membershipError) {
   throw new Error(`Failed to load business: ${membershipError.message}`);
 }
 
   if (membership?.businesses) {
-    return membership.businesses;
+    return { business: membership.businesses, role: membership.role };
   }
 
   if (membership) {
@@ -74,7 +77,7 @@ async function loadBusiness(): Promise<Business> {
   throw new Error(`Failed to load business: ${businessError?.message ?? 'unknown error'}`);
 }
 
-    return business;
+    return { business, role: membership.role };
   }
 
   // First time this user has hit an authenticated page. Provision their
@@ -100,7 +103,7 @@ async function loadBusiness(): Promise<Business> {
   // Welcome email only from the request that actually created the business.
   if (provisioned.created) await notifyOwner('welcome', provisioned.business.id);
 
-  return provisioned.business;
+  return { business: provisioned.business, role: 'owner' };
 }
 
 /**
@@ -108,15 +111,21 @@ async function loadBusiness(): Promise<Business> {
  * the cache each call repeats three database round trips. Also tags any error
  * raised later in this request with the user and business ids (never email or name).
  */
-export const requireBusiness = cache(async (): Promise<Business> => {
-  const business = await loadBusiness();
+const loadAccess = cache(async (): Promise<Membership & { userId: string; email: string | null }> => {
+  const { business, role } = await loadBusiness();
   const user = await getAuthUser();
-  if (user) setErrorContext(user.id, business.id);
-  if (user && isBillingOverrideEmail(user.email)) {
-    return { ...business, subscription_status: 'active', trial_ends_at: null };
-  }
-  return business;
+  if (!user) redirect('/login');
+  setErrorContext(user.id, business.id);
+  const effective = isBillingOverrideEmail(user.email)
+    ? { ...business, subscription_status: 'active' as const, trial_ends_at: null }
+    : business;
+  return { business: effective, role, userId: user.id, email: user.email };
 });
+
+export const requireBusiness = cache(async (): Promise<Business> => (await loadAccess()).business);
+
+/** The business plus the signed-in user's role in it. Prefer requireCapability() when gating an action. */
+export const requireAccess = loadAccess;
 
 /**
  * True if the given email is in the ADMIN_EMAIL list. Used to show the "all

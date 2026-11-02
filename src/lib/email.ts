@@ -187,3 +187,22 @@ export async function sendOwnerEmail(to: string, email: { subject: string; html:
   if (error) throw new Error(typeof error === 'string' ? error : error.message);
   notifyEmailSent();
 }
+
+/** Invitation to join a business's Pentriq team. The link is single-use and tied to the invited address. */
+export function buildTeamInviteEmail(params: { businessName: string; inviterEmail: string | null; role: 'admin' | 'staff'; acceptUrl: string; expiresInDays: number }) {
+  const business = escapeHtml(params.businessName || 'a business');
+  const inviter = params.inviterEmail ? escapeHtml(params.inviterEmail) : 'A teammate';
+  const roleText = params.role === 'admin' ? 'an admin' : 'a staff member';
+  const subject = `You're invited to join ${params.businessName || 'a business'} on ${APP_NAME}`;
+  const html = layout(
+    `<p>${inviter} has invited you to join <strong>${business}</strong> on ${APP_NAME} as ${roleText}.</p>` +
+      `<p style="margin:24px 0"><a href="${params.acceptUrl}" style="background:#188038;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;display:inline-block">Accept invitation</a></p>` +
+      `<p style="font-size:13px;color:#64748b">This link works once, only for this email address, and expires in ${params.expiresInDays} days. If you weren't expecting it, you can ignore this email.</p>`
+  );
+  const text = `${params.inviterEmail ?? 'A teammate'} has invited you to join ${params.businessName || 'a business'} on ${APP_NAME} as ${roleText}.\n\nAccept: ${params.acceptUrl}\n\nThis link works once, only for this email address, and expires in ${params.expiresInDays} days.`;
+  return { subject, html, text };
+}
+
+export async function sendTeamInviteEmail(to: string, params: Parameters<typeof buildTeamInviteEmail>[0]) {
+  await sendOwnerEmail(to, buildTeamInviteEmail(params));
+}

@@ -1,7 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { requireBusiness } from '@/lib/business';
+import { requireCapability } from '@/lib/business-access';
+
 import { createAdminClient } from '@/lib/supabase/admin';
 import { dateKey } from '@/lib/google-review-analytics';
 import { rebuildMetrics, setSource } from '@/lib/reputation-data';
@@ -49,7 +50,7 @@ async function alertOnDrop(businessId: string, date: string, rating: number) {
 
 /** Creates a snapshot, or replaces the one already saved for that date. */
 export async function saveSnapshot(date: string, count: number, rating: number): Promise<ReputationResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('settings.write');
   const error = validateSnapshot({ date, count, rating }, dateKey(new Date()));
   if (error) return { ok: false, message: error };
 
@@ -65,7 +66,7 @@ export async function saveSnapshot(date: string, count: number, rating: number):
 
 /** Corrects an existing snapshot (date, count and rating can all change). */
 export async function updateSnapshot(id: string, date: string, count: number, rating: number): Promise<ReputationResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('settings.write');
   const error = validateSnapshot({ date, count, rating }, dateKey(new Date()));
   if (error) return { ok: false, message: error };
 
@@ -82,7 +83,7 @@ export async function updateSnapshot(id: string, date: string, count: number, ra
 }
 
 export async function deleteSnapshot(id: string): Promise<ReputationResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('settings.write');
   const { error } = await createAdminClient().from('manual_review_snapshots').delete().eq('id', id).eq('business_id', business.id);
   if (error) return { ok: false, message: 'Could not delete the snapshot.' };
   await after(business.id);
@@ -91,7 +92,7 @@ export async function deleteSnapshot(id: string): Promise<ReputationResult> {
 
 /** Rebuilds every monthly metric from the stored snapshots. */
 export async function recalculateAnalytics(): Promise<ReputationResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('settings.write');
   try {
     const months = await rebuildMetrics(createAdminClient(), business.id);
     refresh();

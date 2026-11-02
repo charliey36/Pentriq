@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
+import { requireCapability } from '@/lib/business-access';
 import Link from 'next/link';
-import { requireBusiness } from '@/lib/business';
+
 import { generateApiKey, getApiKeyInfo } from '@/lib/api-keys';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { PageHeader } from '@/components/ui/page-header';
@@ -58,7 +59,7 @@ export default async function IntegrationsPage({
 }: {
   searchParams?: { google?: string; reason?: string; booking?: string; provider?: string };
 }) {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('integrations.manage');
 
   // Google Business Profile: tokens stay on the server; the panel only gets safe fields.
   const googleConnection = await getPublicConnection(business.id);

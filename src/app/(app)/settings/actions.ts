@@ -1,9 +1,10 @@
 'use server';
 
 import { userSafeError } from '@/lib/log';
+import { requireCapability } from '@/lib/business-access';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
-import { requireBusiness } from '@/lib/business';
+
 import { friendlySaveError, isMissingColumnError, missingColumnName } from '@/lib/db-errors';
 import { parseSettingsForm } from '@/lib/settings-validation';
 
@@ -15,7 +16,7 @@ export async function saveSettings(
   _prev: SaveSettingsResult,
   formData: FormData
 ): Promise<SaveSettingsResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('settings.write');
 
   const parsed = parseSettingsForm(formData);
   if (!parsed.ok) {
@@ -101,7 +102,7 @@ export async function uploadBusinessLogo(
   _prev: UploadLogoResult,
   formData: FormData
 ): Promise<UploadLogoResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('settings.write');
   const supabase = createClient();
 
   const file = formData.get('logo');

@@ -1,7 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { requireBusiness } from '@/lib/business';
+import { requireCapability } from '@/lib/business-access';
+
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isProviderId } from '@/lib/booking-sync/registry';
 import { syncBookingConnection } from '@/lib/booking-sync/sync';
@@ -11,7 +12,7 @@ export type BookingActionResult = { ok: boolean; message: string };
 const MIN_GAP_MS = 60_000;
 
 async function load(provider: string) {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('integrations.manage');
   if (!isProviderId(provider)) return { business, conn: null };
   const { data } = await createAdminClient().from('booking_connections').select('*').eq('business_id', business.id).eq('provider', provider).maybeSingle();
   return { business, conn: data };

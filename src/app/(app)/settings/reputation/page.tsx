@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
+import { requireCapability } from '@/lib/business-access';
 import Link from 'next/link';
-import { requireBusiness } from '@/lib/business';
+
 import { createClient } from '@/lib/supabase/server';
 import { dateKey } from '@/lib/google-review-analytics';
 import { PageHeader } from '@/components/ui/page-header';
@@ -12,7 +13,7 @@ import { SnapshotManager, type SnapshotRow } from './snapshot-manager';
 export const metadata: Metadata = { title: 'Reputation Tracking' };
 
 export default async function ReputationSettingsPage() {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('settings.write');
   const { data, error } = await createClient()
     .from('manual_review_snapshots')
     .select('id, snapshot_date, review_count, average_rating')

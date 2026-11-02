@@ -39,7 +39,7 @@ export class MiniDb {
 }
 
 class MiniQuery implements PromiseLike<any> {
-  private op: 'select' | 'insert' | 'update' | 'upsert' = 'select';
+  private op: 'select' | 'insert' | 'update' | 'upsert' | 'delete' = 'select';
   private filters: ((r: Row) => boolean)[] = [];
   private payload: any;
   private returning = false;
@@ -67,6 +67,7 @@ class MiniQuery implements PromiseLike<any> {
     return this;
   }
   update(p: Row) { this.op = 'update'; this.payload = p; return this; }
+  delete() { this.op = 'delete'; return this; }
   eq(c: string, v: unknown) { this.filters.push((r) => r[c] === v); return this; }
   neq(c: string, v: unknown) { this.filters.push((r) => r[c] !== v); return this; }
   in(c: string, vs: unknown[]) { this.filters.push((r) => vs.includes(r[c])); return this; }
@@ -95,6 +96,11 @@ class MiniQuery implements PromiseLike<any> {
         created.push(row);
       }
       return { data: this.returning ? (this.isSingle ? created[0] ?? null : created) : null, error: null };
+    }
+    if (this.op === 'delete') {
+      const gone = hit();
+      this.db.tables[this.t] = rows.filter((r) => !gone.includes(r));
+      return { data: null, error: null };
     }
     if (this.op === 'update') {
       const m = hit();

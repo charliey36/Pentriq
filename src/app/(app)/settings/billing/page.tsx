@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { requireBusiness } from '@/lib/business';
+import { requireCapability } from '@/lib/business-access';
 import Link from 'next/link';
 import { getBillingState, PLAN } from '@/lib/billing';
 import { isPaused } from '@/lib/pause';
@@ -33,7 +33,7 @@ export default async function BillingPage({
 }: {
   searchParams?: { checkout?: string; session_id?: string };
 }) {
-  let business = await requireBusiness();
+  let { business } = await requireCapability('billing.manage');
 
   // Returning from Stripe Checkout: sync immediately instead of waiting for the webhook.
   const checkout = searchParams?.checkout;

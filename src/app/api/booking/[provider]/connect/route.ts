@@ -1,6 +1,7 @@
 import { randomBytes } from 'crypto';
+import { requireCapability } from '@/lib/business-access';
 import { NextResponse, type NextRequest } from 'next/server';
-import { requireBusiness } from '@/lib/business';
+
 import { getAppUrl } from '@/lib/brand';
 import { isTokenEncryptionConfigured } from '@/lib/google-token-crypto';
 import { PROVIDERS, isProviderId } from '@/lib/booking-sync/registry';
@@ -15,7 +16,7 @@ const STATE_COOKIE = 'booking_oauth_state';
  * and sends the browser to the provider's consent screen.
  */
 export async function GET(request: NextRequest, { params }: { params: { provider: string } }) {
-  await requireBusiness();
+  await requireCapability('integrations.manage');
   const back = (reason: string) => NextResponse.redirect(new URL(`/settings/integrations?booking=error&reason=${reason}`, request.url));
 
   if (!isProviderId(params.provider)) return back('unknown_provider');

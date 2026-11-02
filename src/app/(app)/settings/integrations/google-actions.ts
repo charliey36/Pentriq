@@ -1,7 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { requireBusiness } from '@/lib/business';
+import { requireCapability } from '@/lib/business-access';
+
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getConnectionWithTokens } from '@/lib/google-connection';
 import { decryptToken } from '@/lib/google-token-crypto';
@@ -21,7 +22,7 @@ function refresh() {
 
 /** Locations the connected Google user can manage (for the picker). */
 export async function loadGoogleLocations() {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('integrations.manage');
   const conn = await getConnectionWithTokens(business.id);
   if (!conn) return { locations: [], error: 'Not connected.' };
   try {
@@ -34,7 +35,7 @@ export async function loadGoogleLocations() {
 
 /** Saves the chosen location and runs the initial review sync. `value` is "accountId/locationId". */
 export async function selectGoogleLocation(value: string): Promise<ActionResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('integrations.manage');
   const conn = await getConnectionWithTokens(business.id);
   if (!conn) return { ok: false, message: 'Connect your Google account first.' };
 
@@ -95,7 +96,7 @@ export async function selectGoogleLocation(value: string): Promise<ActionResult>
 
 /** Lets the user pick a different location (reviews are replaced when they choose). */
 export async function startChangeLocation(): Promise<ActionResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('integrations.manage');
   await createAdminClient()
     .from('google_business_connections')
     .update({ status: 'pending_location' })
@@ -105,7 +106,7 @@ export async function startChangeLocation(): Promise<ActionResult> {
 }
 
 export async function syncGoogleNow(): Promise<ActionResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('integrations.manage');
   const conn = await getConnectionWithTokens(business.id);
   if (!conn || !conn.google_location_id) return { ok: false, message: 'Connect Google Business Profile first.' };
   if (conn.last_sync_at && Date.now() - Date.parse(conn.last_sync_at) < MIN_SYNC_GAP_MS) {
@@ -119,7 +120,7 @@ export async function syncGoogleNow(): Promise<ActionResult> {
 }
 
 export async function updateRatingThreshold(threshold: number): Promise<ActionResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('integrations.manage');
   if (!Number.isFinite(threshold) || threshold < 1 || threshold > 5) {
     return { ok: false, message: 'Enter a threshold between 1.0 and 5.0.' };
   }
@@ -135,7 +136,7 @@ export async function updateRatingThreshold(threshold: number): Promise<ActionRe
 
 /** Revokes Google access and removes the connection plus data synced from it. */
 export async function disconnectGoogle(): Promise<ActionResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('integrations.manage');
   const conn = await getConnectionWithTokens(business.id);
   if (!conn) return { ok: true, message: 'Already disconnected.' };
 

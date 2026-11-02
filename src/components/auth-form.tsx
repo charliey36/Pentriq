@@ -10,7 +10,10 @@ import { Spinner } from '@/components/ui/submit-button';
 
 type Mode = 'login' | 'signup';
 
-export function AuthForm({ mode }: { mode: Mode }) {
+export function AuthForm({ mode, next }: { mode: Mode; next?: string }) {
+  // Where to land after auth. Defaults keep the old behaviour (new accounts -> onboarding, returning users -> dashboard).
+  const afterSignup = next ?? '/onboarding';
+  const afterLogin = next ?? '/dashboard';
   const router = useRouter();
   const supabase = createClient();
 
@@ -28,7 +31,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
     setError(null);
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=/onboarding` },
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(afterSignup)}` },
     });
     if (oauthError) setError(oauthError.message);
   }
@@ -45,7 +48,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
+            emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(afterSignup)}`,
           },
         });
         if (signUpError) throw signUpError;
@@ -56,7 +59,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         const { data: sessionData } = await supabase.auth.getSession();
         if (sessionData.session) {
           // New accounts go straight to the guided first send (it also starts the free trial).
-          router.push('/onboarding');
+          router.push(afterSignup);
           router.refresh();
         } else {
           setMessage('Account created. Check your email for a confirmation link (look in spam if it does not arrive), then you can finish setup.');
@@ -67,7 +70,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
           password,
         });
         if (signInError) throw signInError;
-        router.push('/dashboard');
+        router.push(afterLogin);
         router.refresh();
       }
     } catch (err) {

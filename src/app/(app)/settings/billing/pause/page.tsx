@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
+import { requireCapability } from '@/lib/business-access';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { requireBusiness } from '@/lib/business';
+
 import { getBillingState, PLAN } from '@/lib/billing';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -17,7 +18,7 @@ import { PauseForm } from './pause-form';
 export const metadata: Metadata = { title: 'Pause subscription' };
 
 export default async function PausePage() {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('billing.manage');
   const billing = getBillingState(business);
   if ((billing.status !== 'active' && billing.status !== 'past_due') || isPaused(business)) redirect('/settings/billing');
 

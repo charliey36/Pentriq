@@ -16,6 +16,12 @@ jest.mock('@/lib/business', () => ({
     owner_id: 'user-1',
     stripe_subscription_id: null,
   })),
+  requireAccess: jest.fn(async () => ({
+    business: { id: 'business-1', owner_id: 'user-1', stripe_subscription_id: null },
+    role: 'owner',
+    userId: 'user-1',
+    email: 'owner@example.com',
+  })),
   getAuthUser: jest.fn(async () => ({ id: 'user-1', email: 'owner@example.com' })),
 }));
 jest.mock('@/lib/supabase/server', () => ({

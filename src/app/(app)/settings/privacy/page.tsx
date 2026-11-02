@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { requireBusiness } from '@/lib/business';
+import { requireCapability } from '@/lib/business-access';
+
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionCard } from '@/components/ui/section-card';
 import { SettingsTabs } from '@/components/settings-tabs';
@@ -8,7 +9,7 @@ import { DeleteAccountForm } from './delete-account-form';
 export const metadata: Metadata = { title: 'Data & privacy' };
 
 export default async function PrivacySettingsPage() {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('data.export');
   return (
     <div>
       <PageHeader

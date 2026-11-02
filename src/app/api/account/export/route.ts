@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { requireBusiness } from '@/lib/business';
+import { requireCapability } from '@/lib/business-access';
+
 import { createClient } from '@/lib/supabase/server';
 import { buildExport, fetchAllRows, toCsv, CUSTOMER_CSV_COLUMNS, type PageFetcher } from '@/lib/account-export';
 import { withinLimit } from '@/lib/rate-limit';
@@ -25,7 +26,7 @@ type Loose = {
  * security guarantees only their business's rows can ever be returned.
  */
 export async function GET(request: NextRequest) {
-  const business = await requireBusiness(); // redirects to /login when signed out
+  const { business } = await requireCapability('data.export'); // redirects to /login when signed out
 
   if (!(await withinLimit('account-export', business.id, { limit: 5, windowSeconds: 3600 }))) {
     return NextResponse.json({ error: 'Too many exports. Please try again in an hour.' }, { status: 429 });

@@ -3,7 +3,7 @@
 import { userSafeError } from '@/lib/log';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
-import { requireBusiness } from '@/lib/business';
+import { requireCapability } from '@/lib/business-access';
 import { parseRewardFields } from '@/lib/referral-rewards';
 
 export type LoyaltyFormResult = { error?: string; success?: boolean };
@@ -12,7 +12,7 @@ export async function saveLoyaltyProgram(
   _prev: LoyaltyFormResult,
   formData: FormData
 ): Promise<LoyaltyFormResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('settings.write');
   const supabase = createClient();
 
   const isActive = formData.get('is_active') === 'on';
@@ -52,7 +52,7 @@ export async function saveLoyaltyProgram(
 }
 
 export async function redeemLoyaltyPoints(customerId: string) {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('customers.write');
   const supabase = createClient();
 
   const { data: program } = await supabase
@@ -119,7 +119,7 @@ export async function createReferralPromotion(
   _prev: LoyaltyFormResult,
   formData: FormData
 ): Promise<LoyaltyFormResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('settings.write');
   const parsed = parsePromotion(formData);
   if ('error' in parsed) return { error: parsed.error };
 
@@ -137,7 +137,7 @@ export async function updateReferralPromotion(
   _prev: LoyaltyFormResult,
   formData: FormData
 ): Promise<LoyaltyFormResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('settings.write');
   const parsed = parsePromotion(formData);
   if ('error' in parsed) return { error: parsed.error };
 
@@ -155,7 +155,7 @@ export async function updateReferralPromotion(
 }
 
 export async function deleteReferralPromotion(promotionId: string) {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('settings.write');
   const supabase = createClient();
   await supabase.from('referral_promotions').delete().eq('id', promotionId).eq('business_id', business.id);
   revalidatePath('/settings/loyalty');

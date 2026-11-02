@@ -1,6 +1,6 @@
 import { randomBytes } from 'crypto';
+import { requireCapability } from '@/lib/business-access';
 import { NextResponse, type NextRequest } from 'next/server';
-import { requireBusiness } from '@/lib/business';
 import { buildAuthUrl, getGoogleConfig, GOOGLE_SCOPE } from '@/lib/google-business';
 import { logGoogleOAuth } from '@/lib/google-oauth-log';
 import { isTokenEncryptionConfigured } from '@/lib/google-token-crypto';
@@ -15,7 +15,7 @@ const STATE_COOKIE = 'gbp_oauth_state';
  * httpOnly cookie, and sends the browser to Google's consent screen.
  */
 export async function GET(request: NextRequest) {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('integrations.manage');
 
   const back = (reason: string) =>
     NextResponse.redirect(new URL(`/settings/integrations?google=error&reason=${reason}`, request.url));

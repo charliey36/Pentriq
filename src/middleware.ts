@@ -58,11 +58,12 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/send-milestones') ||
     pathname.startsWith('/api/test-welcome-email') ||
     pathname.startsWith('/api/stripe/webhook') ||
+    pathname === '/api/health' ||
     pathname === '/robots.txt' ||
     pathname === '/sitemap.xml' ||
     pathname.startsWith('/email-assets/') ||
     pathname.startsWith('/auth/callback');
-  const isPublicPage = pathname === '/blog' || pathname.startsWith('/blog/') || pathname.startsWith('/feedback/') || pathname.startsWith('/book/') || pathname === '/for' || pathname.startsWith('/for/') || pathname.startsWith('/widget/') || pathname === '/r' || pathname.startsWith('/r/') || pathname === '/review-unavailable' || pathname === '/tools/review-gap-calculator' || ['/privacy', '/terms', '/cookies', '/about', '/contact', '/pricing', '/changelog', '/roadmap'].includes(pathname);
+  const isPublicPage = pathname === '/blog' || pathname.startsWith('/blog/') || pathname.startsWith('/feedback/') || pathname.startsWith('/book/') || pathname === '/for' || pathname.startsWith('/for/') || pathname.startsWith('/widget/') || pathname.startsWith('/invite/') || pathname === '/r' || pathname.startsWith('/r/') || pathname === '/review-unavailable' || pathname === '/tools/review-gap-calculator' || ['/privacy', '/terms', '/cookies', '/about', '/contact', '/pricing', '/changelog', '/roadmap'].includes(pathname);
 
   if (!user && !isAuthPage && !isPublicApiRoute && !isPublicPage && pathname !== '/') {
     const redirectUrl = new URL('/login', request.url);

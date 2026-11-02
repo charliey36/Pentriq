@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { requireBusiness } from '@/lib/business';
+import { requireCapability } from '@/lib/business-access';
+
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/ui/page-header';
 import { SettingsTabs } from '@/components/settings-tabs';
@@ -9,7 +10,7 @@ import { ReferralPromotions } from './referral-promotions';
 export const metadata: Metadata = { title: 'Loyalty program' };
 
 export default async function LoyaltySettingsPage() {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('settings.write');
   const supabase = createClient();
 
   const { data: program } = await supabase

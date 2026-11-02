@@ -1,8 +1,9 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { requireCapability } from '@/lib/business-access';
 import { revalidatePath } from 'next/cache';
-import { requireBusiness, getAuthUser } from '@/lib/business';
+import { getAuthUser } from '@/lib/business';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getBillingState, stripeConfigured, TRIAL_DAYS } from '@/lib/billing';
 import { checkoutPriceId, getStripe } from '@/lib/stripe';
@@ -23,7 +24,7 @@ const GENERIC_ERROR = 'Something went wrong talking to Stripe. Please try again.
  * claimed (or subscribed) is refused.
  */
 export async function claimTrial(): Promise<BillingResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('billing.manage');
   if (getBillingState(business).status !== 'trial_available') {
     return { error: 'Your free trial has already been used.' };
   }
@@ -59,7 +60,7 @@ async function ensureStripeCustomer(business: { id: string; name: string; stripe
  * success-page reconcile) writes the resulting subscription state.
  */
 export async function startSubscription(): Promise<BillingResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('billing.manage');
   const priceId = checkoutPriceId();
   if (!stripeConfigured() || !priceId) return { error: NOT_CONFIGURED };
 
@@ -102,7 +103,7 @@ export async function startSubscription(): Promise<BillingResult> {
 
 /** Opens the Stripe Customer Portal (update card, change/cancel plan, invoices, receipts). */
 export async function openBillingPortal(): Promise<BillingResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('billing.manage');
   if (!stripeConfigured()) return { error: NOT_CONFIGURED };
   if (!business.stripe_customer_id) return { error: 'No active subscription to manage.' };
 
@@ -130,7 +131,7 @@ export async function openBillingPortal(): Promise<BillingResult> {
  * NOT mark the business paused, so nobody is left paying for a paused account.
  */
 export async function pauseSubscription(_prev: BillingResult, formData: FormData): Promise<BillingResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('billing.manage');
   const option = formData.get('option');
   if (!isPauseOption(option)) return { error: 'Choose how long to pause for.' };
   const state = getBillingState(business);
@@ -170,7 +171,7 @@ export async function pauseSubscription(_prev: BillingResult, formData: FormData
 
 /** Ends a pause early: payment collection resumes and sending is allowed again. */
 export async function resumeSubscription(): Promise<BillingResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('billing.manage');
   if (!business.paused_at) return { error: 'Your subscription is not paused.' };
 
   if (stripeConfigured() && business.stripe_subscription_id) {

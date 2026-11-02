@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { requireBusiness } from '@/lib/business';
+import { requireCapability } from '@/lib/business-access';
+
 import { createClient } from '@/lib/supabase/server';
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionCard } from '@/components/ui/section-card';
@@ -13,7 +14,7 @@ import { formatUKCurrency } from '@/lib/uk-defaults';
 export const metadata: Metadata = { title: 'Services' };
 
 export default async function ServicesPage() {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('settings.write');
   const supabase = createClient();
 
   const { data: services } = await supabase

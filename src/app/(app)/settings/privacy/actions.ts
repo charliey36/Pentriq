@@ -1,7 +1,8 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { requireBusiness, getAuthUser } from '@/lib/business';
+import { requireCapability } from '@/lib/business-access';
+import { getAuthUser } from '@/lib/business';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { getStripe } from '@/lib/stripe';
@@ -28,7 +29,7 @@ export type DeleteAccountResult = { error?: string };
  * Stripe keeps its own invoice records, which we are required to retain.
  */
 export async function deleteAccount(_prev: DeleteAccountResult, fd: FormData): Promise<DeleteAccountResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('account.delete');
   const user = await getAuthUser();
   if (!user) redirect('/login');
 

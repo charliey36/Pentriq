@@ -9,6 +9,7 @@ const tabs = [
   { href: '/settings/loyalty', label: 'Loyalty program' },
   { href: '/settings/reputation', label: 'Reputation' },
   { href: '/settings/integrations', label: 'Integrations' },
+  { href: '/settings/team', label: 'Team' },
   { href: '/settings/billing', label: 'Billing' },
   { href: '/settings/privacy', label: 'Data & privacy' },
 ];

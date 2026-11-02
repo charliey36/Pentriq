@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { AuthForm } from '@/components/auth-form';
 import { AuthShell } from '@/components/auth-shell';
+import { safeNextPath } from '@/lib/safe-redirect';
 
 export const metadata: Metadata = pageMetadata({
   title: 'Create your account',
@@ -10,7 +11,8 @@ export const metadata: Metadata = pageMetadata({
   path: '/signup',
 });
 
-export default function SignupPage() {
+export default function SignupPage({ searchParams }: { searchParams: { next?: string } }) {
+  const next = searchParams.next ? safeNextPath(searchParams.next) : undefined;
   return (
     <AuthShell
       title="Create your account"
@@ -18,13 +20,13 @@ export default function SignupPage() {
       footer={
         <>
           Already have an account?{' '}
-          <Link href="/login" className="font-medium text-brand-700 hover:underline dark:text-brand-400">
+          <Link href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'} className="font-medium text-brand-700 hover:underline dark:text-brand-400">
             Log in
           </Link>
         </>
       }
     >
-      <AuthForm mode="signup" />
+      <AuthForm mode="signup" next={next} />
     </AuthShell>
   );
 }

@@ -148,3 +148,77 @@ Method: screenshots of the public pages at 1280px and 390px (no horizontal scrol
 4. Set `GEMINI_API_KEY` to turn on AI replies; `NEXT_PUBLIC_GOOGLE_SIGNIN=1` after enabling the Google provider in Supabase.
 
 Verification: `tsc` clean, 618 tests pass, `next build` succeeds. Not verified: AI drafting against the live Gemini API, Google sign-in, and the signed-in pages with real data.
+
+## 10. Transformation pass: team access, operations and executive report
+
+Date: 2026-11-02. This pass built on sections 1-9 above rather than repeating them.
+
+### Scope and honesty about method
+The request covered every area of the product. In this session I read, line by line: the auth middleware, business loader, provisioning, audit, API-key, cron-auth and rate-limit code, the settings server actions, the RLS policies for `businesses` and `business_members`, and the settings, customers and dashboard pages' structure. Everything else was assessed from structure and the three earlier audit passes. **I did not exercise anything against live Supabase, Stripe, Resend, Google or Twilio**, did not render signed-in pages (no database was available), and did not benchmark anything. Competitor comparisons are from general knowledge of those products, not fresh research. The scores and "business value" figures below are judgement, not measurement.
+
+### New findings
+| # | Finding | Severity |
+|---|---|---|
+| N1 | **Team access could not work even though the schema allowed it.** The `businesses` RLS policy had `WITH CHECK (owner_id = auth.uid())`, so only the owner could ever update the business row; a second member's settings saves would match zero rows and show a misleading error. There was also no invite flow, no role enforcement and no UI | High (blocks every multi-user sale) |
+| N2 | Role column existed (`owner/admin/staff`) but nothing read it: every member could do everything, including billing, API keys and data export | High |
+| N3 | No health endpoint for uptime monitors or load balancers | Medium |
+| N4 | No skip-to-content link; keyboard users tab through the whole sidebar on every page | Medium (accessibility) |
+| N5 | Hot query shapes had only single-column `business_id` indexes (customers list, visits windows, review-request lookup, click analytics) | Medium |
+| N6 | `business_members.user_id` was not unique although the loader assumes one membership per user | Medium (data integrity) |
+
+### Implemented
+| Change | Files |
+|---|---|
+| **Roles and permissions**: one capability matrix (owner / admin / staff), least-privilege delegation (admin cannot mint admins; nobody can create a second owner) | `src/lib/permissions.ts`, `src/lib/business-access.ts`, `src/lib/business.ts` |
+| **Enforcement** across about 20 files of server actions, pages and route handlers: settings, services, loyalty, reputation, integrations (API key, Google, booking), billing, account export, account deletion | `settings/**/actions.ts`, pages, `api/account/export`, connect routes |
+| **Team management**: invite by email (single-use, SHA-256-hashed 256-bit token, bound to the invited address, 7-day expiry, re-invite revokes the old link, 10-person cap, 20 invites/hour/business), accept page, change role, remove, revoke, audit events for each | `src/lib/team.ts`, `settings/team/**`, `app/invite/[token]/**`, `src/lib/email.ts` |
+| **Invite-aware auth**: `?next=` on login/signup/email-confirmation (validated by `safeNextPath`) so an invitee lands on the invite after signing up; an auto-created *empty* business (sole member, onboarding unfinished, no customers, no billing) is discarded on accept so invitees are not stranded | `auth-form.tsx`, login/signup pages, `team.ts` |
+| **Migration 0041**: `team_invitations` (RLS on, service-role only), unique one-business-per-user, corrected `businesses` policies (members read; owner/admin update; billing columns still trigger-protected) | `supabase/migrations/0041_team_invitations_and_roles.sql` |
+| **Migration 0042**: four composite indexes matching existing queries | `supabase/migrations/0042_performance_indexes.sql` |
+| **`GET /api/health`** (readiness with 3 s dependency timeout, `?mode=live` liveness; 503 only on critical failure; never returns error text or secrets) | `src/lib/service-health.ts`, `src/app/api/health/route.ts` |
+| Skip-to-content link and focusable `<main>`; "no access" notice on the dashboard | `(app)/layout.tsx`, `dashboard/page.tsx` |
+| 27 new tests (permissions matrix, escalation, token hashing, expiry, wrong-email, re-invite, team cap, empty-business discard, cross-tenant safety, health semantics) | `team-and-permissions.test.ts`, `service-health.test.ts` |
+
+Verification: `tsc --noEmit` clean; 58 suites / 644 tests pass; `next build` succeeds; on a production server `/api/health?mode=live` returned 200, `/api/health` returned 503 with the database unreachable (as designed, in 3 s), `/invite/<bad>` rendered publicly, and `/settings/team` redirected to login.
+
+**Before deploying: apply migrations `0041` and `0042`.** Until `0041` is applied the Team page and invite link fail (no table), and admin teammates cannot save settings. `0041` fails if any user already has two memberships (the app never created that state, but check: `select user_id from business_members group by 1 having count(*) > 1;`).
+
+### Known limits of what was built
+- **Role enforcement is in the application layer.** RLS proves membership, not role, for every table except `businesses`. A staff user with the public anon key and their own session could still write rows such as `services` or `loyalty` settings directly through PostgREST. Closing that needs per-table, role-aware policies (a larger migration to be tested against a real database).
+- A removed member keeps their login; the next sign-in gives them a fresh, empty business of their own.
+- Team size cap and invite-rate limits are fixed constants; seat-based pricing is a product decision.
+- Invite email delivery, the accept flow and migration `0041` have only been tested against in-memory fakes.
+- The admin portal still uses the `ADMIN_EMAIL` allow-list rather than a role claim.
+
+### Executive summary by area
+| Area | State after this pass |
+|---|---|
+| Architecture | Sound: Next 14 App Router, Supabase with RLS, server actions, service-role jobs. Weak points: serverless crons loop over all tenants (H4), `schema.sql` is stale (migrations are the source of truth), several very large page files (dashboard ~600+ lines) |
+| Security | Good baseline (tenant scoping, hashed API keys, timing-safe cron auth, rate limits, audit log, safe redirects). Gaps: RBAC only at app layer (above), CSP still report-only, admin by email list, no MFA/SSO |
+| Performance | Fetch-all paging and chunking already fixed. Indexes added (unmeasured). Remaining: dashboard does many parallel queries per load with no caching; the customers page reads every customer row on each load (paged past the 1000-row cap, but not server-paginated) |
+| UX | Consistent design system (cards, badges, toasts, command palette). Gaps: staff are redirected with a notice if they open a settings page, rather than not seeing the link; no saved filters; tables are not server-paginated |
+| Commercial readiness | SMB-ready; now multi-user capable. Not enterprise-ready: no SSO/SCIM, no per-table DB roles, no DPA tooling, no SLA/status page |
+| Competitive position | Strong vertical fit (UK, consent-aware review gathering, rebooking, loyalty). Behind horizontal tools on user-built automation, public API/webhooks, multi-location and reporting exports |
+
+### Recommendations
+Priority score = impact (Low 1, Medium 2, High 3, Critical 4) divided by effort (Low 1, Medium 2, High 3), rounded to one decimal; higher is sooner.
+
+| # | Recommendation | Impact | Effort | Score | Business justification |
+|---|---|---|---|---|---|
+| R1 | Apply 0041/0042, set `BILLING_OVERRIDE_EMAILS`, Resend sender domain | Critical | Low | 4.0 | Nothing in this pass or the last works in production without them |
+| R2 | Solicitor review of Terms/Privacy/Cookies (placeholders today) | Critical | Low | 4.0 | Cannot lawfully take payment or process customer data without them |
+| R3 | Role-aware RLS policies on config tables (services, loyalty, journeys, segments, storage) | High | Medium | 1.5 | Makes "staff cannot change settings" true at the database, which enterprise buyers will test |
+| R4 | Promote CSP from report-only after a week of clean reports | High | Low | 3.0 | Cheap, large reduction in XSS blast radius |
+| R5 | Uptime monitor on `/api/health` plus alert on repeated rate-limiter errors | High | Low | 3.0 | Turns outages from customer-reported to team-detected |
+| R6 | Per-business job queue for crons (H4) and background large imports (H5) | High | High | 1.0 | Required before tenant count makes cron runs time out; silent missed reminders |
+| R7 | Server-side pagination, search and saved filters on customers; cache dashboard aggregates | High | Medium | 1.5 | Page weight and latency grow linearly with customers today |
+| R8 | Outbound webhooks and a Zapier/Make app on the existing API key | High | Medium | 1.5 | Cheap distribution; the inbound endpoint and OpenAPI doc already exist |
+| R9 | Admin portal on a role claim instead of an email list | Medium | Low | 2.0 | Removes a single-point operational risk |
+| R10 | Multi-location / agency view and white-label sender | High | High | 1.0 | Opens the higher-priced tier; needs a pricing decision first |
+| R11 | Visual journey builder and user-defined automations | Medium | High | 0.7 | Differentiator versus Monday/ClickUp-style tools, large build |
+| R12 | SAML/OIDC SSO, MFA, SCIM, SOC 2 groundwork | High | High | 1.0 | Gate for mid-market and regulated buyers |
+| R13 | Automated accessibility checks (axe) and keyboard-flow tests in CI | Medium | Medium | 1.0 | Protects the skip link and focus work from regressions |
+| R14 | Hide settings links a role cannot open; role badge in the sidebar | Low | Low | 2.0 | Removes a confusing dead end for staff users |
+
+### What I deliberately did not do
+Rewrite the UI wholesale, add speculative AI features beyond the review-reply drafting from earlier, or rework crons into a queue. Each needs either production data to tune against, a product or pricing decision, or infrastructure that is not in this repository, and doing them blind would add risk without evidence of benefit. Estimated business value and performance gains are therefore not quantified here: the honest figure for index and health-check work is "unmeasured"; the measurable gain from this pass is that multi-user accounts can now be sold and operated.

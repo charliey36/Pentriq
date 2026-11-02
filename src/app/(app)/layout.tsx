@@ -53,6 +53,12 @@ export default async function AppLayout({
       <ToastProvider>
         <CommandPaletteProvider>
           <div className="min-h-screen">
+            <a
+              href="#main-content"
+              className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-ink focus:shadow-lg focus:ring-2 focus:ring-brand-500"
+            >
+              Skip to main content
+            </a>
             <SidebarDrawer
               businessName={business.name ?? ''}
               businessLogoUrl={business.brand_logo_url}
@@ -79,7 +85,7 @@ export default async function AppLayout({
                 </div>
               </header>
 
-              <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+              <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
                 {billing.status !== 'active' && (
                   <Link href={billing.status === 'trial_available' ? '/onboarding' : '/settings/billing'} className="mb-6 block rounded-xl bg-brand-50 px-4 py-2.5 text-sm text-brand-800 ring-1 ring-brand-600/15 dark:bg-brand-500/10 dark:text-brand-200">
                     {billing.status === 'trial_available'

@@ -1,6 +1,9 @@
 import { NextRequest } from 'next/server';
 
-jest.mock('@/lib/business', () => ({ requireBusiness: jest.fn(async () => ({ id: 'biz-1' })) }));
+jest.mock('@/lib/business', () => ({
+  requireBusiness: jest.fn(async () => ({ id: 'biz-1' })),
+  requireAccess: jest.fn(async () => ({ business: { id: 'biz-1' }, role: 'owner', userId: 'user-1', email: 'o@example.com' })),
+}));
 
 import { GET } from '@/app/api/google-business/connect/route';
 import { GOOGLE_SCOPE } from '../google-business';

@@ -12,7 +12,12 @@ export type AuditAction =
   | 'account.exported'
   | 'account.deleted'
   | 'customers.imported'
-  | 'admin.organisation_deleted';
+  | 'admin.organisation_deleted'
+  | 'team.invited'
+  | 'team.invitation_revoked'
+  | 'team.joined'
+  | 'team.role_changed'
+  | 'team.member_removed';
 
 export type AuditEntry = {
   action: AuditAction;

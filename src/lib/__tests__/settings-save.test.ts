@@ -19,7 +19,10 @@ const updateSpy = jest.fn();
 const revalidatePathMock = jest.fn();
 
 jest.mock('next/cache', () => ({ revalidatePath: (...args: unknown[]) => revalidatePathMock(...args) }));
-jest.mock('@/lib/business', () => ({ requireBusiness: async () => ({ id: 'biz-1' }) }));
+jest.mock('@/lib/business', () => ({
+  requireBusiness: async () => ({ id: 'biz-1' }),
+  requireAccess: async () => ({ business: { id: 'biz-1' }, role: 'owner', userId: 'user-1', email: 'o@example.com' }),
+}));
 jest.mock('@/lib/supabase/server', () => ({
   createClient: () => ({
     from: () => ({

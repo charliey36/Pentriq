@@ -1,9 +1,10 @@
 'use server';
 
 import { userSafeError } from '@/lib/log';
+import { requireCapability } from '@/lib/business-access';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
-import { requireBusiness } from '@/lib/business';
+
 
 export type ServiceFormResult = { error?: string; success?: boolean };
 
@@ -11,7 +12,7 @@ export async function createService(
   _prev: ServiceFormResult,
   formData: FormData
 ): Promise<ServiceFormResult> {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('settings.write');
   const supabase = createClient();
 
   const name = String(formData.get('name') ?? '').trim();
@@ -48,7 +49,7 @@ export async function createService(
 }
 
 export async function deactivateService(serviceId: string) {
-  const business = await requireBusiness();
+  const { business } = await requireCapability('settings.write');
   const supabase = createClient();
 
   await supabase

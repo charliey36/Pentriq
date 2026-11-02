@@ -67,7 +67,7 @@ const quickActions: { href: string; label: string; description: string; icon: Ic
   { href: '/feedback-inbox', label: 'Review private feedback', description: 'Reply to what customers shared', icon: 'chat', tone: 'rose' },
 ];
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams?: { denied?: string } }) {
   const business = await requireBusiness();
   const supabase = createClient();
 
@@ -300,6 +300,11 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {searchParams?.denied === '1' && (
+        <Notice variant="warning">
+          Your role doesn&apos;t have access to that page. Ask the account owner if you need it.
+        </Notice>
+      )}
       {/* Hero */}
       <section
         className="reveal relative isolate overflow-hidden rounded-3xl shadow-hero"
