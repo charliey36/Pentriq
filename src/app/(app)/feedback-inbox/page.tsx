@@ -28,7 +28,8 @@ function hoursLabel(hours: number): string {
   return `${days}d`;
 }
 
-export default async function FeedbackInboxPage({ searchParams }: { searchParams?: { view?: string; topic?: string } }) {
+export default async function FeedbackInboxPage({ searchParams: searchParamsPromise }: { searchParams?: Promise<{ view?: string; topic?: string }> }) {
+  const searchParams = await searchParamsPromise;
   const business = await requireBusiness();
   const supabase = createClient();
   const view: View = (VIEWS as readonly string[]).includes(searchParams?.view ?? '') ? (searchParams?.view as View) : 'open';
