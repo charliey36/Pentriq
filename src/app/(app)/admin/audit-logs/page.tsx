@@ -10,7 +10,8 @@ export const dynamic = 'force-dynamic';
 
 type Row = { id: number; created_at: string; action: string; actor_email: string | null; actor_id: string | null; business_id: string | null; target_type: string | null; target_id: string | null; metadata: Record<string, unknown> };
 
-export default async function AuditLogsPage({ searchParams }: { searchParams: { action?: string } }) {
+export default async function AuditLogsPage({ searchParams: searchParamsPromise }: { searchParams: Promise<{ action?: string }> }) {
+  const searchParams = await searchParamsPromise;
   await requireBusiness();
   const user = await getAuthUser();
   if (!user || !isAdminEmail(user.email)) notFound();

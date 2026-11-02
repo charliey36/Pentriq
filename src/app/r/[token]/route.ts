@@ -15,11 +15,13 @@ export const dynamic = 'force-dynamic';
  * `token` is the message/review_request tracking_token; raw ids from older
  * links are accepted too.
  */
-export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
+export async function GET(request: NextRequest, { params: paramsPromise }: { params: Promise<{ token: string }> }) {
+  const params = await paramsPromise;
   return handleReviewLinkRequest(request, { by: 'token', value: params.token });
 }
 
 /** Link-checkers often probe with HEAD; same redirect, never counted. */
-export async function HEAD(request: NextRequest, { params }: { params: { token: string } }) {
+export async function HEAD(request: NextRequest, { params: paramsPromise }: { params: Promise<{ token: string }> }) {
+  const params = await paramsPromise;
   return handleReviewLinkRequest(request, { by: 'token', value: params.token });
 }

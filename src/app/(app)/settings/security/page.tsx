@@ -21,7 +21,8 @@ export const metadata: Metadata = { title: 'Security & audit' };
 const PAGE_SIZE = 50;
 const WINDOWS = [30, 90, 365] as const;
 
-export default async function SecurityPage({ searchParams }: { searchParams?: { action?: string; page?: string; days?: string } }) {
+export default async function SecurityPage({ searchParams: searchParamsPromise }: { searchParams?: Promise<{ action?: string; page?: string; days?: string }> }) {
+  const searchParams = await searchParamsPromise;
   const { business, role } = await requireCapability('team.manage');
   const supabase = createClient();
   const admin = createAdminClient();

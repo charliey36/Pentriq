@@ -13,7 +13,8 @@ import { DeleteReferralButton } from './delete-referral-button';
 
 export const metadata: Metadata = { title: 'Referrals' };
 
-export default async function ReferralsPage({ searchParams }: { searchParams?: { status?: string } }) {
+export default async function ReferralsPage({ searchParams: searchParamsPromise }: { searchParams?: Promise<{ status?: string }> }) {
+  const searchParams = await searchParamsPromise;
   const business = await requireBusiness();
   const supabase = createClient();
 

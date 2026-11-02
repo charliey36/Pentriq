@@ -25,10 +25,11 @@ function formatDateTime(value: string) {
 }
 
 export default async function CustomersPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams?: { add?: string; q?: string; status?: string; sort?: string; dir?: string };
+  searchParams?: Promise<{ add?: string; q?: string; status?: string; sort?: string; dir?: string }>;
 }) {
+  const searchParams = await searchParamsPromise;
   const { business, role, userId } = await requireAccess();
   const supabase = createClient();
   // Team-shared saved filters for this list (server-only table). Loaded alongside the customers.

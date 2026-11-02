@@ -42,7 +42,7 @@ export async function inviteMember(_prev: TeamActionResult, formData: FormData):
   }
   await recordAudit({
     action: 'team.invited', businessId: business.id, actorId: userId, actorEmail,
-    targetType: 'invitation', metadata: { role: result.role }, ip: requesterId(headers()),
+    targetType: 'invitation', metadata: { role: result.role }, ip: requesterId(await headers()),
   });
   revalidatePath('/settings/team');
   return { success: true, message: `Invitation sent to ${result.email}.` };

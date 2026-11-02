@@ -11,7 +11,8 @@ export const metadata: Metadata = { title: 'Customer reviews', robots: { index: 
 const stars = (n: number) => '★'.repeat(Math.round(n)) + '☆'.repeat(5 - Math.round(n));
 
 /** Public, iframe-able reviews wall. 404s unless the business switched the widget on. */
-export default async function ReviewWidgetPage({ params }: { params: { businessId: string } }) {
+export default async function ReviewWidgetPage({ params: paramsPromise }: { params: Promise<{ businessId: string }> }) {
+  const params = await paramsPromise;
   if (!isUuid(params.businessId)) notFound();
   const db = createAdminClient();
   const { data: business } = await db.from('businesses').select('id, name, widget_enabled').eq('id', params.businessId).maybeSingle();

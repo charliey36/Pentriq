@@ -25,7 +25,7 @@ export async function requestRebooking(
 ): Promise<RequestRebookingResult> {
   const preferredTime = String(formData.get('preferred_time') ?? '').trim().slice(0, 500);
 
-  const ip = requesterId(headers());
+  const ip = requesterId(await headers());
   if (
     !(await withinLimit('booking-ip', ip, RATE_LIMITS.bookingIp)) ||
     !(await withinLimit('booking-target', customerId, RATE_LIMITS.bookingTarget))

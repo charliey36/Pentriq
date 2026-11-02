@@ -8,11 +8,12 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-export default function ReviewUnavailablePage({
-  searchParams,
+export default async function ReviewUnavailablePage({
+  searchParams: searchParamsPromise,
 }: {
-  searchParams: { reason?: string };
+  searchParams: Promise<{ reason?: string }>;
 }) {
+  const searchParams = await searchParamsPromise;
   const invalidLink = searchParams.reason === 'invalid-link';
 
   return (

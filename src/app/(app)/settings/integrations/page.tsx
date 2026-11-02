@@ -57,10 +57,11 @@ const BOOKING_ERRORS: Record<string, string> = {
 };
 
 export default async function IntegrationsPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams?: { google?: string; reason?: string; booking?: string; provider?: string };
+  searchParams?: Promise<{ google?: string; reason?: string; booking?: string; provider?: string }>;
 }) {
+  const searchParams = await searchParamsPromise;
   const { business } = await requireCapability('integrations.manage');
 
   // Google Business Profile: tokens stay on the server; the panel only gets safe fields.

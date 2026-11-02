@@ -24,5 +24,5 @@ jobs:
           NEXT_PUBLIC_APP_URL: http://localhost:3000
           CRON_SECRET: placeholder
           NEXT_TELEMETRY_DISABLED: '1'
+      # Production dependencies must have no high or critical advisories. Remaining dev-only/low findings are listed in docs/PRODUCT_AUDIT.md.
       - run: npm audit --omit=dev --audit-level=high
-        continue-on-error: true

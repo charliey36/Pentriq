@@ -55,7 +55,8 @@ function membersCsv(members: CustomerMetrics[]): string {
   return `${[header.join(','), ...rows.map((r) => r.join(','))].join('\r\n')}\r\n`;
 }
 
-export default async function SegmentsPage({ searchParams }: { searchParams?: { preset?: string; rules?: string; segment?: string; name?: string } }) {
+export default async function SegmentsPage({ searchParams: searchParamsPromise }: { searchParams?: Promise<{ preset?: string; rules?: string; segment?: string; name?: string }> }) {
+  const searchParams = await searchParamsPromise;
   const { business, role } = await requireAccess();
   const supabase = createClient();
 

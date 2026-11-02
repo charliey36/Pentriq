@@ -12,7 +12,8 @@ export function generateStaticParams() {
   return INDUSTRIES.map((i) => ({ industry: i.slug }));
 }
 
-export function generateMetadata({ params }: { params: { industry: string } }): Metadata {
+export async function generateMetadata({ params: paramsPromise }: { params: Promise<{ industry: string }> }): Promise<Metadata> {
+  const params = await paramsPromise;
   const i = industryBySlug(params.industry);
   if (!i) return {};
   return pageMetadata({
@@ -22,7 +23,8 @@ export function generateMetadata({ params }: { params: { industry: string } }): 
   });
 }
 
-export default function IndustryPage({ params }: { params: { industry: string } }) {
+export default async function IndustryPage({ params: paramsPromise }: { params: Promise<{ industry: string }> }) {
+  const params = await paramsPromise;
   const i = industryBySlug(params.industry);
   if (!i) notFound();
 

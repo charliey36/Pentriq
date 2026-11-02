@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { articleLd, breadcrumbLd } from '@/lib/seo';
 import { POSTS, SITE_URL, formatDate, getPost, postUrl, readingMinutes, relatedPosts, wordCount } from '@/lib/blog';
 
-type Props = { params: { slug: string } };
+type Props = { params: Promise<{ slug: string }> };
 
 // Only the articles that exist are valid; everything else is a real 404.
 export const dynamicParams = false;
@@ -17,7 +17,8 @@ export function generateStaticParams() {
   return POSTS.map((p) => ({ slug: p.slug }));
 }
 
-export function generateMetadata({ params }: Props): Metadata {
+export async function generateMetadata({ params: paramsPromise }: Props): Promise<Metadata> {
+  const params = await paramsPromise;
   const post = getPost(params.slug);
   if (!post) return {};
   const url = postUrl(post.slug);
@@ -43,7 +44,8 @@ export function generateMetadata({ params }: Props): Metadata {
   };
 }
 
-export default function BlogPostPage({ params }: Props) {
+export default async function BlogPostPage({ params: paramsPromise }: Props) {
+  const params = await paramsPromise;
   const post = getPost(params.slug);
   if (!post) notFound();
 

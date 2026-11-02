@@ -29,10 +29,11 @@ const money = (minor: number, currency: string) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: currency.toUpperCase() }).format(minor / 100);
 
 export default async function BillingPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams?: { checkout?: string; session_id?: string };
+  searchParams?: Promise<{ checkout?: string; session_id?: string }>;
 }) {
+  const searchParams = await searchParamsPromise;
   let { business } = await requireCapability('billing.manage');
 
   // Returning from Stripe Checkout: sync immediately instead of waiting for the webhook.

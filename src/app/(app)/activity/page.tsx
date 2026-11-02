@@ -40,7 +40,8 @@ const KIND_STYLE: Record<ActivityKind, { icon: IconName; tone: Tone }> = {
 
 const timeFormat = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: UK_TIMEZONE });
 
-export default async function ActivityPage({ searchParams }: { searchParams?: { type?: string; days?: string } }) {
+export default async function ActivityPage({ searchParams: searchParamsPromise }: { searchParams?: Promise<{ type?: string; days?: string }> }) {
+  const searchParams = await searchParamsPromise;
   const { business, role } = await requireAccess();
   const supabase = createClient();
   const kind = parseKind(searchParams?.type);

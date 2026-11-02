@@ -12,10 +12,12 @@ export const dynamic = 'force-dynamic';
  * branded /review-unavailable page when the link is unknown or the business
  * has no valid review URL.
  */
-export async function GET(request: NextRequest, { params }: { params: { messageId: string } }) {
+export async function GET(request: NextRequest, { params: paramsPromise }: { params: Promise<{ messageId: string }> }) {
+  const params = await paramsPromise;
   return handleReviewLinkRequest(request, { by: 'message_id', value: params.messageId });
 }
 
-export async function HEAD(request: NextRequest, { params }: { params: { messageId: string } }) {
+export async function HEAD(request: NextRequest, { params: paramsPromise }: { params: Promise<{ messageId: string }> }) {
+  const params = await paramsPromise;
   return handleReviewLinkRequest(request, { by: 'message_id', value: params.messageId });
 }

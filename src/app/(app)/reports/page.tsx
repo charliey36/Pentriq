@@ -67,7 +67,8 @@ async function countsFor(db: Db, businessId: string, r: Range) {
   };
 }
 
-export default async function ReportsPage({ searchParams }: { searchParams?: { period?: string } }) {
+export default async function ReportsPage({ searchParams: searchParamsPromise }: { searchParams?: Promise<{ period?: string }> }) {
+  const searchParams = await searchParamsPromise;
   const business = await requireBusiness();
   const supabase = createClient();
   const period = resolvePeriod(searchParams?.period);

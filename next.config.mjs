@@ -10,7 +10,7 @@ const baseConfig = {
   // Always fetch fresh data when navigating between sections (no stale 30s page cache),
   // so clicking a sidebar item doesn't need a second refresh request.
   // instrumentationHook: loads src/instrumentation.ts (Sentry) on Next 14.
-  experimental: { staleTimes: { dynamic: 0, static: 30 }, instrumentationHook: true },
+  experimental: { staleTimes: { dynamic: 0, static: 30 } },
   // The release id is baked into the browser bundle so frontend errors carry the same release as the server.
   // Baseline security headers on every response (no CSP yet: it needs testing against Stripe/Sentry/Google scripts).
   // The Email tab moved to the Admin Portal; keep old bookmarks and links working.

@@ -11,7 +11,8 @@ export const metadata: Metadata = pageMetadata({
   path: '/signup',
 });
 
-export default function SignupPage({ searchParams }: { searchParams: { next?: string } }) {
+export default async function SignupPage({ searchParams: searchParamsPromise }: { searchParams: Promise<{ next?: string }> }) {
+  const searchParams = await searchParamsPromise;
   const next = searchParams.next ? safeNextPath(searchParams.next) : undefined;
   return (
     <AuthShell

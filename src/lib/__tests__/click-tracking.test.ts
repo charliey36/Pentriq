@@ -50,7 +50,7 @@ function headers(overrides: Record<string, string> = {}) {
 }
 const get = (path: string, h: Record<string, string> = headers(), method = 'GET') =>
   new NextRequest(`https://app.pentriq.test${path}`, { method, headers: h });
-const hit = (token: string, h?: Record<string, string>) => GET(get(`/r/${token}`, h), { params: { token } });
+const hit = (token: string, h?: Record<string, string>) => GET(get(`/r/${token}`, h), { params: Promise.resolve({ token }) });
 
 function seed(opts: { google?: string | null; enrollment?: boolean } = {}) {
   const db = new FakeDb();
@@ -344,7 +344,7 @@ describe('Test 5: the Google review link still opens normally', () => {
     const bot = await hit(TOKEN, headers({ 'user-agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)' }));
     expect(bot.status).toBe(302);
     expect(bot.headers.get('location')).toBe(GOOGLE);
-    const head = await HEAD(get(`/r/${TOKEN}`, headers(), 'HEAD'), { params: { token: TOKEN } });
+    const head = await HEAD(get(`/r/${TOKEN}`, headers(), 'HEAD'), { params: Promise.resolve({ token: TOKEN }) });
     expect(head.headers.get('location')).toBe(GOOGLE);
   });
 });
@@ -379,7 +379,7 @@ describe('bots, scanners and previews', () => {
   });
 
   it('writes nothing for HEAD probes', async () => {
-    await HEAD(get(`/r/${TOKEN}`, headers(), 'HEAD'), { params: { token: TOKEN } });
+    await HEAD(get(`/r/${TOKEN}`, headers(), 'HEAD'), { params: Promise.resolve({ token: TOKEN }) });
     expect(db.rows('interaction_events')).toHaveLength(0);
   });
 

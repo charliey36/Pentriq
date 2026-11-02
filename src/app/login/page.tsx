@@ -12,7 +12,8 @@ export const metadata: Metadata = pageMetadata({
   path: '/login',
 });
 
-export default function LoginPage({ searchParams }: { searchParams: { reset?: string; next?: string } }) {
+export default async function LoginPage({ searchParams: searchParamsPromise }: { searchParams: Promise<{ reset?: string; next?: string }> }) {
+  const searchParams = await searchParamsPromise;
   return (
     <AuthShell
       title="Welcome back"
