@@ -314,7 +314,7 @@ export async function syncConnection(
       .update({ last_sync_at: syncedAt, last_sync_error: null, initial_sync_done: true, status: 'active' })
       .eq('id', conn.id);
 
-    await rebuildMetrics(admin, conn.business_id).catch((e) => console.error('[google-sync] metrics rebuild failed', e));
+    await rebuildMetrics(admin, conn.business_id, now).catch((e) => console.error('[google-sync] metrics rebuild failed', e));
     await recordJob(admin, { ...result, ok: true }, jobTrigger);
     return { ...result, ok: true };
   } catch (err) {

@@ -21,6 +21,8 @@ export const RATE_LIMITS = {
   feedbackTarget: { limit: 20, windowSeconds: 3600 },
   bookingIp: { limit: 10, windowSeconds: 600 },
   bookingTarget: { limit: 5, windowSeconds: 3600 },
+  /** Public integration API: generous for real automations, tight enough to stop key-guessing and floods. */
+  apiIp: { limit: 120, windowSeconds: 60 },
 } satisfies Record<string, RateLimitRule>;
 
 type RpcCaller = (key: string, windowSeconds: number, limit: number) => Promise<{ data: unknown; error: { message: string } | null }>;

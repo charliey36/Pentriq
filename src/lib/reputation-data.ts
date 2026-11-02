@@ -54,7 +54,7 @@ export async function setSource(db: Admin, businessId: string, type: ReputationS
 }
 
 /** Recomputes the monthly `review_metrics` roll-up from the active source. Safe to call any time (idempotent). */
-export async function rebuildMetrics(db: Admin, businessId: string): Promise<number> {
+export async function rebuildMetrics(db: Admin, businessId: string, now: Date = new Date()): Promise<number> {
   const { data: conn } = await db
     .from('google_business_connections')
     .select('status, google_location_id')
@@ -62,7 +62,7 @@ export async function rebuildMetrics(db: Admin, businessId: string): Promise<num
     .maybeSingle();
   const { snapshots } = await loadReputation(db, businessId, conn?.status === 'active' && Boolean(conn.google_location_id));
 
-  const rows = monthlyMetrics(snapshots, dateKey(new Date())).map((m) => ({ ...m, business_id: businessId, calculated_at: new Date().toISOString() }));
+  const rows = monthlyMetrics(snapshots, dateKey(now)).map((m) => ({ ...m, business_id: businessId, calculated_at: now.toISOString() }));
   await db.from('review_metrics').delete().eq('business_id', businessId);
   if (rows.length > 0) {
     const { error } = await db.from('review_metrics').insert(rows);
