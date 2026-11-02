@@ -57,10 +57,11 @@ type TabKey = (typeof TABS)[number]['key'];
 const TONE_DOT = { good: 'bg-brand-500', bad: 'bg-red-500', neutral: 'bg-line-strong' } as const;
 
 export default async function ReviewsAnalyticsPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams?: { tab?: string; range?: string; from?: string; to?: string; filter?: string };
+  searchParams?: Promise<{ tab?: string; range?: string; from?: string; to?: string; filter?: string }>;
 }) {
+  const searchParams = await searchParamsPromise;
   const business = await requireBusiness();
   const connection = await getPublicConnection(business.id);
   const tab: TabKey = TABS.find((t) => t.key === searchParams?.tab)?.key ?? 'analytics';

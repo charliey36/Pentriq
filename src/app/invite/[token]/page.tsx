@@ -11,7 +11,8 @@ import { AcceptButton } from './accept-button';
 export const metadata: Metadata = { title: 'Team invitation', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
 
-export default async function InvitePage({ params }: { params: { token: string } }) {
+export default async function InvitePage({ params: paramsPromise }: { params: Promise<{ token: string }> }) {
+  const params = await paramsPromise;
   const invite = await lookupInvitation(createAdminClient() as never, params.token);
   const user = await getAuthUser();
   const back = `/invite/${params.token}`;

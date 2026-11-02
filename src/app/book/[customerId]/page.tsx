@@ -7,7 +7,8 @@ import { RequestRebookingForm } from './request-rebooking-form';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Book your next visit' };
 
-export default async function BookPage({ params }: { params: { customerId: string } }) {
+export default async function BookPage({ params: paramsPromise }: { params: Promise<{ customerId: string }> }) {
+  const params = await paramsPromise;
   const supabase = createAdminClient();
 
   const { data: customer } = await supabase

@@ -13,7 +13,8 @@ export const metadata: Metadata = { title: 'Share feedback' };
  * link - see src/lib/compliance.ts for why this page exists unconditionally
  * rather than being gated behind a sentiment check.
  */
-export default async function FeedbackPage({ params }: { params: { messageId: string } }) {
+export default async function FeedbackPage({ params: paramsPromise }: { params: Promise<{ messageId: string }> }) {
+  const params = await paramsPromise;
   const supabase = createAdminClient();
 
   const { data: message } = await supabase
