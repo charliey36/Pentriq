@@ -7,6 +7,9 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Icon } from '@/components/ui/icons';
 import { AddCustomerPanel } from './add-customer-panel';
 import { CustomersTable, type CustomerRow } from './customers-table';
+import { parseListState, serializeListState } from '@/lib/customer-list';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { SavedViewsBar } from '@/components/saved-views-bar';
 import { SendHeldButton } from './review-row-actions';
 import { fetchAll } from '@/lib/fetch-all';
 import { formatUKDate, formatUKDateTime } from '@/lib/uk-defaults';
@@ -24,10 +27,19 @@ function formatDateTime(value: string) {
 export default async function CustomersPage({
   searchParams,
 }: {
-  searchParams?: { add?: string };
+  searchParams?: { add?: string; q?: string; status?: string; sort?: string; dir?: string };
 }) {
-  const { business, role } = await requireAccess();
+  const { business, role, userId } = await requireAccess();
   const supabase = createClient();
+  // Team-shared saved filters for this list (server-only table). Loaded alongside the customers.
+  const savedViewsPromise = createAdminClient()
+    .from('saved_views')
+    .select('id, name, query, created_by')
+    .eq('business_id', business.id)
+    .eq('scope', 'customers')
+    .order('created_at')
+    .limit(20)
+    .then((r) => r.data ?? [], () => []);
 
   // Paged read: a single query is capped at 1000 rows, which used to hide customers beyond that and misreport the total.
   const customers = await fetchAll((from, to) =>
@@ -99,6 +111,15 @@ export default async function CustomersPage({
   });
 
   const wantsAdd = searchParams?.add === '1';
+  const initialState = parseListState(
+    new URLSearchParams(
+      Object.entries({ q: searchParams?.q, status: searchParams?.status, sort: searchParams?.sort, dir: searchParams?.dir }).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string'
+      )
+    )
+  );
+  const savedViews = await savedViewsPromise;
+  const canManageViews = can(role, 'team.manage');
 
   return (
     <div>
@@ -122,7 +143,18 @@ export default async function CustomersPage({
 
       <AddCustomerPanel defaultOpen={wantsAdd || rows.length === 0} autoFocus={wantsAdd} />
 
-      <CustomersTable rows={rows} canExport={can(role, 'data.export')} />
+      <SavedViewsBar
+        scope="customers"
+        quick={[
+          { name: 'Needs attention', query: 'status=failed' },
+          { name: 'On hold', query: 'status=held' },
+          { name: 'Never asked', query: 'status=none' },
+        ]}
+        views={savedViews.map((v) => ({ id: v.id, name: v.name, query: v.query, canDelete: canManageViews || v.created_by === userId }))}
+      />
+
+      {/* Keyed on the URL state so following a saved view or deep link re-initialises the table. */}
+      <CustomersTable key={serializeListState(initialState)} rows={rows} canExport={can(role, 'data.export')} initialState={initialState} />
     </div>
   );
 }

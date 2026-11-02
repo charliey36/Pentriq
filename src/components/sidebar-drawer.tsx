@@ -74,7 +74,7 @@ export function SidebarDrawer({
 
       <aside
         aria-label="Sidebar"
-        className={`fixed inset-y-0 left-0 z-40 flex w-[264px] flex-col border-r border-line/80 bg-surface-sidebar/80 backdrop-blur-xl backdrop-saturate-150 ${position} ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-[264px] print:hidden flex-col border-r border-line/80 bg-surface-sidebar/80 backdrop-blur-xl backdrop-saturate-150 ${position} ${
           ready ? 'transition-[transform,visibility] duration-300 ease-out-expo' : ''
         } max-lg:shadow-pop`}
       >

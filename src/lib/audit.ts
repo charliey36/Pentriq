@@ -20,7 +20,13 @@ export type AuditAction =
   | 'team.member_removed'
   | 'webhook.configured'
   | 'webhook.secret_rotated'
-  | 'webhook.deleted';
+  | 'webhook.deleted'
+  | 'feedback.bulk_updated'
+  | 'segment.campaign_sent'
+  | 'settings.retention_changed'
+  | 'saved_view.created'
+  | 'saved_view.deleted'
+  | 'audit.exported';
 
 export type AuditEntry = {
   action: AuditAction;

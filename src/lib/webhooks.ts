@@ -20,7 +20,7 @@ import { logEvent } from '@/lib/log';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Db = { from(table: string): any };
 
-export const WEBHOOK_EVENTS = ['customer.created', 'feedback.received'] as const;
+export const WEBHOOK_EVENTS = ['customer.created', 'feedback.received', 'feedback.resolved', 'visit.logged'] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number] | 'webhook.test';
 export const MAX_FAILURES = 10;
 export const DELIVERY_TIMEOUT_MS = 3000;
@@ -89,46 +89,76 @@ export function verifySignature(secret: string, header: string, body: string, to
 
 export type EndpointRow = { id: string; business_id: string; url: string; secret_encrypted: string; events: string[]; is_active: boolean; consecutive_failures: number };
 
-/** Sends one event to one endpoint and records the outcome. Never throws. */
+/** Transient outcomes worth one more try: timeouts, connection failures, 429 and 5xx. Redirects and 4xx are final. */
+export function isRetryable(result: { status?: number; error?: string }): boolean {
+  if (result.error === 'timeout' || result.error === 'network_error') return true;
+  return typeof result.status === 'number' && (result.status === 429 || result.status >= 500);
+}
+
+export type DeliverDeps = {
+  fetchImpl?: FetchLike;
+  lookup?: Lookup;
+  now?: () => number;
+  /** Extra attempts after a transient failure (default 0). The same delivery id is reused so receivers can de-duplicate. */
+  retries?: number;
+  sleep?: (ms: number) => Promise<void>;
+};
+
+const RETRY_DELAYS_MS = [400, 1500];
+
+/** Sends one event to one endpoint and records the outcome (one log row, however many attempts). Never throws. */
 export async function deliver(
   db: Db,
   endpoint: EndpointRow,
   type: WebhookEvent,
   data: Record<string, unknown>,
-  deps: { fetchImpl?: FetchLike; lookup?: Lookup; now?: () => number } = {}
-): Promise<{ ok: boolean; status?: number; error?: string }> {
+  deps: DeliverDeps = {}
+): Promise<{ ok: boolean; status?: number; error?: string; attempts: number }> {
   const now = deps.now ?? Date.now;
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const started = now();
   const id = randomUUID();
   let status: number | undefined;
   let error: string | undefined;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT_MS);
-  try {
-    await assertPublicTarget(endpoint.url, deps.lookup);
-    const body = JSON.stringify({ id, type, created_at: new Date(started).toISOString(), data });
-    const ts = Math.floor(started / 1000);
-    const secret = decryptToken(endpoint.secret_encrypted);
-    const res = await (deps.fetchImpl ?? (fetch as unknown as FetchLike))(endpoint.url, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'user-agent': 'Pentriq-Webhooks/1',
-        'pentriq-event': type,
-        'pentriq-delivery': id,
-        'pentriq-signature': `t=${ts},v1=${sign(secret, ts, body)}`,
-      },
-      body,
-      redirect: 'manual',
-      signal: controller.signal,
-    });
-    status = res.status;
-    if (status < 200 || status >= 300) error = `HTTP ${status}`;
-  } catch (e) {
-    error = controller.signal.aborted ? 'timeout' : e instanceof Error && e.message === 'blocked_target' ? 'blocked_target' : 'network_error';
-  } finally {
-    clearTimeout(timer);
+  let attempts = 0;
+  const maxAttempts = 1 + Math.max(0, Math.min(2, deps.retries ?? 0));
+
+  while (attempts < maxAttempts) {
+    attempts += 1;
+    status = undefined;
+    error = undefined;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT_MS);
+    try {
+      await assertPublicTarget(endpoint.url, deps.lookup);
+      const body = JSON.stringify({ id, type, created_at: new Date(started).toISOString(), data });
+      const ts = Math.floor(now() / 1000);
+      const secret = decryptToken(endpoint.secret_encrypted);
+      const res = await (deps.fetchImpl ?? (fetch as unknown as FetchLike))(endpoint.url, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'user-agent': 'Pentriq-Webhooks/1',
+          'pentriq-event': type,
+          'pentriq-delivery': id,
+          'pentriq-attempt': String(attempts),
+          'pentriq-signature': `t=${ts},v1=${sign(secret, ts, body)}`,
+        },
+        body,
+        redirect: 'manual',
+        signal: controller.signal,
+      });
+      status = res.status;
+      if (status < 200 || status >= 300) error = `HTTP ${status}`;
+    } catch (e) {
+      error = controller.signal.aborted ? 'timeout' : e instanceof Error && e.message === 'blocked_target' ? 'blocked_target' : 'network_error';
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!error || !isRetryable({ status, error }) || attempts >= maxAttempts) break;
+    await sleep(RETRY_DELAYS_MS[attempts - 1] ?? 1500);
   }
+  if (error && attempts > 1) error = `${error} after ${attempts} attempts`;
 
   const ok = !error;
   try {
@@ -149,16 +179,17 @@ export async function deliver(
   } catch (e) {
     logEvent('db', 'webhook_log_failed', { reason: e instanceof Error ? e.message : String(e) }, 'error');
   }
-  return { ok, status, error };
+  return { ok, status, error, attempts };
 }
 
 /** Fire-and-forget from user actions: finds the business's endpoint, and delivers if it is on and subscribed. Never throws. */
-export async function emitWebhookEvent(db: Db, businessId: string, type: Exclude<WebhookEvent, 'webhook.test'>, data: Record<string, unknown>, deps?: Parameters<typeof deliver>[4]): Promise<void> {
+export async function emitWebhookEvent(db: Db, businessId: string, type: Exclude<WebhookEvent, 'webhook.test'>, data: Record<string, unknown>, deps?: DeliverDeps): Promise<void> {
   try {
     if (!isTokenEncryptionConfigured()) return;
     const { data: endpoint } = await db.from('webhook_endpoints').select('id, business_id, url, secret_encrypted, events, is_active, consecutive_failures').eq('business_id', businessId).eq('is_active', true).maybeSingle();
     if (!endpoint || !(endpoint.events as string[]).includes(type)) return;
-    await deliver(db, endpoint as EndpointRow, type, data, deps);
+    // One quick retry for transient failures; the caller is a user action, so keep the wait short.
+    await deliver(db, endpoint as EndpointRow, type, data, { retries: 1, ...deps });
   } catch (e) {
     logEvent('db', 'webhook_emit_failed', { reason: e instanceof Error ? e.message : String(e) }, 'error');
   }

@@ -237,3 +237,52 @@ Verification: `tsc` clean; 60 suites / 687 tests pass (43 new: list logic, URL-s
 **Apply migration `0043` before using the webhook panel** (the Integrations page reads the new tables and will error without them). Webhooks also need `GOOGLE_TOKEN_ENCRYPTION_KEY`.
 
 Not verified: any of the UI in a browser against real data (no database available), the bulk send against a live mailer, and webhook delivery to a real receiver. Not done: retries with backoff, webhooks for CSV/booking imports, per-event payload versioning, server-side pagination of the customers query (the page still loads all rows, now rendered 50 at a time), and anything from the "needs a decision or infrastructure" list in section 10.
+
+## 12. Transformation pass: Pentriq Intelligence, new workspaces and enterprise controls
+
+Date: 2026-11-02. Built on sections 1-11; nothing here repeats them.
+
+### Method and limits (read first)
+Same constraints as the earlier passes: **no database, no live Stripe/Resend/Google/Twilio, and no signed-in
+page could be rendered** in this environment. Everything below was verified by typecheck, unit tests (pure
+logic, test fakes and server-rendered component markup), a production `next build`, and a smoke test of the
+production server (new pages redirect to login when signed out; the new cron route returns 401 without the
+secret). Competitor comparisons were not re-researched. The "intelligence" is deterministic, documented rules,
+not a trained model, and it is described that way in the UI. No figure below is a measured business outcome.
+
+### What changed, by area
+| Area | Before | After | Files |
+|---|---|---|---|
+| Intelligence layer | Rule-based dashboard highlights; AI only for Google review replies | Health score (5 pillars, A-E, no-data pillars excluded), ranked next best actions with reasons and value estimates, feedback triage (sentiment, topics, urgency, escalation, 48 h target), customer insights (learned visit rhythm, churn risk, next visit), review themes, forecasts, "Ask Pentriq" natural-language queries. All local: no customer text leaves the app | `src/lib/intelligence/*` |
+| Insights (new) | None | Health score, top actions, 30-day projections, review milestone ETA, revenue due to rebook, retention split, feedback topics, Google review themes | `src/app/(app)/insights/page.tsx` |
+| Executive report (new) | None | 30 d / 90 d / 12 m period-over-period KPIs, plain-English summary, health table, priorities; print/PDF (print stylesheet) and CSV | `src/app/(app)/reports/*`, `src/lib/intelligence/report.ts`, `globals.css` |
+| Activity (new) | None | One timeline across customers, messages, clicks, visits, feedback, Google reviews and (owners/admins) audit events; filters and 7/30/90-day windows | `src/app/(app)/activity/page.tsx`, `src/lib/activity-feed.ts` |
+| Dashboard | Highlights from 5 rules; 4 sequential query batches | Hero "Do next" from the ranked action engine; next-actions + compact health card row; queries run in one parallel batch | `dashboard/page.tsx` |
+| Feedback inbox | Flat list, three status tabs | Triage queue (most urgent first), views (open/critical/overdue/resolved/all), topic chips, KPI strip, search, bulk acknowledge/resolve, editable reply draft + "Reply by email", reopen, status changes shown instantly (rolled back on failure), paged past 1000 rows | `feedback-inbox/*` |
+| Customer profile | Stats, visit table, tags | "Pentriq summary" (narrative, churn risk, predicted visit, usual gap, spend trend, reasons), one-click recommended actions, unified per-customer timeline | `customers/[customerId]/*`, `components/intelligence/customer-insight-card.tsx` |
+| Segments | One condition, count only, no sending, no validation of field/operator | Up to five conditions; new fields (rebooking status, email status, days since added, average spend); seven templates with live counts; preview from template, URL rules or Ask Pentriq; member table; CSV export; send rebooking reminder or review request to the segment (25 per click, unsubscribed skipped, audited); strict validation; legacy rules normalised | `src/lib/segments.ts`, `segments/*` |
+| Reviews | List capped at 50, no filters | Filters (needs a reply, 1-3★, 4-5★), search, progressive loading up to 500; themes on the Insights tab; renamed "Reviews" | `reviews/*` |
+| Customers | Initial filters read from `window` in `useState` (hydration mismatch on deep links) | Server-parsed initial state, remount on navigation; team-shared saved views plus quick views | `customers/*`, `saved-views-bar.tsx`, `lib/saved-views.ts` |
+| Shell and navigation | Flat groups; palette with substring match | Overview / Reputation / Customers groups; notification centre (new feedback, review alerts, failed sends, held requests); command palette with fuzzy ranking, recents, Ask Pentriq and shortcut hints; `g`-then-key navigation, `n`, `?` cheat sheet | `sidebar-nav.tsx`, `command-palette.tsx`, `keyboard-shortcuts.tsx`, `notification-center.tsx`, `lib/command-search.ts`, `lib/shortcuts.ts` |
+| Design system | No gauge, meter, delta, kbd or segmented control | `ScoreGauge`, `Meter`, `DeltaBadge`, `Kbd`, `SegmentedNav`, 15 new icons, print stylesheet (forces light palette), print-hidden chrome | `components/ui/*`, `globals.css` |
+| Enterprise: database roles (R3) | RLS proved membership only; staff could write config rows directly through PostgREST | **Restrictive** policies (ANDed with existing ones, so they can only narrow access): services update/delete, loyalty programs, referral promotions and journeys insert/update/delete need owner or admin | migration `0044` |
+| Enterprise: security centre | Audit log visible only to platform admins | Settings → Security & audit: posture checklist (roles, invites, API key age, webhook, retention, Google, reply address, audit trail), business audit log with filters, paging and CSV export | `settings/security/*`, `api/audit/export`, `lib/security-posture.ts` |
+| Enterprise: data retention | None | Owner-set policy (6 months to 3 years) for message history and tracking events; nightly cron; queued/pending messages, customers, visits, feedback and audit log are never purged | `lib/retention.ts`, `api/apply-retention`, `vercel.json`, migration `0044` |
+| Webhooks | One attempt, two events | Retry with backoff for timeouts/5xx/429 (same delivery id, `Pentriq-Attempt` header, one log row); new `visit.logged` and `feedback.resolved` events | `lib/webhooks.ts`, `docs/WEBHOOKS.md` |
+| Quality gates | CI ran tsc + tests | CI also runs `next build` (placeholder env) | `.github/workflows/ci.yml` |
+
+### Counts (sanity check)
+47 new files and 35 modified (about 8,000 lines added). 13 pages significantly redesigned or new (dashboard, insights, reports, activity, feedback inbox, customer profile, segments, reviews, customers, security settings, command palette, notification centre, shortcuts overlay). 9 workflows redesigned (feedback triage and reply, segment-to-campaign, deep-link to filtered lists, saved views, report and export, customer follow-up from insight, retention, audit review, palette question to answer). Tests: 687 → 782 (95 new), 66 suites. Performance changes are modest and **unmeasured**: dashboard query batches made parallel; segments and the Insights loader compute customer metrics once per request; review and feedback lists render progressively; activity name lookups are chunked.
+
+### Must do before deploying
+1. **Apply migration `0044_enterprise_controls.sql`.** Until then: saved views fail (the table is missing and the bar shows an error toast on save), the retention form shows "apply migration 0044", the retention cron reports "column not available", and the role policies are not in force. Test the restrictive policies in staging with an owner, an admin and a staff login: an admin and owner should save Services and Loyalty settings; a staff session should be refused if it writes those tables directly.
+2. Nothing else needs new credentials. The retention cron uses the existing `CRON_SECRET`.
+
+### Known limits and honest caveats
+- Triage, sentiment and themes are a keyword lexicon (English, UK service-business vocabulary). They will mislabel sarcasm and unusual wording; the UI always shows the reasons so a person can overrule them. A model-based classifier could replace `lexicon.ts` behind the same interface.
+- Health-score targets (30 requests, 8 reviews a month, 25% click-through, 50% rebooking, 80% reply rate) are judgement, documented in `TARGETS`, not industry benchmarks.
+- The Insights loader runs about 15 queries (some paged) per request and is used by the dashboard. It is memoised per request but not cached across requests; for large tenants this should move to a nightly roll-up.
+- Segment campaigns send 25 per click (to stay within serverless time limits); a queue would remove the cap.
+- The customers list still loads every row (now with saved views and correct deep links); server-side pagination remains open (R7).
+- Restrictive RLS covers configuration tables only; `segments` and customer data remain member-writable by design (staff work with customers).
+- Not verified: any signed-in page against real data, the print layout in a real browser, webhook retries against a real receiver, migration `0044` against a real database.

@@ -15,5 +15,14 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npx tsc --noEmit
       - run: npm test
+      # Catches server/client boundary and route errors that tsc and unit tests cannot (no secrets needed).
+      - run: npx next build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: placeholder-service-key
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          CRON_SECRET: placeholder
+          NEXT_TELEMETRY_DISABLED: '1'
       - run: npm audit --omit=dev --audit-level=high
         continue-on-error: true

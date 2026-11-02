@@ -22,7 +22,7 @@ export function CopyButton({ value, label = 'Copy' }: { value: string; label?: s
   }
 
   return (
-    <button type="button" onClick={copy} className="btn btn-ghost btn-sm" aria-label={`${label} ${value}`}>
+    <button type="button" onClick={copy} className="btn btn-ghost btn-sm" aria-label={value.length <= 80 ? `${label} ${value}` : label}>
       <Icon
         name={copied ? 'check' : 'copy'}
         className={`h-3.5 w-3.5 ${copied ? 'text-brand-600 dark:text-brand-400' : ''}`}

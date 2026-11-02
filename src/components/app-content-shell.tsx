@@ -15,7 +15,7 @@ export function AppContentShell({ children }: { children: ReactNode }) {
     <div
       className={`flex min-h-screen flex-1 flex-col ${
         ready ? 'transition-[margin] duration-300 ease-out-expo' : ''
-      } ${isOpen ? 'lg:ml-[264px]' : 'lg:ml-0'}`}
+      } ${isOpen ? 'lg:ml-[264px]' : 'lg:ml-0'} print:ml-0`}
     >
       {children}
     </div>

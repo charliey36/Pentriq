@@ -125,13 +125,35 @@ implementation notes.
 - Admin view: if you log in with an email listed in `ADMIN_EMAIL`, your
   dashboard also shows a table of every registered business.
 
-### AI (hooks, not live calls)
-- [`src/lib/ai.ts`](./src/lib/ai.ts) has a `draftMessageCopy()` function
-  that would call an LLM if `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` is set,
-  and otherwise falls back to a deterministic template-based draft. No
-  real LLM call is implemented (no credentials to test against) — the
-  integration point is ready for a one-function addition once a provider
-  is chosen.
+### Pentriq Intelligence (explainable, runs inside the app)
+All of these are deterministic, documented rules in [`src/lib/intelligence/`](./src/lib/intelligence):
+no customer text is sent to a third-party AI provider, every label can be traced to what triggered it,
+and every money figure is an estimate from the business's own visit prices.
+- **Health score** (`business-health.ts`): one 0-100 score and A-E grade from five pillars (foundations,
+  reach, reputation, responsiveness, retention). Pillars without data are left out, not scored zero.
+- **Next best actions** (`next-best-actions.ts`): ranked "do this next" list with the reason, the value where
+  measurable, and a link to where the work gets done. Drives the dashboard hero, Insights and the report.
+- **Feedback triage** (`feedback-triage.ts`, `lexicon.ts`): sentiment, topics, urgency (safety, legal and
+  money issues escalate), 48-hour response target, and an editable reply draft that never promises refunds
+  or discounts.
+- **Customer insights** (`customer-insights.ts`): learns each customer's own visit rhythm, predicts the next
+  visit, scores churn risk with reasons and recommends the next action.
+- **Review themes** (`review-themes.ts`): what Google reviews praise and criticise, with example quotes.
+- **Forecasts** (`forecast.ts`): Holt smoothing and least-squares trends with a "too early to tell" guard.
+- **Ask Pentriq** (`nl-query.ts`): plain-English questions in the command palette ("lapsed customers who
+  spent over £200") become segment previews or customer-list filters.
+- **AI review replies** (Gemini, opt-in with `GEMINI_API_KEY`): see `src/lib/ai-review-reply.ts`.
+
+### Workspaces
+- **Insights** (`/insights`), **Executive report** (`/reports`, period comparison, print/PDF, CSV) and
+  **Activity** (`/activity`, one timeline across every source).
+- **Segments** with presets, up to five ANDed conditions (including rebooking status), member preview,
+  CSV export and send-to-segment (rebooking reminder or review request, 25 per click).
+- **Feedback inbox** with triage views (open, critical, overdue), topic filters, search, bulk actions.
+- **Command palette** (Cmd/Ctrl+K) with fuzzy ranking and recents; **keyboard shortcuts** (`g` then a key,
+  `n` to add a customer, `?` for the cheat sheet); **notification centre** in the header.
+- **Security & audit** (Settings): posture checklist, data retention policy, filterable audit log and CSV
+  export. Saved views on the customers list are shared with the team.
 
 ## Integration points that need real credentials
 
@@ -141,7 +163,7 @@ fallback — not left out, but not fake either:
 | Feature | File | Current behavior | To go live |
 | --- | --- | --- | --- |
 | SMS / WhatsApp sending | [`src/lib/messaging.ts`](./src/lib/messaging.ts) | `TwilioSmsProvider` (REST, no SDK) when all three `TWILIO_*` variables are set; otherwise `LoggingStubSmsProvider` logs and does not deliver | Set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`; send a test to your own number first (not yet verified against a live account) |
-| AI-drafted message copy | [`src/lib/ai.ts`](./src/lib/ai.ts) | Falls back to a template-based draft | Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`, then implement the completion call in `draftMessageCopy()` |
+| AI-drafted message copy (journeys) | [`src/lib/ai.ts`](./src/lib/ai.ts) | Falls back to a template-based draft | Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`, then implement the completion call in `draftMessageCopy()`. (Feedback reply drafts and the intelligence layer do not need a provider.) |
 | One-click rebooking with live availability | [`src/app/book/[customerId]`](./src/app/book/[customerId]) | Captures a preferred-time request as a note for manual follow-up | Either build a native slot-availability engine or integrate with the business's existing calendar/scheduling tool — see the comment in `actions.ts` |
 
 ## 1. Create a Supabase project
