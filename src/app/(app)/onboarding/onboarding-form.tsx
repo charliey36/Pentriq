@@ -4,6 +4,7 @@ import { useFormState } from 'react-dom';
 import { Notice } from '@/components/ui/notice';
 import { SubmitButton } from '@/components/ui/submit-button';
 import { completeOnboarding, type OnboardingResult } from './actions';
+import { INDUSTRIES } from '@/lib/industries';
 import { CONSENT_FIELD, CONSENT_LABEL } from '@/lib/consent';
 
 export function OnboardingForm({ defaultName, defaultUrl, defaultBookingUrl = '' }: { defaultName: string; defaultUrl: string; defaultBookingUrl?: string }) {
@@ -13,6 +14,14 @@ export function OnboardingForm({ defaultName, defaultUrl, defaultBookingUrl = ''
       <div>
         <label htmlFor="name" className="label">1. Your business name</label>
         <input id="name" name="name" required defaultValue={defaultName} className="input mt-1.5" placeholder="Smith & Sons Garage" />
+      </div>
+      <div>
+        <label htmlFor="industry" className="label">What kind of business is it? <span className="font-normal text-ink-4">(optional)</span></label>
+        <select id="industry" name="industry" defaultValue="" className="input mt-1.5">
+          <option value="">Other / not listed</option>
+          {INDUSTRIES.map((i) => <option key={i.slug} value={i.slug}>{i.plural}</option>)}
+        </select>
+        <p className="mt-1.5 text-xs text-ink-4">We pre-fill typical services and rebooking reminders for your trade. You can change them any time.</p>
       </div>
       <div>
         <label htmlFor="google_review_url" className="label">2. Your Google review link</label>

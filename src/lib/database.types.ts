@@ -38,6 +38,8 @@ export type Database = {
           review_cooldown_days: number;
           booking_url: string | null;
           booking_url_updated_at: string | null;
+          industry: string | null;
+          widget_enabled: boolean;
           onboarding_completed_at: string | null;
           welcome_email_sent_at: string | null;
           campaign_email_sent_at: string | null;
@@ -83,6 +85,8 @@ export type Database = {
           review_cooldown_days?: number;
           booking_url?: string | null;
           booking_url_updated_at?: string | null;
+          industry?: string | null;
+          widget_enabled?: boolean;
           onboarding_completed_at?: string | null;
           welcome_email_sent_at?: string | null;
           campaign_email_sent_at?: string | null;

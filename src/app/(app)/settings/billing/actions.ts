@@ -8,6 +8,7 @@ import { getBillingState, stripeConfigured, TRIAL_DAYS } from '@/lib/billing';
 import { checkoutPriceId, getStripe } from '@/lib/stripe';
 import { getAppUrl } from '@/lib/brand';
 import { captureError } from '@/lib/monitoring';
+import { startTrialIfAvailable } from '@/lib/trial';
 import { isPauseOption, isPaused, pauseEnd } from '@/lib/pause';
 
 export type BillingResult = { error?: string; success?: boolean };
@@ -16,8 +17,8 @@ const NOT_CONFIGURED = 'Online payments are not switched on yet. Your free trial
 const GENERIC_ERROR = 'Something went wrong talking to Stripe. Please try again.';
 
 /**
- * Claims the 30-day free trial. The trial is opt-in: it never starts at
- * signup. The update is conditional on `trial_ends_at IS NULL`, so a double
+ * Claims the 30-day free trial manually. It also starts automatically when
+ * onboarding completes (see completeOnboarding), so new accounts reach their first send without a detour. The update is conditional on `trial_ends_at IS NULL`, so a double
  * click or two tabs cannot restart or extend it, and a business that has ever
  * claimed (or subscribed) is refused.
  */
@@ -27,33 +28,12 @@ export async function claimTrial(): Promise<BillingResult> {
     return { error: 'Your free trial has already been used.' };
   }
 
-  const now = new Date();
-  const { data, error } = await createAdminClient()
-    .from('businesses')
-    .update({
-      trial_claimed_at: now.toISOString(),
-      trial_ends_at: new Date(now.getTime() + TRIAL_DAYS * 86_400_000).toISOString(),
-      subscription_status: 'trialing',
-    })
-    .eq('id', business.id)
-    .eq('subscription_status', 'trialing')
-    .is('trial_ends_at', null)
-    .select('id');
-
-  if (error) {
+  try {
+    if (!(await startTrialIfAvailable(business))) return { error: 'Your free trial has already been used.' };
+  } catch (error) {
     captureError(error, { area: 'billing:claim-trial', tags: { business_id: business.id } });
     return { error: 'Could not start your trial. Please try again.' };
   }
-  if (!data?.length) return { error: 'Your free trial has already been used.' };
-
-  // Anything queued before the trial started was deferred by the sender (one day
-  // at a time); make it due now instead of making the owner wait up to 24h.
-  await createAdminClient()
-    .from('messages')
-    .update({ next_attempt_at: now.toISOString() })
-    .eq('business_id', business.id)
-    .in('status', ['queued', 'pending'])
-    .gt('next_attempt_at', now.toISOString());
 
   revalidatePath('/', 'layout');
   return { success: true };

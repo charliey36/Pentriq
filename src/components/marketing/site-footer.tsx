@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Logo } from '@/components/logo';
 import { LegalLinks } from '@/components/legal-links';
 import { ORG, ORG_LOCATION } from '@/lib/site';
+import { INDUSTRIES } from '@/lib/industries';
 
 const columns: { title: string; links: [string, string][] }[] = [
   {
@@ -13,6 +14,10 @@ const columns: { title: string; links: [string, string][] }[] = [
       ['Review gap calculator', '/tools/review-gap-calculator'],
       ['Blog', '/blog'],
     ],
+  },
+  {
+    title: 'Industries',
+    links: INDUSTRIES.slice(0, 6).map((i): [string, string] => [i.plural, `/for/${i.slug}`]).concat([['All industries', '/for']]),
   },
   {
     title: 'Company',
@@ -37,7 +42,7 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-line bg-surface/70 backdrop-blur">
       <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid gap-10 md:grid-cols-[1.4fr_repeat(3,1fr)]">
+        <div className="grid gap-10 md:grid-cols-[1.4fr_repeat(4,1fr)]">
           <div>
             <Logo />
             <p className="mt-4 max-w-xs text-sm leading-6 text-ink-3">

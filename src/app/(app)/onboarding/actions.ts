@@ -8,6 +8,9 @@ import { enrollCustomerInJourney } from '@/lib/journeys';
 import { CONSENT_REQUIRED_MESSAGE, hasConsent } from '@/lib/consent';
 import { validateBookingUrl } from '@/lib/booking-url';
 import { suppressedEmails } from '@/lib/safeguards';
+import { industryBySlug, presetServices } from '@/lib/industries';
+import { startTrialIfAvailable } from '@/lib/trial';
+import { captureError } from '@/lib/monitoring';
 
 export type OnboardingResult = { error?: string };
 
@@ -23,6 +26,8 @@ export async function completeOnboarding(_prev: OnboardingResult, fd: FormData):
   const url = String(fd.get('google_review_url') ?? '').trim();
   const customerName = String(fd.get('customer_name') ?? '').trim();
   const bookingUrl = String(fd.get('booking_url') ?? '').trim();
+  const industryRaw = String(fd.get('industry') ?? '').trim();
+  const industry = industryBySlug(industryRaw)?.slug ?? null;
   const customerEmail = String(fd.get('customer_email') ?? '').trim().toLowerCase();
 
   if (!name) return { error: 'Enter your business name.' };
@@ -40,9 +45,18 @@ export async function completeOnboarding(_prev: OnboardingResult, fd: FormData):
 
   const { error: bizError } = await supabase
     .from('businesses')
-    .update({ name, google_review_url: url, booking_url: bookingUrl || null, ...(bookingUrl ? { booking_url_updated_at: new Date().toISOString() } : {}) })
+    .update({ name, google_review_url: url, ...(industry ? { industry } : {}), booking_url: bookingUrl || null, ...(bookingUrl ? { booking_url_updated_at: new Date().toISOString() } : {}) })
     .eq('id', business.id);
   if (bizError) return { error: userSafeError('Could not save your business', bizError) };
+
+  // Industry preset: seed the service catalogue (only when the business has none yet), so rebooking
+  // reminders work from day one. Best effort; a failure here must not block setup.
+  if (industry) {
+    const { count } = await supabase.from('services').select('id', { count: 'exact', head: true }).eq('business_id', business.id);
+    if (!count) {
+      await supabase.from('services').insert(presetServices(industry).map((s) => ({ ...s, business_id: business.id })));
+    }
+  }
 
   const { data: customer, error: custError } = await supabase
     .from('customers')
@@ -57,6 +71,9 @@ export async function completeOnboarding(_prev: OnboardingResult, fd: FormData):
     .select('*')
     .single();
   if (custError || !customer) return { error: `Could not add customer: ${custError?.message ?? 'unknown error'}` };
+
+  // Activation: finishing setup starts the 30-day trial (no card), so the first request below can actually send.
+  await startTrialIfAvailable(business).catch((e) => captureError(e, { area: 'onboarding:start-trial', tags: { business_id: business.id } }));
 
   // First request goes out straight away (not next-day) so setup ends with a real send.
   const { data: journey } = await supabase

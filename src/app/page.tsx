@@ -13,6 +13,7 @@ import { ThemeToggleButton } from '@/components/theme-toggle-button';
 import { Icon, type IconName } from '@/components/ui/icons';
 import { toneStyle, type Tone } from '@/components/ui/tones';
 import { ProductPreview } from '@/components/marketing/product-preview';
+import { INDUSTRIES } from '@/lib/industries';
 
 export const metadata: Metadata = pageMetadata({
   title: APP_TITLE,
@@ -255,6 +256,20 @@ export default async function HomePage() {
                   </span>
                   <h3 className="mt-6 text-[17px] font-semibold tracking-[-0.02em] text-ink">{feature.title}</h3>
                   <p className="mt-2 text-sm leading-6 text-ink-3">{feature.description}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        {/* Industries */}
+        <section aria-labelledby="home-industries" className="px-4 pb-20 sm:px-6 sm:pb-28 lg:px-8">
+          <div className="mx-auto max-w-6xl">
+            <SectionHeading eyebrow="Industries" title="Built for local service businesses" />
+            <ul id="home-industries" className="mt-10 flex flex-wrap justify-center gap-3">
+              {INDUSTRIES.map((i) => (
+                <li key={i.slug}>
+                  <Link href={`/for/${i.slug}`} className="inline-block rounded-full border border-line bg-surface px-4 py-2 text-sm font-medium text-ink-2 transition-colors hover:text-ink">{i.plural}</Link>
                 </li>
               ))}
             </ul>

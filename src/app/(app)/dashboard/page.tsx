@@ -2,7 +2,10 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { getAuthUser, isAdminEmail, requireBusiness } from '@/lib/business';
-import { getBillingState } from '@/lib/billing';
+import { getBillingState, PLAN } from '@/lib/billing';
+import { computeRevenueAttribution } from '@/lib/health';
+import { monthsBetween, summariseImpact } from '@/lib/impact';
+import { ImpactCard } from '@/components/dashboard/impact-card';
 import { SETUP_COLLAPSED_COOKIE } from '@/lib/brand';
 import { createClient } from '@/lib/supabase/server';
 import { bucketDaily, splitPeriods } from '@/lib/trends';
@@ -159,6 +162,7 @@ export default async function DashboardPage() {
     )
   );
   const pipeline = await loadPipelineStats(supabase, business.id);
+  const revenue = await computeRevenueAttribution(supabase, business.id).catch(() => ({ totalAttributed: 0, attributedVisitCount: 0 }));
   const sent = (emailsSentCount.count ?? 0) + (queueSent.count ?? 0);
   const clicks = clicksCount;
   const delivered = deliveredFromSent(sent);
@@ -444,6 +448,20 @@ export default async function DashboardPage() {
         />
       </div>
 
+      <ImpactCard
+        summary={summariseImpact({
+          attributedRevenue: revenue.totalAttributed,
+          attributedVisits: revenue.attributedVisitCount,
+          reviewsCompleted: pipeline.reviewsCompleted,
+          requestsSent: pipeline.requestsSent,
+          monthlyPrice: PLAN.priceMonthly,
+          monthsActive: monthsBetween(new Date(business.created_at), new Date()),
+        })}
+        attributedRevenue={revenue.totalAttributed}
+        reviewsCompleted={pipeline.reviewsCompleted}
+        monthlyPrice={PLAN.priceMonthly}
+        currency={PLAN.currency}
+      />
       <ReviewPipeline stats={pipeline} remindersEnabled={business.review_reminders_enabled ?? true} />
 
       {/* Activity + funnel */}

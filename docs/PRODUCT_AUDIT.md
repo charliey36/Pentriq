@@ -100,3 +100,26 @@ Verification: `tsc` clean, 589 tests pass, `next build` succeeds (with placehold
 - Job queue for crons, background large imports (>2,000 rows), Zapier app, outbound webhooks, white-label, visual journey builder: multi-week projects needing infrastructure or product decisions.
 - Automated accessibility (axe) tests: not added; needs a browser test harness.
 - The `audit_log` and SMS provider have been tested only against fakes.
+
+## 8. Sellability pass (local-business focus)
+
+Findings from reading the buyer journey end to end: a new user could not send anything until they found and clicked "claim trial"; onboarding was generic; nothing proved value after sign-up; nothing sold to a specific trade; no growth loop; and the repo contained a personal email hard-coded as a free-access bypass.
+
+| Change | Why it sells | Files |
+|---|---|---|
+| Free trial starts automatically when onboarding completes (still no card; idempotent, can't restart or extend) | Removes the biggest activation blocker | `src/lib/trial.ts`, onboarding + billing actions |
+| Industry presets in onboarding: 10 trades pre-fill services and rebooking intervals | Reminders work from day one; "set up in minutes" | `src/lib/industries.ts`, onboarding form/action |
+| 10 industry landing pages + `/for` index, FAQ and breadcrumb JSON-LD, sitemap, footer and home links | Search traffic and relevance for each trade; no invented stats or testimonials | `src/app/for/**`, `sitemap.ts`, footer, home |
+| "Your return on Pentriq" dashboard card (revenue after reminder clicks, review-link follow-through, plan cost, honest empty states) | Proves value monthly, which drives retention | `src/lib/impact.ts`, `src/components/dashboard/impact-card.tsx` |
+| Opt-in embeddable reviews widget with "Collected with Pentriq" credit | Customers' websites become a referral channel | `src/app/widget/**`, `src/lib/review-widget.ts`, review-link page, `next.config.mjs` (widget alone may be framed) |
+| Pricing page: cost-per-day and payback framing, links to calculator and industries | Conversion on the pricing page | `src/app/pricing/page.tsx` |
+| Billing bypass moved from a hard-coded personal email to `BILLING_OVERRIDE_EMAILS` | A buyer inherits no hidden free account | `src/lib/billing.ts`, `.env.example` |
+
+**Apply migration `0040_industry_and_review_widget.sql`** (adds `businesses.industry` and `businesses.widget_enabled`). Choosing an industry in onboarding and the widget toggle fail without it.
+
+**Action for the current owner:** set `BILLING_OVERRIDE_EMAILS=<your email>` in the environment, or your own account will be treated as a normal trial/paid account.
+
+Verification: `tsc` clean, 599 tests pass, `next build` succeeds, and a production server returned the expected pages and headers. Not verified: widget rendering with real review data, onboarding presets against a real database, and the dashboard card with real attribution data (no database was available).
+
+### Further ideas not built (need a decision or are larger)
+Annual plan (needs a Stripe price), a second tier for multi-location, referral rewards for customers who refer another business to Pentriq, AI-drafted replies surfaced on the dashboard, competitor comparison pages (need verified facts about named products), and customer testimonials/case studies (need real customers).

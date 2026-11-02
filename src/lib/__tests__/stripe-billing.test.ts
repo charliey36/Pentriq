@@ -16,7 +16,7 @@ describe('opt-in trial', () => {
     const state = getBillingState(biz('trialing', null), now);
     expect(state.status).toBe('trial_available');
     expect(state.hasAccess).toBe(false);
-    expect(sendBlockedReason(biz('trialing', null), now)).toMatch(/Start your 30-day free trial/);
+    expect(sendBlockedReason(biz('trialing', null), now)).toMatch(/Finish setup to start your 30-day free trial/);
     expect(canUse(biz('trialing', null), 'view', now)).toBe(true);
   });
   it('starts counting from the claimed end date', () => {
@@ -33,8 +33,11 @@ describe('opt-in trial', () => {
 
   it('keeps the specified account active regardless of stored trial state', () => {
     const expired = biz('canceled', -100);
-    expect(getBillingState(expired, now, 'charlieyoults123@gmail.com')).toMatchObject({ status: 'active', hasAccess: true });
-    expect(sendBlockedReason(expired, now, 'charlieyoults123@gmail.com')).toBeNull();
+    process.env.BILLING_OVERRIDE_EMAILS = 'Owner@Example.com, other@x.com';
+    expect(getBillingState(expired, now, 'owner@example.com')).toMatchObject({ status: 'active', hasAccess: true });
+    expect(sendBlockedReason(expired, now, 'owner@example.com')).toBeNull();
+    delete process.env.BILLING_OVERRIDE_EMAILS;
+    expect(getBillingState(expired, now, 'owner@example.com').hasAccess).toBe(false);
     expect(getBillingState(expired, now, 'other@example.com').hasAccess).toBe(false);
   });
 });

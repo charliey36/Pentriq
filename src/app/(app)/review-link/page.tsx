@@ -6,6 +6,9 @@ import { PageHeader } from '@/components/ui/page-header';
 import { SectionCard } from '@/components/ui/section-card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { QrPanel } from './qr-panel';
+import { WidgetPanel } from './widget-panel';
+import { embedSnippet } from '@/lib/review-widget';
+import { getAppUrl } from '@/lib/brand';
 
 export const metadata: Metadata = { title: 'Review link & QR code' };
 
@@ -33,6 +36,13 @@ export default async function ReviewLinkPage() {
             action={<Link href="/settings" className="btn btn-primary">Open settings</Link>}
           />
         )}
+      </SectionCard>
+      <SectionCard title="Show your reviews on your website" className="mt-6">
+        <WidgetPanel
+          enabled={Boolean(business.widget_enabled)}
+          snippet={embedSnippet(getAppUrl(), business.id)}
+          previewUrl={`${getAppUrl().replace(/\/$/, '')}/widget/${business.id}`}
+        />
       </SectionCard>
     </div>
   );
