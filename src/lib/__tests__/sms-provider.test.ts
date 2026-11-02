@@ -34,3 +34,19 @@ describe('TwilioSmsProvider', () => {
     await expect(new TwilioSmsProvider('AC1', 't', '+44700', f).send({ to: 'x', body: 'Hi', whatsapp: false })).rejects.toThrow(MessageSendError);
   });
 });
+
+describe('email reply-to', () => {
+  it('passes the business contact email as replyTo so customer replies reach the business', async () => {
+    jest.resetModules();
+    const send = jest.fn(async () => ({ error: null }));
+    jest.doMock('resend', () => ({ Resend: class { emails = { send }; } }));
+    jest.doMock('@/lib/email-events', () => ({ notifyEmailSent: jest.fn() }));
+    process.env.RESEND_API_KEY = 'k';
+    const { sendMessage } = await import('../messaging');
+    await sendMessage({ channel: 'email', to: { email: 'real.customer@gmail.com' }, subject: 's', text: 't', replyTo: 'owner@salon.co.uk' }, 'Salon');
+    await sendMessage({ channel: 'email', to: { email: 'real.customer@gmail.com' }, subject: 's', text: 't', replyTo: null }, 'Salon');
+    const calls = send.mock.calls as unknown as Array<[Record<string, unknown>]>;
+    expect(calls[0][0].replyTo).toBe('owner@salon.co.uk');
+    expect('replyTo' in calls[1][0]).toBe(false);
+  });
+});

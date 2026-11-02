@@ -8,6 +8,10 @@ import { getConnectionWithTokens } from '@/lib/google-connection';
 import { GoogleApiError, replyToReview } from '@/lib/google-business';
 import { getAccessToken } from '@/lib/google-review-sync';
 import { MAX_REPLY_LENGTH } from '@/lib/google-business-constants';
+import { getBillingState } from '@/lib/billing';
+import { withinLimit } from '@/lib/rate-limit';
+import { generateGeminiText } from '@/lib/gemini';
+import { aiConfigured, draftReviewReply, firstName } from '@/lib/ai-review-reply';
 
 export type ReplyResult = { ok: boolean; message: string; replyText?: string; replyUpdateTime?: string };
 
@@ -68,4 +72,38 @@ export async function markReviewAlertsRead(): Promise<void> {
     .eq('business_id', business.id)
     .eq('is_read', false);
   revalidatePath('/', 'layout');
+}
+
+export type DraftResult = { ok: boolean; message?: string; text?: string };
+
+/**
+ * Drafts a reply with AI. Nothing is posted: the text lands in the editable reply box.
+ * Limited to 20 drafts an hour per business and to businesses with an active trial or subscription.
+ */
+export async function draftReviewReplyAction(reviewId: string): Promise<DraftResult> {
+  const business = await requireBusiness();
+  if (!aiConfigured()) return { ok: false, message: 'AI drafting is not switched on for this account yet.' };
+  if (!getBillingState(business).hasAccess) return { ok: false, message: 'AI drafting is available during your trial or on a subscription.' };
+  if (!(await withinLimit('ai-reply-draft', business.id, { limit: 20, windowSeconds: 3600 }))) {
+    return { ok: false, message: 'You have used your AI drafts for this hour. Please try again later.' };
+  }
+
+  const { data: review } = await createAdminClient()
+    .from('google_reviews')
+    .select('rating, comment, reviewer_name')
+    .eq('id', reviewId)
+    .eq('business_id', business.id)
+    .maybeSingle();
+  if (!review) return { ok: false, message: 'Review not found.' };
+
+  try {
+    const text = await draftReviewReply(
+      { businessName: business.name, rating: review.rating, comment: review.comment, reviewerFirstName: firstName(review.reviewer_name) },
+      (prompt) => generateGeminiText(prompt, { quick: true })
+    );
+    return { ok: true, text };
+  } catch (err) {
+    console.error('[ai-reply] failed:', err instanceof Error ? err.message : err);
+    return { ok: false, message: err instanceof Error ? err.message : 'Could not draft a reply. Please try again.' };
+  }
 }

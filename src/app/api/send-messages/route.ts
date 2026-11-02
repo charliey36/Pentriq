@@ -170,6 +170,7 @@ export async function GET(request: NextRequest) {
           subject: rendered.subject,
           html: rendered.html,
           text: rendered.text,
+          replyTo: business.contact_email,
           listUnsubscribeUrl: unsubscribeUrl,
         },
         senderDisplayName(business.name)

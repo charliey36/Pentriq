@@ -110,6 +110,7 @@ export async function sendQueuedReview(
           subject: rendered.subject,
           html: rendered.html,
           text: rendered.text,
+          replyTo: business.contact_email,
           listUnsubscribeUrl: `${appUrl}/api/unsubscribe/${customer.id}`,
         },
         senderDisplayName(business.name)

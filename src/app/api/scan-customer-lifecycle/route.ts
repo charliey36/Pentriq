@@ -1,3 +1,4 @@
+import { fetchAll } from '@/lib/fetch-all';
 import { notifyOwner } from '@/lib/notifications';
 import { isRebookingEligible } from '@/lib/eligibility';
 import { NextResponse, type NextRequest } from 'next/server';
@@ -56,9 +57,10 @@ export async function GET(request: NextRequest) {
   const todayDate = new Date().getUTCDate();
 
   for (const business of businesses ?? []) {
-    const [{ data: journeys }, { data: customers }] = await Promise.all([
+    // Paged: one query returns at most 1000 rows, so larger businesses silently lost reminders and birthday emails.
+    const [{ data: journeys }, customers] = await Promise.all([
       supabase.from('journeys').select('*').eq('business_id', business.id).eq('is_active', true),
-      supabase.from('customers').select('*').eq('business_id', business.id).is('unsubscribed_at', null),
+      fetchAll((from, to) => supabase.from('customers').select('*').eq('business_id', business.id).is('unsubscribed_at', null).order('id').range(from, to)),
     ]);
 
     const rebookingJourney = business.rebooking_reminders_enabled === false ? undefined : journeys?.find((j) => j.key === 'rebooking_reminder');

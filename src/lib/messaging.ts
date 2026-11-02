@@ -32,6 +32,8 @@ export type SendMessageParams = {
   html?: string;
   text: string;
   listUnsubscribeUrl?: string;
+  /** The business's own contact email: customer replies go here instead of the platform's sending address. */
+  replyTo?: string | null;
 };
 
 export class MessageSendError extends Error {}
@@ -65,6 +67,7 @@ async function sendEmail(params: SendMessageParams, fromLabel: string) {
     subject: params.subject ?? '',
     html: params.html ?? `<p>${escapeHtml(params.text)}</p>`,
     text: params.text,
+    ...(params.replyTo ? { replyTo: params.replyTo } : {}),
     headers: params.listUnsubscribeUrl
       ? { 'List-Unsubscribe': `<${params.listUnsubscribeUrl}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' }
       : undefined,

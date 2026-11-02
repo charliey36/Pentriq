@@ -123,3 +123,28 @@ Verification: `tsc` clean, 599 tests pass, `next build` succeeds, and a producti
 
 ### Further ideas not built (need a decision or are larger)
 Annual plan (needs a Stripe price), a second tier for multi-location, referral rewards for customers who refer another business to Pentriq, AI-drafted replies surfaced on the dashboard, competitor comparison pages (need verified facts about named products), and customer testimonials/case studies (need real customers).
+
+## 9. Page-by-page review pass
+
+Method: screenshots of the public pages at 1280px and 390px (no horizontal scroll; the only console error was a blocked external request in the sandbox), then code review of the signed-in pages and background jobs. Signed-in pages were reviewed from code, not rendered, because no database was available.
+
+| Finding | Severity | Fix |
+|---|---|---|
+| **Demo-mode detection faked sends for real customers.** Any address containing "demo" or "test" (e.g. `contest.winner@gmail.com`, `latest@…`) was marked "sent" without being delivered | Critical | Detection now matches reserved test domains only; regression tests added (`src/lib/demo-mode.ts`) |
+| **Silent 1000-row truncation.** Supabase caps a response at 1000 rows. The customers list, analytics, segments, revenue attribution and the nightly lifecycle job (rebooking, win-back, birthdays) all read whole tables in one query, so larger businesses got wrong totals and missed reminders | Critical | `src/lib/fetch-all.ts` pages through results and throws on error; applied at all five sites; the test fake now enforces the 1000-row cap so the tests prove it |
+| Revenue attribution used `.in()` with thousands of ids (URL length failure) and an O(n²) lookup; segments re-read all data once per segment; analytics filtered all visits per customer | High | Chunked ids, indexed by customer, segment data loaded once |
+| "AI-powered" was claimed everywhere but no AI feature was live (the drafting function was never called) | High (advertising-claims risk) | Real feature: **Draft with AI** for Google review replies (`src/lib/ai-review-reply.ts`). Reviewer name never sent to the model, review text fenced as untrusted, output stripped of links/emails/phone numbers, never auto-posted, 20 drafts/hour/business, hidden unless `GEMINI_API_KEY` is set |
+| Customer replies to review emails went to the platform's sending address, so the business never saw them | High | `replyTo` set to the business contact email; settings field now marked recommended and explains this |
+| Home hero still said the trial must be "claimed", jargon-heavy copy, no audience | Medium | Rewritten for UK local businesses; trial and price stated plainly |
+| Pricing card listed 4 of ~15 features | Medium | Nine concrete perks |
+| Signup: no terms/privacy acknowledgement, 6-char passwords, new users landed on the dashboard instead of the guided first send, stale metadata | Medium | Terms line, 8-char minimum, new accounts go to `/onboarding` (also after email confirmation), optional "Continue with Google" (`NEXT_PUBLIC_GOOGLE_SIGNIN=1`) |
+| Trial banner told existing users to claim a trial on the billing page | Low | Points to onboarding |
+| US number formatting (`en-US`) in a UK product | Low | `en-GB` throughout |
+
+### Needs your attention (not code)
+1. **Legal pages are placeholder text** (the component says so). Have Terms, Privacy and Cookies reviewed by a solicitor before taking payment.
+2. **Google Business Profile API is approval-gated.** Until Google approves the project, `GOOGLE_BUSINESS_API_APPROVED` stays off and most users see "coming soon" for review sync, replies and alerts, which are headline features (the widget and AI replies depend on them).
+3. **Sender domain.** If `EMAIL_FROM` is unset, mail goes from Resend's sandbox address. Verify a domain in Resend before onboarding real customers.
+4. Set `GEMINI_API_KEY` to turn on AI replies; `NEXT_PUBLIC_GOOGLE_SIGNIN=1` after enabling the Google provider in Supabase.
+
+Verification: `tsc` clean, 618 tests pass, `next build` succeeds. Not verified: AI drafting against the live Gemini API, Google sign-in, and the signed-in pages with real data.

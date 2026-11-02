@@ -8,11 +8,17 @@ export const PLAN = {
   priceMonthly: 19,
   currency: '£',
   perks: [
-    'Unlimited customers and review requests',
-    'Automatic email follow-up reminders',
-    'Private feedback inbox',
-    'Analytics and reporting',
+    'Unlimited customers and review requests, no per-message fees',
+    'Automatic Google review requests with two follow-up reminders',
+    'Private feedback inbox on every request',
+    'Rebooking and win-back reminders for lapsed customers',
+    'Google reviews sync, rating alerts and reply from Pentriq',
+    'Loyalty points, referral codes and customer segments',
+    'CSV import, plus Square, Acuity and Calendly sync',
+    'QR code and a reviews widget for your website',
+    'Analytics, weekly summary email and full data export',
   ],
+
 };
 
 export const TRIAL_DAYS = 30;

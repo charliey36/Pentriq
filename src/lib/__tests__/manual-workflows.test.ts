@@ -310,7 +310,13 @@ describe('Scenario 2: Manual review send', () => {
   it('identifies demo/sandbox customers so sends are simulated, not delivered', () => {
     expect(isDemoEmail('demo-customer@example.com')).toBe(true);
     expect(isDemoEmail('demo@pentriq.app')).toBe(true);
-    expect(isDemoEmail('test@foo.io')).toBe(true);
+    expect(isDemoEmail('anyone@sample.test')).toBe(true);
+    // Real addresses that merely CONTAIN "test" or "demo" must be delivered, never simulated.
+    for (const real of ['contest.winner@gmail.com', 'latest@outlook.com', 'test@foo.io', 'demolition-ltd@btinternet.co.uk', 'jo.testa@yahoo.co.uk', 'attest@firm.co.uk']) {
+      expect(isDemoEmail(real)).toBe(false);
+    }
+    expect(isDemoEmail('')).toBe(false);
+    expect(isDemoEmail(null)).toBe(false);
     expect(isDemoCustomer({ email: 'real.person@gmail.com' })).toBe(false);
   });
 

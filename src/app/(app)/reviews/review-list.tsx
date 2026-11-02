@@ -7,7 +7,7 @@ import { Spinner } from '@/components/ui/submit-button';
 import { StarFilled } from '@/components/ui/icons';
 import { formatUKDate } from '@/lib/uk-defaults';
 import { MAX_REPLY_LENGTH } from '@/lib/google-business-constants';
-import { replyToGoogleReview } from './actions';
+import { draftReviewReplyAction, replyToGoogleReview } from './actions';
 
 export type ReviewItem = {
   id: string;
@@ -30,12 +30,14 @@ function Stars({ rating }: { rating: number }) {
   );
 }
 
-function ReviewRow({ review, canReply }: { review: ReviewItem; canReply: boolean }) {
+function ReviewRow({ review, canReply, aiEnabled }: { review: ReviewItem; canReply: boolean; aiEnabled: boolean }) {
   const [reply, setReply] = useState(review.reply_text);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(review.reply_text ?? '');
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [drafting, startDraft] = useTransition();
+  const [aiNote, setAiNote] = useState(false);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,6 +49,19 @@ function ReviewRow({ review, canReply }: { review: ReviewItem; canReply: boolean
         setEditing(false);
       } else {
         setError(res.message);
+      }
+    });
+  }
+
+  function aiDraft() {
+    setError(null);
+    startDraft(async () => {
+      const res = await draftReviewReplyAction(review.id);
+      if (res.ok && res.text) {
+        setDraft(res.text);
+        setAiNote(true);
+      } else {
+        setError(res.message ?? 'Could not draft a reply.');
       }
     });
   }
@@ -107,6 +122,7 @@ function ReviewRow({ review, canReply }: { review: ReviewItem; canReply: boolean
                 className="input w-full"
               />
               {error && <Notice variant="error">{error}</Notice>}
+              {aiNote && <p className="text-xs text-ink-3">AI-drafted. Read it and edit anything before you post; nothing is posted until you press the button.</p>}
               <div className="flex flex-wrap items-center gap-2">
                 <button type="submit" className="btn btn-primary btn-sm" disabled={pending || !draft.trim()}>
                   {pending ? (
@@ -117,6 +133,17 @@ function ReviewRow({ review, canReply }: { review: ReviewItem; canReply: boolean
                     'Post reply to Google'
                   )}
                 </button>
+                {aiEnabled && (
+                  <button type="button" className="btn btn-secondary btn-sm" disabled={pending || drafting} onClick={aiDraft}>
+                    {drafting ? (
+                      <>
+                        <Spinner className="h-3.5 w-3.5" /> Drafting&hellip;
+                      </>
+                    ) : (
+                      'Draft with AI'
+                    )}
+                  </button>
+                )}
                 <button type="button" className="btn btn-ghost btn-sm" disabled={pending} onClick={() => setEditing(false)}>
                   Cancel
                 </button>
@@ -132,11 +159,11 @@ function ReviewRow({ review, canReply }: { review: ReviewItem; canReply: boolean
   );
 }
 
-export function ReviewList({ reviews, canReply }: { reviews: ReviewItem[]; canReply: boolean }) {
+export function ReviewList({ reviews, canReply, aiEnabled = false }: { reviews: ReviewItem[]; canReply: boolean; aiEnabled?: boolean }) {
   return (
     <ul className="divide-y divide-line/70">
       {reviews.map((r) => (
-        <ReviewRow key={r.id} review={r} canReply={canReply} />
+        <ReviewRow key={r.id} review={r} canReply={canReply} aiEnabled={aiEnabled} />
       ))}
     </ul>
   );

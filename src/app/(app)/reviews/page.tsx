@@ -273,7 +273,7 @@ export default async function ReviewsAnalyticsPage({
       {tab === 'reviews' && (
         <SectionCard title="Recent reviews" description={live ? 'Newest first.' : undefined}>
           {live && reviews.length > 0 ? (
-            <ReviewList reviews={reviews.slice(0, MAX_LISTED)} canReply />
+            <ReviewList reviews={reviews.slice(0, MAX_LISTED)} canReply aiEnabled={Boolean(process.env.GEMINI_API_KEY)} />
           ) : (
             <EmptyState
               icon="star"

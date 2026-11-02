@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { requireBusiness } from '@/lib/business';
 import { createClient } from '@/lib/supabase/server';
 import { computeRebookingRate, computeRevenueAttribution, computeHealthScore } from '@/lib/health';
+import { fetchAll } from '@/lib/fetch-all';
 import { getCampaignPerformance, getRecentClicks, getReviewLinkTotals } from '@/lib/click-analytics';
 import { formatUKDateTime } from '@/lib/uk-defaults';
 import { PageHeader } from '@/components/ui/page-header';
@@ -24,23 +25,30 @@ export default async function AnalyticsPage() {
   const business = await requireBusiness();
   const supabase = createClient();
 
-  const [{ data: visits }, { data: customers }, { data: services }, linkTotals, campaigns, recentClicks] = await Promise.all([
-    supabase.from('visits').select('*').eq('business_id', business.id),
-    supabase.from('customers').select('id').eq('business_id', business.id),
+  const [visits, customers, { data: services }, linkTotals, campaigns, recentClicks] = await Promise.all([
+    fetchAll((from, to) => supabase.from('visits').select('*').eq('business_id', business.id).order('id').range(from, to)),
+    fetchAll((from, to) => supabase.from('customers').select('id').eq('business_id', business.id).order('id').range(from, to)),
     supabase.from('services').select('id, recurrence_interval_days').eq('business_id', business.id),
     getReviewLinkTotals(supabase, business.id),
     getCampaignPerformance(supabase, business.id),
     getRecentClicks(supabase, business.id, 10),
   ]);
 
-  const rebookingRate = computeRebookingRate(visits ?? []);
+  const rebookingRate = computeRebookingRate(visits);
   const revenueAttribution = await computeRevenueAttribution(supabase, business.id);
 
   const serviceIntervalById = new Map((services ?? []).map((s) => [s.id, s.recurrence_interval_days]));
 
   const healthTierCounts = { thriving: 0, steady: 0, at_risk: 0, lapsed: 0 };
-  for (const customer of customers ?? []) {
-    const customerVisits = (visits ?? []).filter((v) => v.customer_id === customer.id);
+  // Group once; filtering the whole visit list per customer was quadratic.
+  const visitsByCustomer = new Map<string, typeof visits>();
+  for (const v of visits) {
+    const list = visitsByCustomer.get(v.customer_id);
+    if (list) list.push(v);
+    else visitsByCustomer.set(v.customer_id, [v]);
+  }
+  for (const customer of customers) {
+    const customerVisits = visitsByCustomer.get(customer.id) ?? [];
     if (customerVisits.length === 0) continue;
     const interval = serviceIntervalById.get(customerVisits[0].service_id ?? '') ?? null;
     const health = computeHealthScore(customerVisits, interval);

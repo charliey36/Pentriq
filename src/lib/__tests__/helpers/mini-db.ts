@@ -105,6 +105,8 @@ class MiniQuery implements PromiseLike<any> {
     if (this.orderCol) out = [...out].sort((a, b) => ((a[this.orderCol!] < b[this.orderCol!] ? -1 : 1) * (this.asc ? 1 : -1)));
     if (this.rng) out = out.slice(this.rng[0], this.rng[1] + 1);
     if (this.max !== null) out = out.slice(0, this.max);
+    // Like the real server (PostgREST max-rows): one response never returns more than 1000 rows.
+    if (!this.head) out = out.slice(0, 1000);
     const count = this.count ? hit().length : null;
     return { data: this.head ? null : this.isSingle ? out[0] ?? null : out, count, error: null };
   }
