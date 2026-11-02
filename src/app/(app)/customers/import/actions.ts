@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireBusiness } from '@/lib/business';
+import { recordAudit } from '@/lib/audit';
 import { bulkImportWithRecovery, mapCsvRowsToCustomers, parseCsvWithIssues } from '@/lib/customers';
 import type { BulkImportSummary } from '@/lib/customers';
 import { analyzeCsvMapping, mappingIndexes, CSV_IMPORT_FIELDS, type CsvConfirmedMapping, type CsvMappingAnalysis } from '@/lib/csv-import-mapping';
@@ -105,6 +106,7 @@ export async function importCustomers(
     return { error: 'The import could not be completed. Nothing was lost; please try again, and contact support if it keeps happening.' };
   }
 
+  await recordAudit({ action: 'customers.imported', businessId: business.id, metadata: { rows: rows.length } });
   revalidatePath('/customers');
   revalidatePath('/dashboard');
 

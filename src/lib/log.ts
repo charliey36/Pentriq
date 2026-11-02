@@ -3,7 +3,7 @@
  * `area` + `event` (e.g. area=email event=send_failed) and root causes read from `reason`.
  * Email addresses are masked and secrets/tokens are never logged.
  */
-export type LogArea = 'import' | 'email' | 'referral' | 'review_request' | 'rebooking' | 'auth' | 'settings' | 'db' | 'security';
+export type LogArea = 'sms' | 'audit' | 'import' | 'email' | 'referral' | 'review_request' | 'rebooking' | 'auth' | 'settings' | 'db' | 'security';
 
 export function maskEmail(email: string | null | undefined): string {
   const value = (email ?? '').trim();

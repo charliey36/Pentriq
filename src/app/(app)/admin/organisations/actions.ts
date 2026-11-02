@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireBusiness, isAdminEmail } from '@/lib/business';
+import { recordAudit } from '@/lib/audit';
 
 /**
  * Admin-only hard delete of an organisation. Deleting the business row
@@ -28,6 +29,7 @@ export async function deleteOrganisation(businessId: string): Promise<{ error?: 
     await admin.auth.admin.deleteUser(m.user_id);
   }
 
+  await recordAudit({ action: 'admin.organisation_deleted', actorId: data.user?.id, actorEmail: data.user?.email, targetType: 'business', targetId: businessId });
   revalidatePath('/admin/organisations');
   return {};
 }

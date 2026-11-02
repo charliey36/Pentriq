@@ -20,6 +20,22 @@ export class MiniDb {
   from(t: string) {
     return new MiniQuery(this, t);
   }
+  /** Mirrors migration 0039 import_apply_visits: insert visits and bump customer totals together. */
+  async rpc(fn: string, args: { p_business_id: string; p_visits: Row[] }) {
+    if (fn !== 'import_apply_visits') return { data: null, error: { message: `unknown rpc ${fn}` } };
+    const created: Row[] = args.p_visits.map((p) => ({ id: this.nextId('visits'), business_id: args.p_business_id, ...p }));
+    for (const v of created) {
+      const c = this.rows('customers').find((x) => x.id === v.customer_id && x.business_id === args.p_business_id);
+      if (c) {
+        c.visit_count = (c.visit_count ?? 0) + 1;
+        c.total_spend = Number(c.total_spend ?? 0) + Number(v.price ?? 0);
+        const d = String(v.visited_at).slice(0, 10);
+        if (!c.last_service_date || d > c.last_service_date) c.last_service_date = d;
+      }
+    }
+    this.rows('visits').push(...created);
+    return { data: created, error: null };
+  }
 }
 
 class MiniQuery implements PromiseLike<any> {

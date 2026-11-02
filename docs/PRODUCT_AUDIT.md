@@ -78,3 +78,25 @@ Twilio (SMS), roles/SSO product scope, audit-log retention policy and GDPR DPA w
 - **90 days:** team invites and roles (owner/manager/staff); per-business job queue for crons; Zapier/Make app and outbound webhooks; background large imports.
 - **6 months:** multi-location and agency/white-label (custom domain, logo, email sender); visual journey builder; scheduled reports; SSO (SAML/OIDC) for a higher tier.
 - **12 months:** SOC 2 Type I groundwork, EU/UK data-residency option, public API with scoped keys and usage metering, tiered pricing (Starter / Growth / Multi-location / Enterprise) keyed to SMS volume, locations and seats.
+
+## 7. Follow-up pass (all earlier recommendations that could be done without outside credentials or live infrastructure)
+
+| Item | Status | Files |
+|---|---|---|
+| Atomic CSV import totals (C5) | Done. Visit rows and customer totals now move in one Postgres function, `import_apply_visits` (migration `0039`); a failed write plus retry counts spend once. Two regression tests added | `supabase/migrations/0039_import_atomic_and_audit_log.sql`, `src/lib/customers.ts`, test fakes |
+| Audit log (C6, part) | Done: `audit_log` table, `recordAudit()` helper, events for API-key regeneration, account export, account deletion, CSV import, admin org deletion, and an admin viewer at `/admin/audit-logs` | `src/lib/audit.ts`, `src/app/(app)/admin/audit-logs/page.tsx`, action files |
+| Twilio SMS/WhatsApp (H2) | Code done (REST provider, no SDK, 5 tests). **Not verified against a live Twilio account** | `src/lib/messaging.ts` |
+| Remove `?secret=` cron auth (H3) | Done. **Any external scheduler still using the query string must switch to `Authorization: Bearer`** or it will get 401 | `src/lib/cron-auth.ts`, README |
+| Delete `/ai-test` (C1) | Done (page and API route removed) | |
+| Archive stale root docs (H6), refresh README (H7) | Done; files moved to `docs/history/` | |
+
+Verification: `tsc` clean, 589 tests pass, `next build` succeeds (with placeholder env vars).
+
+**Must do before deploying:** apply migration `0039` to the database (the CSV import calls `import_apply_visits` and will fail without it).
+
+**Still not done, and why:**
+- Team invites, role management UI and SSO: needs a product decision on roles and an email/invite flow design; not started.
+- Enforcing CSP: needs a week of browser violation reports first.
+- Job queue for crons, background large imports (>2,000 rows), Zapier app, outbound webhooks, white-label, visual journey builder: multi-week projects needing infrastructure or product decisions.
+- Automated accessibility (axe) tests: not added; needs a browser test harness.
+- The `audit_log` and SMS provider have been tested only against fakes.

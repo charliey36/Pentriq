@@ -3,6 +3,7 @@ import { requireBusiness } from '@/lib/business';
 import { createClient } from '@/lib/supabase/server';
 import { buildExport, fetchAllRows, toCsv, CUSTOMER_CSV_COLUMNS, type PageFetcher } from '@/lib/account-export';
 import { withinLimit } from '@/lib/rate-limit';
+import { recordAudit } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,6 +31,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Too many exports. Please try again in an hour.' }, { status: 429 });
   }
 
+  await recordAudit({ action: 'account.exported', businessId: business.id, metadata: { format: request.nextUrl.searchParams.get('format') === 'csv' ? 'csv' : 'json' } });
   const supabase = createClient() as unknown as Loose;
   const fetchPage: PageFetcher = (table, from, to) =>
     supabase.from(table).select('*').eq('business_id', business.id).order('id').range(from, to);

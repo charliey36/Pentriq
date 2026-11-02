@@ -34,13 +34,14 @@ reminders, and customer retention (loyalty, referrals, win-back campaigns),
 built on top of a channel-agnostic messaging engine and a small journey
 scheduler.
 
-**This started as a minimal prototype and has grown into a fuller platform,
-but is still not a hardened production application.** Several integration
-points (SMS/WhatsApp delivery, AI-drafted copy, real-time booking) are
-implemented as clean, swappable interfaces with a working fallback rather
-than live third-party integrations, since this environment has no real
-Twilio/LLM credentials to build and test against — see "Integration points
-that need real credentials" below for exactly what to wire up.
+Pentriq is a multi-tenant SaaS with row-level-security tenant isolation,
+rate-limited public endpoints, signed webhooks, structured masked logging,
+Sentry monitoring and CI (typecheck + tests). Email (Resend), Stripe billing,
+Google Business Profile and Square/Acuity/Calendly imports are live
+integrations; SMS/WhatsApp go through Twilio once `TWILIO_*` credentials are
+set (otherwise a logging stub is used). See `docs/PRODUCT_AUDIT.md` for the
+current audit, known gaps and roadmap, and `docs/history/` for archived
+implementation notes.
 
 ## Stack
 
@@ -138,7 +139,7 @@ fallback — not left out, but not fake either:
 
 | Feature | File | Current behavior | To go live |
 | --- | --- | --- | --- |
-| SMS / WhatsApp sending | [`src/lib/messaging.ts`](./src/lib/messaging.ts) | Logs the message server-side instead of delivering it (`LoggingStubSmsProvider`) | Set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`, then implement the real Twilio REST call in `createSmsProvider()` — everything else (templates, retry, consent, resolveChannel) already works against the interface |
+| SMS / WhatsApp sending | [`src/lib/messaging.ts`](./src/lib/messaging.ts) | `TwilioSmsProvider` (REST, no SDK) when all three `TWILIO_*` variables are set; otherwise `LoggingStubSmsProvider` logs and does not deliver | Set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`; send a test to your own number first (not yet verified against a live account) |
 | AI-drafted message copy | [`src/lib/ai.ts`](./src/lib/ai.ts) | Falls back to a template-based draft | Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`, then implement the completion call in `draftMessageCopy()` |
 | One-click rebooking with live availability | [`src/app/book/[customerId]`](./src/app/book/[customerId]) | Captures a preferred-time request as a note for manual follow-up | Either build a native slot-availability engine or integrate with the business's existing calendar/scheduling tool — see the comment in `actions.ts` |
 
@@ -274,7 +275,7 @@ override with `SEED_DEMO_EMAIL` / `SEED_DEMO_PASSWORD` env vars.
 
 Nothing sends automatically on a timer inside the Next.js app — external
 schedulers must hit these endpoints on an interval. All are protected by
-`CRON_SECRET` (as `?secret=...` or `Authorization: Bearer ...`):
+`CRON_SECRET` (as an `Authorization: Bearer ...` header; the `?secret=` form was removed because query strings leak into logs):
 
 | Endpoint | What it does | Suggested interval |
 | --- | --- | --- |
@@ -286,7 +287,7 @@ schedulers must hit these endpoints on an interval. All are protected by
 Locally:
 
 ```bash
-curl "http://localhost:3000/api/send-messages?secret=YOUR_CRON_SECRET"
+curl -H "Authorization: Bearer YOUR_CRON_SECRET" http://localhost:3000/api/send-messages
 ```
 
 In production, use [Vercel Cron](./vercel.json) (set `CRON_SECRET` in Vercel and it

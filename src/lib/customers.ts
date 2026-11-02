@@ -286,15 +286,16 @@ export async function bulkImportCustomers(
       .insert(
         batch.map((k) => {
           const e = identity.entities.get(k)!;
-          const a = agg.get(k)!;
           return {
             business_id: business.id,
             name: e.name,
             email: e.email,
             phone: e.phone,
-            last_service_date: a.latest,
-            total_spend: a.total,
-            visit_count: a.count,
+            // Totals start at zero and are applied together with the visit rows in step 8
+            // (import_apply_visits), so a retry after a partial failure can never count twice.
+            last_service_date: null,
+            total_spend: 0,
+            visit_count: 0,
             ...(consentConfirmedAt ? { consent_confirmed_at: consentConfirmedAt } : {}),
             ...(suppressed.has(e.email.toLowerCase()) ? { unsubscribed_at: new Date().toISOString() } : {}),
           };
@@ -305,22 +306,15 @@ export async function bulkImportCustomers(
     const idByEmail = new Map((data ?? []).map((c) => [c.email.toLowerCase(), c.id]));
     batch.forEach((k) => customerIdByKey.set(k, idByEmail.get(identity.entities.get(k)!.email.toLowerCase())!));
   }
-  for (const batch of chunks(changedKeys, 20)) {
+  // Existing customers: only the phone back-fill happens here; spend / visit totals move atomically in step 8.
+  for (const batch of chunks(changedKeys.filter((k) => identity.entities.get(k)!.phoneToFill), 20)) {
     await Promise.all(
       batch.map(async (k) => {
         const entity = identity.entities.get(k)!;
-        const c = known.get(entity.existingId!)!;
-        const a = agg.get(k)!;
-        const latest = a.latest && (!c.last_service_date || a.latest > c.last_service_date) ? a.latest : c.last_service_date;
         const { error } = await supabase
           .from('customers')
-          .update({
-            total_spend: Number(c.total_spend) + a.total,
-            visit_count: c.visit_count + a.count,
-            last_service_date: latest,
-            ...(entity.phoneToFill ? { phone: entity.phoneToFill } : {}),
-          })
-          .eq('id', c.id)
+          .update({ phone: entity.phoneToFill })
+          .eq('id', entity.existingId!)
           .eq('business_id', business.id);
         if (error) throw fail(error);
       })
@@ -330,20 +324,18 @@ export async function bulkImportCustomers(
   // 8. Record the service visits (date + amount). Earlier visits are never touched.
   const visitIdByKey = new Map<string, string>();
   for (const batch of chunks(accepted, 200)) {
-    const { data, error } = await supabase
-      .from('visits')
-      .insert(
-        batch.map((v) => ({
-          business_id: business.id,
-          customer_id: customerIdByKey.get(v.entityKey)!,
-          service_id: v.serviceId,
-          visited_at: `${v.date}T12:00:00Z`,
-          price: v.amount,
-          notes: 'Imported from CSV',
-          ...(v.staff ? { staff_name: v.staff } : {}),
-        }))
-      )
-      .select('id, customer_id, service_id, visited_at');
+    const payload = batch.map((v) => ({
+      customer_id: customerIdByKey.get(v.entityKey)!,
+      service_id: v.serviceId,
+      visited_at: `${v.date}T12:00:00Z`,
+      price: v.amount,
+      notes: 'Imported from CSV',
+      staff_name: v.staff ?? null,
+    }));
+    // One transaction: visit rows + customer totals together (migration 0039).
+    const { data, error } = await (supabase as unknown as {
+      rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: Array<{ id: string; customer_id: string; service_id: string; visited_at: string }> | null; error: { message: string; code?: string } | null }>;
+    }).rpc('import_apply_visits', { p_business_id: business.id, p_visits: payload });
     if (error) throw fail(error);
     (data ?? []).forEach((v) => visitIdByKey.set(`${v.customer_id}|${v.service_id}|${v.visited_at.slice(0, 10)}`, v.id));
   }

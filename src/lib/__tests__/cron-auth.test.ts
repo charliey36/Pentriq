@@ -9,8 +9,8 @@ describe('isCronAuthorized', () => {
     expect(isCronAuthorized(req('/api/x', { authorization: `Bearer ${SECRET}` }), SECRET)).toBe(true);
   });
 
-  it('still accepts ?secret= for existing external schedulers', () => {
-    expect(isCronAuthorized(req(`/api/x?secret=${SECRET}`), SECRET)).toBe(true);
+  it('no longer accepts ?secret= (query strings leak into logs)', () => {
+    expect(isCronAuthorized(req(`/api/x?secret=${SECRET}`), SECRET)).toBe(false);
   });
 
   it('rejects missing, wrong, and different-length secrets', () => {

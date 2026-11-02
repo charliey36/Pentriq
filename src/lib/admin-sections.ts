@@ -18,5 +18,5 @@ export const ADMIN_SECTIONS: AdminSection[] = [
   { key: 'feature-flags', title: 'Feature Flags', description: 'Switch features on and off.', icon: 'bolt' },
   { key: 'integrations', title: 'Integrations', description: 'Google, Stripe and other connections.', icon: 'cog' },
   { key: 'system-health', title: 'System Health', description: 'Uptime and error rates.', icon: 'shield' },
-  { key: 'audit-logs', title: 'Audit Logs', description: 'Who changed what, and when.', icon: 'clock' },
+  { key: 'audit-logs', title: 'Audit Logs', description: 'Who changed what, and when.', icon: 'clock', href: '/admin/audit-logs' },
 ];

@@ -4,12 +4,17 @@ import { revalidatePath } from 'next/cache';
 import { requireBusiness } from '@/lib/business';
 import { handleServiceCompleted } from '@/lib/service-import';
 import { generateApiKey } from '@/lib/api-keys';
+import { recordAudit } from '@/lib/audit';
+import { getAuthUser } from '@/lib/business';
 
 /** Replaces the organisation's API key (the old one stops working immediately). */
 export async function regenerateApiKey(): Promise<{ key?: string; error?: string }> {
   const business = await requireBusiness();
   try {
-    return { key: await generateApiKey(business.id) };
+    const key = await generateApiKey(business.id);
+    const user = await getAuthUser();
+    await recordAudit({ action: 'api_key.regenerated', businessId: business.id, actorId: user?.id, actorEmail: user?.email });
+    return { key };
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Could not regenerate key.' };
   }
