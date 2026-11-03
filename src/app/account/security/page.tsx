@@ -23,7 +23,8 @@ export default async function AccountSecurityPage({ searchParams }: { searchPara
 
   const { data: membership } = await createClient()
     .from('business_members')
-    .select('role, businesses(name, require_mfa)')
+    // businesses(*) rather than naming require_mfa: before migration 0045 the column is absent and the page still works.
+    .select('role, businesses(*)')
     .eq('user_id', user.id)
     .maybeSingle()
     .returns<{ role: string; businesses: { name: string | null; require_mfa: boolean | null } | null } | null>();
