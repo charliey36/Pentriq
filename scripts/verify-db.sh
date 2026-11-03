@@ -5,6 +5,8 @@
 #   2. supabase/schema.sql
 #   3. every supabase/migrations/*.sql in numeric order, TWICE (every migration must be safe to re-run)
 #   4. every supabase/tests/*.test.sql (each raises an exception on failure)
+#   5. scripts/check-schema-drift.mjs: every column the code selects/filters on, and every column declared in
+#      src/lib/database.types.ts, must exist in the migrated schema
 #
 # Usage: PGHOST=localhost PGPORT=5432 PGUSER=postgres PGPASSWORD=... scripts/verify-db.sh [database_name]
 # Never point this at a real Supabase project: step 1 creates objects Supabase already owns, and the
@@ -56,5 +58,11 @@ for file in "${tests[@]}"; do
   fi
   echo "    ok  $(basename "$file")"
 done
+
+echo "==> Code and types against the migrated schema"
+columns_file="$(mktemp)"
+trap 'rm -f "$columns_file"' EXIT
+psql -X -At -d "$DB" -c "select json_object_agg(table_name, cols) from (select table_name, json_agg(column_name order by ordinal_position) as cols from information_schema.columns where table_schema = 'public' group by table_name) s" > "$columns_file"
+node "$ROOT/scripts/check-schema-drift.mjs" "$columns_file"
 
 echo "==> All database checks passed"
