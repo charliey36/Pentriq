@@ -27,7 +27,7 @@
     "stripe": "23.0.0"
   },
   "devDependencies": {
-    "@jest/globals": "^29.7.0",
+    "@jest/globals": "^30.5.2",
     "@types/jest": "^29.5.14",
     "@types/node": "22.7.5",
     "@types/react": "18.3.11",
