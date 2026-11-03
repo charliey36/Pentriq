@@ -132,12 +132,13 @@ const loadAccess = cache(async (): Promise<Membership & { userId: string; email:
   const { business, role } = await loadBusiness();
   const user = await getAuthUser();
   if (!user) redirect('/login');
-  setErrorContext(user.id, business.id);
+  const requestHeaders = await headers();
+  setErrorContext(user.id, business.id, requestHeaders.get('x-request-id'));
 
   // Two-factor enforcement for every signed-in page, server action and route handler that needs the business.
   const gate = mfaGate({ aal: user.aal, userEnrolled: user.mfaEnrolled, orgRequires: business.require_mfa === true });
   if (gate !== 'ok') {
-    const requested = (await headers()).get('x-pathname');
+    const requested = requestHeaders.get('x-pathname');
     redirect(gateRedirect(gate, safeNextPath(requested)));
   }
   const effective = isBillingOverrideEmail(user.email)
