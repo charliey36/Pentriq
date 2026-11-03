@@ -32,6 +32,7 @@ const sections: Array<{ icon: IconName; title: string; points: string[] }> = [
       'Two-factor authentication with any authenticator app, which an owner can require for the whole team. An admin can reset a lost device.',
       'One password policy everywhere (at least 8 characters, common passwords refused) and one-click "sign out of every other device".',
       'Two-factor status is read from signed tokens, never from data in the browser.',
+      'Pentriq staff can only open the operator console with two-factor, every time they sign in.',
     ],
   },
   {

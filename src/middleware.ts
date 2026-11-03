@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { isAdminEmail } from '@/lib/admin-access';
+import { adminAccess } from '@/lib/admin-access';
+import { enrolledFromClaims, gateRedirect } from '@/lib/mfa';
 
 /**
  * Refreshes the Supabase auth session cookie on every request and protects
@@ -82,11 +83,24 @@ export async function middleware(request: NextRequest) {
     return withRequestId(NextResponse.redirect(redirectUrl), requestId);
   }
 
-  // Admin Portal: signed-in non-admins get a real 403 (not a redirect or a guessable 404).
-  if (user && (pathname === '/admin' || pathname.startsWith('/admin/') || pathname.startsWith('/api/admin/')) && !isAdminEmail(typeof user.email === 'string' ? user.email : null)) {
-    return pathname.startsWith('/api/')
-      ? NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
-      : new NextResponse('403 - You do not have permission to view this page.', { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+  // Admin Portal: signed-in non-admins get a real 403 (not a redirect or a guessable 404), and admins need a
+  // two-factor session: the portal reads every organisation's data.
+  if (user && (pathname === '/admin' || pathname.startsWith('/admin/') || pathname.startsWith('/api/admin/'))) {
+    const access = adminAccess({
+      email: typeof user.email === 'string' ? user.email : null,
+      aal: typeof user.aal === 'string' ? user.aal : null,
+      mfaEnrolled: enrolledFromClaims(user as unknown as Record<string, unknown>),
+    });
+    if (access === 'forbidden') {
+      return pathname.startsWith('/api/')
+        ? NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+        : new NextResponse('403 - You do not have permission to view this page.', { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+    }
+    if (access !== 'ok') {
+      return pathname.startsWith('/api/')
+        ? NextResponse.json({ error: 'Two-factor authentication required.' }, { status: 403 })
+        : withRequestId(NextResponse.redirect(new URL(gateRedirect(access, `${pathname}${search}`), request.url)), requestId);
+    }
   }
 
   if (user && isAuthPage) {

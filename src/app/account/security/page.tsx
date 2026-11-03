@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getAuthUser } from '@/lib/business';
+import { isAdminEmail } from '@/lib/admin-access';
 import { createClient } from '@/lib/supabase/server';
 import { safeNextPath } from '@/lib/safe-redirect';
 import { AccountShell } from '@/components/account-shell';
@@ -27,7 +28,8 @@ export default async function AccountSecurityPage({ searchParams }: { searchPara
     .maybeSingle()
     .returns<{ role: string; businesses: { name: string | null; require_mfa: boolean | null } | null } | null>();
 
-  const required = membership?.businesses?.require_mfa === true;
+  // Required by the organisation's policy, or because this is a platform admin (the Admin Portal needs two-factor).
+  const requiredBy = membership?.businesses?.require_mfa === true ? 'organisation' : isAdminEmail(user.email) ? 'admin' : null;
   const setupRequired = params.setup === 'required';
   const next = safeNextPath(params.next);
 
@@ -42,7 +44,7 @@ export default async function AccountSecurityPage({ searchParams }: { searchPara
         </p>
       </div>
       <div className="space-y-6">
-        <MfaPanel required={required} setupRequired={setupRequired} next={next} />
+        <MfaPanel requiredBy={requiredBy} setupRequired={setupRequired} next={next} />
         {!setupRequired && (
           <>
             <PasswordPanel email={user.email} />

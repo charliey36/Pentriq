@@ -37,6 +37,14 @@ export function mfaGate({ aal, userEnrolled, orgRequires }: MfaGateInput): MfaGa
   return 'ok';
 }
 
+/**
+ * Platform operators (ADMIN_EMAIL) can read and delete every organisation's data through the service role, so the
+ * Admin Portal always needs a two-factor session, whatever their own organisation's policy.
+ */
+export function adminMfaGate(aal: string | null | undefined, userEnrolled: boolean): MfaGate {
+  return mfaGate({ aal, userEnrolled, orgRequires: true });
+}
+
 export function gateRedirect(gate: Exclude<MfaGate, 'ok'>, next: string): string {
   const encoded = encodeURIComponent(next);
   return gate === 'verify' ? `/mfa?next=${encoded}` : `/account/security?setup=required&next=${encoded}`;

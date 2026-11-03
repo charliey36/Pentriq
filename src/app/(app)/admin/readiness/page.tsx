@@ -18,6 +18,7 @@ const STATUS_STYLE: Record<ReadinessCheck['status'], { icon: 'check' | 'warning'
 
 /** Manual items no code can verify; listed so the go-live checklist is complete in one place. */
 const HUMAN_ITEMS = [
+  'Every ADMIN_EMAIL account has two-factor set up (the portal requires it) and a second authenticator or a recovery plan.',
   'Terms, privacy and cookie policies reviewed by a solicitor (the current text is a draft).',
   'Data processing agreement available for business customers (UK GDPR Article 28).',
   'Processing regions confirmed for Supabase, Vercel, Resend and Stripe, and added to /subprocessors.',

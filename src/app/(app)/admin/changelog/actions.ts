@@ -3,14 +3,14 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getAuthUser, isAdminEmail } from '@/lib/business';
+import { getAuthUser } from '@/lib/business';
+import { adminAccess } from '@/lib/admin-access';
 
 const TAGS = ['New', 'Improved', 'Infrastructure'] as const;
 
-/** Every action re-checks admin status; hiding the page is not enough, actions are public endpoints. */
+/** Every action re-checks admin status and two-factor; hiding the page is not enough, actions are public endpoints. */
 async function requireAdmin() {
-  const user = await getAuthUser();
-  if (!user || !isAdminEmail(user.email)) redirect('/dashboard');
+  if (adminAccess(await getAuthUser()) !== 'ok') redirect('/dashboard');
 }
 
 function parse(fd: FormData) {

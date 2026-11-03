@@ -15,10 +15,17 @@ type Enrolling = { factorId: string; qr: string; secret: string };
 
 /**
  * Two-factor authentication with an authenticator app (TOTP): set up, confirm with a code, list and remove.
- * The organisation's policy (required or optional) is shown, and the last authenticator cannot be removed
- * while the organisation requires two-factor.
+ * Whether two-factor is required (by the organisation's policy, or because the user is a platform admin) is
+ * shown, and the last authenticator cannot be removed while it is required.
  */
-export function MfaPanel({ required, setupRequired, next }: { required: boolean; setupRequired: boolean; next: string }) {
+const REQUIRED_BY: Record<'organisation' | 'admin', { subject: string; short: string }> = {
+  organisation: { subject: 'Your organisation requires', short: 'Required by your organisation.' },
+  admin: { subject: 'The Admin Portal requires', short: 'Required for the Admin Portal.' },
+};
+
+export function MfaPanel({ requiredBy, setupRequired, next }: { requiredBy: 'organisation' | 'admin' | null; setupRequired: boolean; next: string }) {
+  const required = requiredBy !== null;
+  const why = REQUIRED_BY[requiredBy ?? 'organisation'];
   const router = useRouter();
   const [factors, setFactors] = useState<Factor[] | null>(null);
   const [enrolling, setEnrolling] = useState<Enrolling | null>(null);
@@ -102,7 +109,7 @@ export function MfaPanel({ required, setupRequired, next }: { required: boolean;
     setError(null);
     setMessage(null);
     if (required && verified.length <= 1 && factor.status === 'verified') {
-      setError('Your organisation requires two-factor authentication. Add another authenticator before removing this one.');
+      setError(`${why.subject} two-factor authentication. Add another authenticator before removing this one.`);
       return;
     }
     setBusy(factor.id);
@@ -146,10 +153,10 @@ export function MfaPanel({ required, setupRequired, next }: { required: boolean;
 
       {setupRequired && verified.length === 0 && (
         <Notice variant="warning" className="mt-4">
-          Your organisation requires two-factor authentication. Set it up below to continue to Pentriq.
+          {why.subject} two-factor authentication. Set it up below to continue to Pentriq.
         </Notice>
       )}
-      {required && !setupRequired && <p className="mt-3 text-xs text-ink-3">Required by your organisation.</p>}
+      {required && !setupRequired && <p className="mt-3 text-xs text-ink-3">{why.short}</p>}
       {error && <Notice variant="error" className="mt-4">{error}</Notice>}
       {message && <Notice variant="success" className="mt-4">{message}</Notice>}
 
