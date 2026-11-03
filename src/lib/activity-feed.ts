@@ -71,6 +71,21 @@ const AUDIT_LABELS: Record<string, string> = {
   'feedback.bulk_updated': 'Feedback bulk-updated',
   'settings.retention_changed': 'Data retention changed',
   'saved_view.created': 'Saved view created',
+  'saved_view.deleted': 'Saved view deleted',
+  'audit.exported': 'Audit log exported',
+  'security.mfa_enrolled': 'Two-factor turned on',
+  'security.mfa_removed': 'Two-factor turned off',
+  'security.mfa_policy_changed': 'Two-factor policy changed',
+  'security.sessions_revoked': 'Signed out of other devices',
+  'security.password_changed': 'Password changed',
+  'team.mfa_reset': 'Teammate two-factor reset',
+  'customer.exported': 'Customer data exported',
+  'customer.erased': 'Customer erased',
+  'settings.updated': 'Settings updated',
+  'services.changed': 'Services changed',
+  'loyalty.changed': 'Loyalty programme changed',
+  'integration.connected': 'Integration connected',
+  'integration.disconnected': 'Integration disconnected',
 };
 
 export function auditLabel(action: string): string {

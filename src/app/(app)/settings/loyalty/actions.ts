@@ -1,5 +1,6 @@
 'use server';
 
+import { auditAsCurrentUser } from '@/lib/audit-actor';
 import { userSafeError } from '@/lib/log';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
@@ -47,6 +48,7 @@ export async function saveLoyaltyProgram(
     return { error: userSafeError('Failed to save loyalty program', error) };
   }
 
+  await auditAsCurrentUser('loyalty.changed', { targetType: 'loyalty_program', metadata: { change: 'programme_saved', active: isActive } });
   revalidatePath('/settings/loyalty');
   return { success: true };
 }
@@ -126,6 +128,7 @@ export async function createReferralPromotion(
   const supabase = createClient();
   const { error } = await supabase.from('referral_promotions').insert({ business_id: business.id, ...parsed.values });
   if (error) return { error: promotionSaveError(error, 'create') };
+  await auditAsCurrentUser('loyalty.changed', { targetType: 'referral_promotion', metadata: { change: 'promotion_created' } });
 
   revalidatePath('/settings/loyalty');
   revalidatePath('/referrals');
@@ -148,6 +151,7 @@ export async function updateReferralPromotion(
     .eq('id', promotionId)
     .eq('business_id', business.id);
   if (error) return { error: promotionSaveError(error, 'update') };
+  await auditAsCurrentUser('loyalty.changed', { targetType: 'referral_promotion', targetId: promotionId, metadata: { change: 'promotion_updated' } });
 
   revalidatePath('/settings/loyalty');
   revalidatePath('/referrals');
@@ -158,6 +162,7 @@ export async function deleteReferralPromotion(promotionId: string) {
   const { business } = await requireCapability('settings.write');
   const supabase = createClient();
   await supabase.from('referral_promotions').delete().eq('id', promotionId).eq('business_id', business.id);
+  await auditAsCurrentUser('loyalty.changed', { targetType: 'referral_promotion', targetId: promotionId, metadata: { change: 'promotion_deleted' } });
   revalidatePath('/settings/loyalty');
   revalidatePath('/referrals');
   return { success: true };

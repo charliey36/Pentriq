@@ -245,10 +245,33 @@ insert into storage.objects (bucket_id, name) values ('business-logos', 'aaaaaaa
 reset role;
 
 -- ---------------------------------------------------------------------------------------------------------
+-- Right to erasure: deleting a customer (as the owner, through RLS) removes every record linked to them
+-- ---------------------------------------------------------------------------------------------------------
+insert into public.customer_tags (business_id, customer_id, tag) values ('aaaaaaaa-0000-0000-0000-000000000001', 'cccccccc-0000-0000-0000-0000000000a1', 'vip');
+insert into public.loyalty_ledger_entries (business_id, customer_id, delta, reason) values ('aaaaaaaa-0000-0000-0000-000000000001', 'cccccccc-0000-0000-0000-0000000000a1', 10, 'visit');
+insert into public.review_requests (business_id, customer_id, send_at) values ('aaaaaaaa-0000-0000-0000-000000000001', 'cccccccc-0000-0000-0000-0000000000a1', now());
+insert into public.interaction_events (business_id, customer_id, event_type) values ('aaaaaaaa-0000-0000-0000-000000000001', 'cccccccc-0000-0000-0000-0000000000a1', 'review_link_clicked');
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+set local role authenticated;
+with removed as (delete from public.customers where id = 'cccccccc-0000-0000-0000-0000000000a1' returning 1)
+select rls_test.check((select count(*) from removed) = 1, 'owner can erase a customer');
+reset role;
+select rls_test.check(
+  (select count(*) from public.visits where customer_id = 'cccccccc-0000-0000-0000-0000000000a1')
+  + (select count(*) from public.messages where customer_id = 'cccccccc-0000-0000-0000-0000000000a1')
+  + (select count(*) from public.private_feedback where customer_id = 'cccccccc-0000-0000-0000-0000000000a1')
+  + (select count(*) from public.customer_tags where customer_id = 'cccccccc-0000-0000-0000-0000000000a1')
+  + (select count(*) from public.loyalty_ledger_entries where customer_id = 'cccccccc-0000-0000-0000-0000000000a1')
+  + (select count(*) from public.review_requests where customer_id = 'cccccccc-0000-0000-0000-0000000000a1')
+  + (select count(*) from public.interaction_events where customer_id = 'cccccccc-0000-0000-0000-0000000000a1') = 0,
+  'erasing a customer removes their visits, messages, feedback, tags, loyalty, requests and clicks'
+);
+
+-- ---------------------------------------------------------------------------------------------------------
 -- Service role (server code) bypasses RLS
 -- ---------------------------------------------------------------------------------------------------------
 set local role service_role;
-select rls_test.check((select count(*) from public.customers) = 4, 'service role sees every tenant');
+select rls_test.check((select count(*) from public.customers) = 3, 'service role sees every tenant');
 select rls_test.check((select count(*) from public.team_invitations) = 1, 'service role reads server-only tables');
 reset role;
 

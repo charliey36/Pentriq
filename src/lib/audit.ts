@@ -59,9 +59,11 @@ export function hashIp(ip: string | null | undefined): string | null {
   return ip ? createHash('sha256').update(ip).digest('hex').slice(0, 16) : null;
 }
 
-export async function recordAudit(entry: AuditEntry, db: Inserter = createAdminClient() as unknown as Inserter): Promise<void> {
+export async function recordAudit(entry: AuditEntry, db?: Inserter): Promise<void> {
   try {
-    const { error } = await db.from('audit_log').insert({
+    // Created inside the try: a missing service key or other set-up problem must never fail the user's action.
+    const client = db ?? (createAdminClient() as unknown as Inserter);
+    const { error } = await client.from('audit_log').insert({
       business_id: entry.businessId ?? null,
       actor_id: entry.actorId ?? null,
       actor_email: entry.actorEmail ?? null,

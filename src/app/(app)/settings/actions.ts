@@ -1,5 +1,6 @@
 'use server';
 
+import { auditAsCurrentUser } from '@/lib/audit-actor';
 import { userSafeError } from '@/lib/log';
 import { requireCapability } from '@/lib/business-access';
 import { revalidatePath } from 'next/cache';
@@ -74,6 +75,7 @@ export async function saveSettings(
     return { error: 'Something went wrong while saving your settings. Please try again in a moment.' };
   }
 
+  await auditAsCurrentUser('settings.updated', { targetType: 'business', targetId: business.id, metadata: { section: 'general' } });
   revalidatePath('/settings');
   revalidatePath('/dashboard');
   return { success: true };

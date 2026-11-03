@@ -2,6 +2,10 @@
 
 import { userSafeError } from '@/lib/log';
 import { revalidatePath } from 'next/cache';
+import { requireCapability } from '@/lib/business-access';
+import { eraseCustomer } from '@/lib/customer-privacy';
+import { recordAudit } from '@/lib/audit';
+import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { requireBusiness } from '@/lib/business';
 import { todayIso } from '@/lib/eligibility';
@@ -270,4 +274,32 @@ export async function editCustomer(
   revalidatePath('/customers');
   revalidatePath(`/customers/${customerId}`);
   return { success: true, message: 'Customer updated.' };
+}
+
+export type EraseCustomerResult = { error?: string };
+
+/**
+ * Right to erasure: permanently deletes this customer and everything linked to them. Owners and admins only,
+ * confirmed by typing the customer's name. The audit entry records that it happened, never who it was.
+ */
+export async function eraseCustomerAction(customerId: string, confirmName: string, keepOnDoNotContactList: boolean): Promise<EraseCustomerResult> {
+  const { business, userId, email } = await requireCapability('data.export');
+  const result = await eraseCustomer(createClient(), createAdminClient(), {
+    businessId: business.id,
+    customerId,
+    confirmName,
+    keepOnDoNotContactList: Boolean(keepOnDoNotContactList),
+  });
+  if (!result.ok) return { error: result.error };
+  await recordAudit({
+    action: 'customer.erased',
+    businessId: business.id,
+    actorId: userId,
+    actorEmail: email,
+    targetType: 'customer',
+    targetId: customerId,
+    metadata: { kept_on_do_not_contact_list: Boolean(keepOnDoNotContactList), integration_logs_removed: result.logsRemoved },
+  });
+  revalidatePath('/customers');
+  redirect('/customers?erased=1');
 }
