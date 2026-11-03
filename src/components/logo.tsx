@@ -41,7 +41,7 @@ export function Logo({ className = '', size = 'md' }: { className?: string; size
       <span
         className={`font-semibold tracking-[-0.02em] text-ink ${size === 'lg' ? 'text-xl' : 'text-[15px]'}`}
       >
-        {APP_NAME_LEAD}<span className="text-brand-600 dark:text-brand-400">{APP_NAME_ACCENT}</span>
+        {APP_NAME_LEAD}<span className="text-brand-700 dark:text-brand-400">{APP_NAME_ACCENT}</span>
       </span>
     </span>
   );

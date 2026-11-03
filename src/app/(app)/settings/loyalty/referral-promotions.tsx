@@ -51,7 +51,7 @@ function RewardField({
             aria-selected={type === tab.type}
             onClick={() => setType(tab.type)}
             className={`rounded-md px-3 py-1.5 text-[13px] font-semibold transition-colors ${
-              type === tab.type ? 'bg-brand-600 text-white shadow-sm' : 'text-ink-3 hover:text-ink'
+              type === tab.type ? 'bg-brand-700 text-white shadow-sm' : 'text-ink-3 hover:text-ink'
             }`}
           >
             {tab.label}

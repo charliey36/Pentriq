@@ -245,7 +245,7 @@ export function SettingsForm({ business }: { business: Business }) {
               <p className="text-xs text-ink-3">Subject</p>
               <p className="text-sm font-semibold text-ink">{previewSubject}</p>
               <p className="mt-3 text-sm leading-6 text-ink-2">{previewBody}</p>
-              <p className="mt-3 inline-block rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white">Leave a Review</p>
+              <p className="mt-3 inline-block rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white">Leave a Review</p>
             </div>
             {usedFallbacks.length > 0 && (
               <p className="field-hint">Where a detail is unknown, a friendly default is used instead: {TEMPLATE_VARIABLES.filter((v) => usedFallbacks.includes(v.key)).map((v) => `${v.label} → “${v.fallback}”`).join(', ')}.</p>

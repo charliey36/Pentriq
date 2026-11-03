@@ -16,7 +16,7 @@ export function ResourceLinks({ current }: { current: (typeof LINKS)[number][1] 
           href={href}
           aria-current={href === current ? 'page' : undefined}
           className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-            href === current ? 'bg-brand-600 text-white' : 'bg-surface-muted text-ink-3 hover:text-ink'
+            href === current ? 'bg-brand-700 text-white' : 'bg-surface-muted text-ink-3 hover:text-ink'
           }`}
         >
           {label}

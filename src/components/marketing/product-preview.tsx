@@ -85,7 +85,7 @@ export function ProductPreview({ className = '' }: { className?: string }) {
           <div className="flex items-center gap-2 px-1.5 pb-3 pt-1">
             <LogoMark className="h-6 w-6" />
             <span className="text-[13px] font-semibold tracking-[-0.02em] text-ink">
-              {APP_NAME_LEAD}<span className="text-brand-600 dark:text-brand-400">{APP_NAME_ACCENT}</span>
+              {APP_NAME_LEAD}<span className="text-brand-700 dark:text-brand-400">{APP_NAME_ACCENT}</span>
             </span>
           </div>
           <ul className="space-y-1">

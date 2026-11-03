@@ -38,8 +38,8 @@
     /* Text */
     --ink: 11 18 32;
     --ink-2: 45 56 78;
-    --ink-3: 94 106 129;
-    --ink-4: 130 141 161;
+    --ink-3: 80 92 114;
+    --ink-4: 98 109 130; /* >= 4.5:1 on every light surface (WCAG AA), checked by scripts/a11y-audit.mjs */
 
     /* Elevation */
     --shadow-xs: 0 1px 2px 0 rgb(16 24 40 / 0.06);
@@ -81,8 +81,8 @@
 
     --ink: 240 244 250;
     --ink-2: 196 205 220;
-    --ink-3: 143 155 175;
-    --ink-4: 102 114 135;
+    --ink-3: 163 174 192;
+    --ink-4: 134 146 167; /* >= 4.5:1 on every dark surface (WCAG AA) */
 
     --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.4);
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5), 0 1px 3px 0 rgb(0 0 0 / 0.35);
@@ -563,8 +563,8 @@
     --line-strong: 203 213 225;
     --ink: 11 18 32;
     --ink-2: 45 56 78;
-    --ink-3: 94 106 129;
-    --ink-4: 130 141 161;
+    --ink-3: 80 92 114;
+    --ink-4: 98 109 130; /* >= 4.5:1 on every light surface (WCAG AA), checked by scripts/a11y-audit.mjs */
     --shadow-card: none;
     --shadow-hero: none;
   }
