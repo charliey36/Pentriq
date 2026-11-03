@@ -8,10 +8,19 @@ import { isAdminEmail } from '@/lib/admin-access';
  * routes (tracking + scheduled send job).
  */
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
+
+  // Correlation id for logs and support tickets (kept if a trusted proxy already set one), and the requested
+  // path for server components (used as the return address after a two-factor check). Both are always
+  // overwritten here, so a client cannot inject them.
+  const incomingId = request.headers.get('x-request-id');
+  const requestId = incomingId && /^[A-Za-z0-9._-]{8,128}$/.test(incomingId) ? incomingId : crypto.randomUUID();
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-request-id', requestId);
+  requestHeaders.set('x-pathname', `${pathname}${search}`);
 
   let response = NextResponse.next({
-    request: { headers: request.headers },
+    request: { headers: requestHeaders },
   });
 
   const supabase = createServerClient(
@@ -27,7 +36,7 @@ export async function middleware(request: NextRequest) {
             request.cookies.set(name, value);
           });
           response = NextResponse.next({
-            request: { headers: request.headers },
+            request: { headers: requestHeaders },
           });
           cookiesToSet.forEach(({ name, value, options }) => {
             response.cookies.set(name, value, options);
@@ -69,7 +78,7 @@ export async function middleware(request: NextRequest) {
 
   if (!user && !isAuthPage && !isPublicApiRoute && !isPublicPage && pathname !== '/') {
     const redirectUrl = new URL('/login', request.url);
-    return NextResponse.redirect(redirectUrl);
+    return withRequestId(NextResponse.redirect(redirectUrl), requestId);
   }
 
   // Admin Portal: signed-in non-admins get a real 403 (not a redirect or a guessable 404).
@@ -81,9 +90,14 @@ export async function middleware(request: NextRequest) {
 
   if (user && isAuthPage) {
     const redirectUrl = new URL('/dashboard', request.url);
-    return NextResponse.redirect(redirectUrl);
+    return withRequestId(NextResponse.redirect(redirectUrl), requestId);
   }
 
+  return withRequestId(response, requestId);
+}
+
+function withRequestId(response: NextResponse, requestId: string): NextResponse {
+  response.headers.set('x-request-id', requestId);
   return response;
 }
 

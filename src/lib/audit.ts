@@ -26,7 +26,20 @@ export type AuditAction =
   | 'settings.retention_changed'
   | 'saved_view.created'
   | 'saved_view.deleted'
-  | 'audit.exported';
+  | 'audit.exported'
+  | 'security.mfa_enrolled'
+  | 'security.mfa_removed'
+  | 'security.mfa_policy_changed'
+  | 'security.sessions_revoked'
+  | 'security.password_changed'
+  | 'team.mfa_reset'
+  | 'customer.exported'
+  | 'customer.erased'
+  | 'settings.updated'
+  | 'services.changed'
+  | 'loyalty.changed'
+  | 'integration.connected'
+  | 'integration.disconnected';
 
 export type AuditEntry = {
   action: AuditAction;

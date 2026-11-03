@@ -1,6 +1,9 @@
 import { cache } from 'react';
+import { headers } from 'next/headers';
 import { isAdminEmail as isAdminEmailImpl } from '@/lib/admin-access';
 import { redirect } from 'next/navigation';
+import { enrolledFromClaims, gateRedirect, mfaGate } from '@/lib/mfa';
+import { safeNextPath } from '@/lib/safe-redirect';
 import { notifyOwner } from '@/lib/notifications';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -29,12 +32,26 @@ import type { Role } from '@/lib/permissions';
  * Auth server (as getUser() does) — about 100ms saved per call. Memoised per
  * request so the layout, the page and requireBusiness() share one check.
  */
-export const getAuthUser = cache(async (): Promise<{ id: string; email: string | null } | null> => {
+export type AuthUser = {
+  id: string;
+  email: string | null;
+  /** Assurance level of this session: 'aal1' (password) or 'aal2' (password + authenticator code). */
+  aal: string | null;
+  /** The user has two-factor set up (server-written app_metadata, signed into the token; see lib/mfa.ts). */
+  mfaEnrolled: boolean;
+};
+
+export const getAuthUser = cache(async (): Promise<AuthUser | null> => {
   const supabase = createClient();
   const { data, error } = await supabase.auth.getClaims();
   const claims = data?.claims;
   if (error || !claims?.sub) return null;
-  return { id: claims.sub, email: typeof claims.email === 'string' ? claims.email : null };
+  return {
+    id: claims.sub,
+    email: typeof claims.email === 'string' ? claims.email : null,
+    aal: typeof claims.aal === 'string' ? claims.aal : null,
+    mfaEnrolled: enrolledFromClaims(claims as unknown as Record<string, unknown>),
+  };
 });
 
 type Membership = { business: Business; role: Role };
@@ -116,6 +133,13 @@ const loadAccess = cache(async (): Promise<Membership & { userId: string; email:
   const user = await getAuthUser();
   if (!user) redirect('/login');
   setErrorContext(user.id, business.id);
+
+  // Two-factor enforcement for every signed-in page, server action and route handler that needs the business.
+  const gate = mfaGate({ aal: user.aal, userEnrolled: user.mfaEnrolled, orgRequires: business.require_mfa === true });
+  if (gate !== 'ok') {
+    const requested = (await headers()).get('x-pathname');
+    redirect(gateRedirect(gate, safeNextPath(requested)));
+  }
   const effective = isBillingOverrideEmail(user.email)
     ? { ...business, subscription_status: 'active' as const, trial_ends_at: null }
     : business;
