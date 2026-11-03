@@ -2,85 +2,68 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { RATE_LIMITS, requesterId, withinLimit } from '@/lib/rate-limit';
 import { unsubscribeCustomer } from '@/lib/unsubscribe';
+import { isOneClickBody, renderUnsubscribePage, type UnsubscribeState } from '@/lib/unsubscribe-page';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const dynamic = 'force-dynamic';
 
-/**
- * Public unsubscribe endpoint linked from every review request email
- * (CAN-SPAM requires a working opt-out mechanism in commercial email).
- *
- * GET /api/unsubscribe/[customerId] marks the customer as unsubscribed and
- * cancels any still-pending review request for them, then shows a plain
- * confirmation page. Runs with the admin client since the visitor clicking
- * this link has no Supabase auth session — same pattern as the existing
- * click-tracking redirect.
- */
-export async function GET(
-  request: NextRequest,
-  { params: paramsPromise }: { params: Promise<{ customerId: string }> }
-) {
-  const params = await paramsPromise;
-  const { customerId } = params;
+const STATUS: Record<UnsubscribeState, number> = { confirm: 200, done: 200, already: 200, invalid: 400, not_found: 404, rate_limited: 429 };
 
-  const uuidPattern =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-  const html = (message: string) => `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Unsubscribed</title>
-</head>
-<body style="font-family: -apple-system, Helvetica, Arial, sans-serif; max-width: 480px; margin: 80px auto; padding: 0 24px; color: #0f172a; text-align: center;">
-  <p style="font-size: 16px; line-height: 1.5;">${message}</p>
-</body>
-</html>`;
-
-  if (!uuidPattern.test(customerId)) {
-    return new NextResponse(html('Invalid unsubscribe link.'), {
-      status: 400,
-      headers: { 'Content-Type': 'text/html' },
-    });
-  }
-
-  if (!(await withinLimit('unsubscribe-ip', requesterId(request.headers), RATE_LIMITS.unsubscribeIp))) {
-    return new NextResponse(html('Too many requests. Please wait a few minutes and try again.'), {
-      status: 429,
-      headers: { 'Content-Type': 'text/html', 'Retry-After': '600' },
-    });
-  }
-
-  const supabase = createAdminClient();
-
-  const outcome = await unsubscribeCustomer(supabase, customerId);
-  if (outcome === 'not_found') {
-    return new NextResponse(html('We could not find that subscription.'), {
-      status: 404,
-      headers: { 'Content-Type': 'text/html' },
-    });
-  }
-
-  return new NextResponse(
-    html("You've been unsubscribed and won't receive any further emails from this business."),
-    { status: 200, headers: { 'Content-Type': 'text/html' } }
-  );
+function page(state: UnsubscribeState, opts: { businessName?: string | null; actionPath?: string } = {}) {
+  return new NextResponse(renderUnsubscribePage(state, opts), {
+    status: STATUS[state],
+    headers: {
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store',
+      ...(state === 'rate_limited' ? { 'retry-after': '600' } : {}),
+    },
+  });
 }
 
 /**
- * RFC 8058 one-click unsubscribe. Mail clients that see
- * `List-Unsubscribe-Post: List-Unsubscribe=One-Click` POST here directly, with
- * no page shown. Same effect as the link in the email footer.
+ * Public unsubscribe link from every email (UK PECR / CAN-SPAM opt-out). Runs with the admin client because the
+ * visitor has no Pentriq session (same pattern as click tracking).
+ *
+ * GET only shows a confirmation page and never changes anything: email security scanners fetch every link in a
+ * message, and when GET unsubscribed they silently opted real customers out.
+ */
+export async function GET(request: NextRequest, { params: paramsPromise }: { params: Promise<{ customerId: string }> }) {
+  const { customerId } = await paramsPromise;
+  if (!UUID.test(customerId)) return page('invalid');
+  if (!(await withinLimit('unsubscribe-ip', requesterId(request.headers), RATE_LIMITS.unsubscribeIp))) return page('rate_limited');
+
+  const db = createAdminClient();
+  const { data: customer } = await db.from('customers').select('id, business_id, unsubscribed_at').eq('id', customerId).maybeSingle();
+  if (!customer) return page('not_found');
+  const { data: business } = await db.from('businesses').select('name').eq('id', customer.business_id).maybeSingle();
+  if (customer.unsubscribed_at) return page('already', { businessName: business?.name });
+  return page('confirm', { businessName: business?.name, actionPath: `/api/unsubscribe/${customerId}` });
+}
+
+/**
+ * Performs the unsubscribe. Two callers:
+ *  - mail clients doing RFC 8058 one-click (body `List-Unsubscribe=One-Click`, List-Unsubscribe-Post header in
+ *    our emails): answered with a short plain-text body;
+ *  - the confirmation form above: answered with the "you've been unsubscribed" page.
  */
 export async function POST(request: NextRequest, { params: paramsPromise }: { params: Promise<{ customerId: string }> }) {
-  const params = await paramsPromise;
-  const { customerId } = params;
-  if (!UUID.test(customerId)) return new NextResponse('Invalid unsubscribe link.', { status: 400 });
+  const { customerId } = await paramsPromise;
+  const body = await request.text().catch(() => '');
+  const oneClick = isOneClickBody(body);
+  if (!UUID.test(customerId)) return oneClick ? new NextResponse('Invalid unsubscribe link.', { status: 400 }) : page('invalid');
   if (!(await withinLimit('unsubscribe-ip', requesterId(request.headers), RATE_LIMITS.unsubscribeIp))) {
-    return new NextResponse('Too many requests.', { status: 429, headers: { 'Retry-After': '600' } });
+    return oneClick ? new NextResponse('Too many requests.', { status: 429, headers: { 'Retry-After': '600' } }) : page('rate_limited');
   }
-  const outcome = await unsubscribeCustomer(createAdminClient(), customerId);
-  return new NextResponse(outcome === 'not_found' ? 'Not found.' : 'Unsubscribed.', { status: outcome === 'not_found' ? 404 : 200 });
+
+  const db = createAdminClient();
+  const outcome = await unsubscribeCustomer(db, customerId);
+  if (oneClick) return new NextResponse(outcome === 'not_found' ? 'Not found.' : 'Unsubscribed.', { status: outcome === 'not_found' ? 404 : 200 });
+  if (outcome === 'not_found') return page('not_found');
+
+  const { data: customer } = await db.from('customers').select('business_id').eq('id', customerId).maybeSingle();
+  const { data: business } = customer
+    ? await db.from('businesses').select('name').eq('id', customer.business_id).maybeSingle()
+    : { data: null };
+  return page('done', { businessName: business?.name });
 }

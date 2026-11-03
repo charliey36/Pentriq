@@ -60,6 +60,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/test-welcome-email') ||
     pathname.startsWith('/api/stripe/webhook') ||
     pathname === '/api/health' ||
+    pathname === '/api/csp-report' ||
     pathname === '/robots.txt' ||
     pathname === '/sitemap.xml' ||
     pathname.startsWith('/email-assets/') ||
