@@ -1,6 +1,6 @@
 # Dependency updates: weekly, minor and patch releases grouped into one PR. Framework major versions are
 # excluded because they need a planned migration (e.g. Tailwind CSS 4 replaces the v3 config and PostCSS
-# plugin, and would break every page if merged automatically). Security updates are not affected by these
+# plugin, and would break every page if merged automatically; TypeScript 7 is refused by ts-jest's peer range). Security updates are not affected by these
 # rules: GitHub raises them separately whenever an advisory applies.
 version: 2
 updates:
@@ -22,6 +22,10 @@ updates:
       - dependency-name: react-dom
         update-types: ['version-update:semver-major']
       - dependency-name: recharts
+        update-types: ['version-update:semver-major']
+      # ts-jest declares a peer range of typescript <7, so a TypeScript 7 bump fails npm install (ERESOLVE) and
+      # breaks every build. Lift this when ts-jest supports TypeScript 7.
+      - dependency-name: typescript
         update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: /
