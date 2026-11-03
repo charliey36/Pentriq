@@ -1,6 +1,8 @@
 # Pentriq release readiness report
 
-Assessment date: 3 November 2026. Branch `claude/awesome-rubin-l9dede`, compared with `main` at `dfaf1db`.
+Assessment date: 3 November 2026. Branch `claude/awesome-rubin-l9dede`, rebased on `main` at `3a0bd23`.
+The baseline ("Before") is `main` at `dfaf1db`, before this programme. Since then `main` has gained the Next.js 15
+upgrade and Dependabot's transitive security fixes through PR #7 (`3a0bd23`); this branch builds on that.
 
 **Headline:** release readiness for Pentriq's market (UK small businesses, self-serve, £19 a month) moves from
 **4/10 to 7/10**. The code-side blockers found in this audit are fixed and tested. What stands between 7 and 9 is
@@ -15,7 +17,7 @@ How to read this report:
 
 - Every finding cites a file, function, route or database entity. Where the repository has no evidence of
   something, the report says **"Not evidenced in codebase."**
-- Scores are out of 10. "Before" is `main` at `dfaf1db`; "After" is this branch.
+- Scores are out of 10. "Before" is `main` at `dfaf1db`; "After" is this branch (which includes PR #7).
 - The competitor comparisons in sections 2 and 3 describe the vendors' publicly documented enterprise tiers in
   general terms. They come from general knowledge and were not re-verified live during this audit.
 
@@ -62,7 +64,7 @@ Contents:
 | 15 | End-to-end tests | 1 → 3 | Public pages are driven in a real browser by `scripts/a11y-audit.mjs`. Signed-in journeys (sign-up → send → click → feedback → billing): **Not evidenced in codebase.** | Supabase's local stack could not be pulled in this environment (Docker Hub 429, ECR 403), so no signed-in E2E could be built or proven here. | Playwright suite against `supabase start` on GitHub Actions runners. **The main engineering item left.** |
 | 16 | CI/CD | 4 → 8 | `.github/workflows/ci.yml` has three jobs. `verify`: tsc, Jest, `next build`, `npm audit --omit=dev --audit-level=high`. `database`: PostgreSQL 16, all migrations twice, RLS suite, claim race test, drift check. `accessibility`. | Deployment is on Vercel and configured outside the repository (only crons are in `vercel.json`). Preview-environment smoke tests: **Not evidenced in codebase.** | Run `/api/health` and the a11y audit against each Vercel preview. |
 | 17 | Dependencies and supply chain | 5 → 7 | `npm audit`: production 4 low (`resend` → `@react-email/render`, no non-breaking fix), 0 moderate, 0 high, 0 critical; all dependencies 7 low and 17 moderate (dev-only Jest toolchain). Dependabot (`.github/dependabot.yml`), weekly grouped updates. | The Tailwind 4 Dependabot branch is held back: it breaks styling. | Upgrade `resend` when a fixed major is out; plan Tailwind 4 as its own task. |
-| 18 | Framework currency | 4 → 8 | Next.js 14 → 15.5.28 (`5df0f10`), with async `params`, `searchParams` and `cookies()` converted (`022f08f`). | `react` / `react-dom` 18.3.1 in `package.json` (the App Router uses Next's bundled React). | Move to React 19 when the dependency group allows it. |
+| 18 | Framework currency | 4 → 8 | Next.js 14 → 15.5.28 (`5df0f10`), with async `params`, `searchParams` and `cookies()` converted (`d1c6067`); both reached `main` in PR #7. | `react` / `react-dom` 18.3.1 in `package.json` (the App Router uses Next's bundled React). | Move to React 19 when the dependency group allows it. |
 | 19 | Database migrations | 5 → 8 | 45 migrations plus `supabase/schema.sql`, all safe to re-run (CI applies them twice). `0009` fixed for fresh databases. A ledger, `public.schema_migrations`, starts at `0045`. | Applied by hand in the Supabase SQL editor; no deploy-time runner or down-migrations: **Not evidenced in codebase.** | Adopt `supabase db push` with the ledger, once the production project is linked (human). |
 | 20 | Schema and type drift control | 2 → 8 | `scripts/check-schema-drift.mjs` checks every `.from().select()` column, filter, embed and `database.types.ts` row key: 0 errors on the real schema, 20 on a deliberately broken snapshot. | Static: it cannot see column names built at runtime. | Combine with generated types (#12). |
 
@@ -79,7 +81,7 @@ Contents:
 | 27 | Secrets and encryption at rest | 7 → 8 | AES-256-GCM for OAuth tokens and webhook secrets (`src/lib/google-token-crypto.ts`). SHA-256 for API keys (`src/lib/api-keys.ts`) and invitation tokens. `isAes256Key` validates the key on the readiness page. | Key rotation procedure: **Not evidenced in codebase.** | Document rotation; support two keys during a changeover. |
 | 28 | Rate limiting and abuse protection | 6 → 7 | Database-backed `rate_limit_hit` (`src/lib/rate-limit.ts`) on public endpoints, including `/api/csp-report` and the customer export (60 an hour). | Sign-in throttling is Supabase's, not Pentriq's (#21). | H16. |
 | 29 | Audit logging | 5 → 8 | `src/lib/audit.ts` (`recordAudit`, best-effort so it never blocks the user's action); `audit_log` (`0039`). New events: `security.*`, `team.mfa_reset`, `customer.exported`, `customer.erased`, `settings.updated`, `services.changed`, `loyalty.changed`, `integration.connected` / `integration.disconnected`. Viewer and CSV export at `/settings/security`. | Streaming to a SIEM: **Not evidenced in codebase.** | Only on enterprise demand. |
-| 30 | Operator (platform admin) access | 3 → 7 | `ADMIN_EMAIL` allow-list (`src/lib/admin-access.ts`), now also requiring a two-factor (`aal2`) session via `adminAccess()`. Checked in `src/middleware.ts`, `src/app/(app)/admin/layout.tsx`, `requireAdminApi` (`src/lib/admin-guard.ts`) and the admin server actions (`6b671a9`). | Operator identity is an environment variable, not a role table. Operator reads of tenant data are not audited; only deletion is (`admin.organisation_deleted`). | Audit operator page views of tenant data. |
+| 30 | Operator (platform admin) access | 3 → 7 | `ADMIN_EMAIL` allow-list (`src/lib/admin-access.ts`), now also requiring a two-factor (`aal2`) session via `adminAccess()`. Checked in `src/middleware.ts`, `src/app/(app)/admin/layout.tsx`, `requireAdminApi` (`src/lib/admin-guard.ts`) and the admin server actions (`935f7e3`). | Operator identity is an environment variable, not a role table. Operator reads of tenant data are not audited; only deletion is (`admin.organisation_deleted`). | Audit operator page views of tenant data. |
 
 ### D. Privacy and compliance
 
@@ -238,22 +240,22 @@ set the bar an enterprise buyer, CTO or security team brings to any SaaS purchas
 
 ## 4. What was implemented
 
-Twelve commits on this branch: 134 files changed, about 5,700 lines added and 1,400 removed.
+The first two commits below reached `main` through PR #7. The rest are this branch's eleven commits on top of it.
 
 | Commit | Change | Categories |
 |---|---|---|
-| `5df0f10` | Next.js 14 → 15.5.28 and patched transitive packages (dependency vulnerabilities) | 17, 18 |
-| `022f08f` | Async `searchParams` on activity, segments, reports, feedback-inbox and settings/security | 18 |
-| `9c332a2` | Every migration (twice) plus an RLS suite (now 49 assertion statements) on real PostgreSQL 16, in CI. Fixed `0009` on fresh databases; `0045` revokes anonymous `EXECUTE` on `import_apply_visits`, drops a hard-coded default and adds the migration ledger and `rls_status()` | 16, 19, 24 |
-| `7477302` | Static drift check of code and `database.types.ts` against the migrated schema | 12, 20 |
-| `86ae9a2` | Unsubscribe no longer triggered by link scanners; CSP violation reporting; same-origin guard on cookie-authenticated route handlers | 25, 26, 32 |
-| `debb3f8` | TOTP two-factor, `/account/security` (password, sessions, sign out elsewhere), an organisation "require 2FA" policy, admin reset, shared password policy | 21, 22 |
-| `7f7c2c4` | Per-customer export and erasure (GDPR), audit of all configuration changes, best-effort audit writes | 29, 31 |
-| `b040755` | `/security`, `/subprocessors`, `security.txt`, `SECURITY.md` | 34, 37 |
-| `e511b92` | Launch readiness console, boot-time config check, request ids on errors | 38, 43 |
-| `ab136aa` | WCAG 2.1 AA on all public pages (40 failures → 0) with a CI audit; lazy charts; streamed dashboard | 5, 6, 45 |
-| `03e43ea` | Cron senders claim each send (no duplicates from overlapping runs), idempotency keys, FIFO batches within a time budget, race test, backlog check | 40, 46 |
-| `6b671a9` | The Admin Portal requires a two-factor session | 30 |
+| `5df0f10` | Next.js 14 → 15.5.28 and patched transitive packages (dependency vulnerabilities; on `main`) | 17, 18 |
+| `d1c6067` | Async `searchParams` on activity, segments, reports, feedback-inbox and settings/security (on `main`) | 18 |
+| `3acc7fe` | Every migration (twice) plus an RLS suite (now 49 assertion statements) on real PostgreSQL 16, in CI. Fixed `0009` on fresh databases; `0045` revokes anonymous `EXECUTE` on `import_apply_visits`, drops a hard-coded default and adds the migration ledger and `rls_status()` | 16, 19, 24 |
+| `5b7276d` | Static drift check of code and `database.types.ts` against the migrated schema | 12, 20 |
+| `abaa530` | Unsubscribe no longer triggered by link scanners; CSP violation reporting; same-origin guard on cookie-authenticated route handlers | 25, 26, 32 |
+| `55d3e73` | TOTP two-factor, `/account/security` (password, sessions, sign out elsewhere), an organisation "require 2FA" policy, admin reset, shared password policy | 21, 22 |
+| `0c96733` | Per-customer export and erasure (GDPR), audit of all configuration changes, best-effort audit writes | 29, 31 |
+| `a0de429` | `/security`, `/subprocessors`, `security.txt`, `SECURITY.md` | 34, 37 |
+| `44ae523` | Launch readiness console, boot-time config check, request ids on errors | 38, 43 |
+| `c683617` | WCAG 2.1 AA on all public pages (40 failures → 0) with a CI audit; lazy charts; streamed dashboard | 5, 6, 45 |
+| `9955685` | Cron senders claim each send (no duplicates from overlapping runs), idempotency keys, FIFO batches within a time budget, race test, backlog check | 40, 46 |
+| `935f7e3` | The Admin Portal requires a two-factor session | 30 |
 
 ---
 
@@ -263,15 +265,15 @@ Defects found and fixed during this audit:
 
 | Finding | Where | Effect before the fix | Fix |
 |---|---|---|---|
-| Overlapping cron runs sent the same emails twice | `src/app/api/send-messages/route.ts`, `src/app/api/send-review-requests/route.ts` | A test of two overlapping runs on the old code sent 8 emails for 4 messages | `claimDue` lease, `releaseClaims`, idempotency keys (`03e43ea`) |
+| Overlapping cron runs sent the same emails twice | `src/app/api/send-messages/route.ts`, `src/app/api/send-review-requests/route.ts` | A test of two overlapping runs on the old code sent 8 emails for 4 messages | `claimDue` lease, `releaseClaims`, idempotency keys (`9955685`) |
 | A failure after a successful send was recorded as a failed send | same routes (one `try` around send, journey advance and `notifyOwner`) | A message already delivered could be retried (second email) or marked `failed` | Post-send steps isolated; failure updates apply only while `status = 'pending'` |
 | One unordered batch of 50 per run | same routes | With the daily schedule, at most 50 of each per day across all businesses, in arbitrary order | Oldest first, batches of 25 until 45 s pass |
-| `GET` unsubscribe changed data | `src/app/api/unsubscribe/[customerId]/route.ts` | Security scanners that open links unsubscribed customers | `GET` confirms, `POST` acts (`86ae9a2`) |
+| `GET` unsubscribe changed data | `src/app/api/unsubscribe/[customerId]/route.ts` | Security scanners that open links unsubscribed customers | `GET` confirms, `POST` acts (`abaa530`) |
 | `recordAudit` created its client outside `try` | `src/lib/audit.ts` | An audit failure could fail the user's action | Client created inside `try`; `auditAsCurrentUser` also catches |
 | Migration `0009` hard-coded an organisation id | `supabase/migrations/0009_demo_company_db.sql` | Failed on any fresh database | Conditional insert; `0045` drops the default |
 | Reset form allowed 6-character passwords | reset password form | Weaker than sign-up | Shared `checkPassword` |
 | Team page looked members up one by one | `listTeam`, `src/lib/team.ts` | Slow with large teams | Parallel lookups |
-| Admin Portal reachable with a password-only session | `src/middleware.ts`, `src/app/(app)/admin/` | One phished password exposed every tenant | `adminAccess()` requires `aal2` (`6b671a9`) |
+| Admin Portal reachable with a password-only session | `src/middleware.ts`, `src/app/(app)/admin/` | One phished password exposed every tenant | `adminAccess()` requires `aal2` (`935f7e3`) |
 
 Open review items (not defects; documented so they are decided rather than forgotten):
 
@@ -325,20 +327,20 @@ No live penetration test was performed. The production project was not accessibl
 
 | ID | Severity | Finding | Evidence | Status |
 |---|---|---|---|---|
-| S-01 | High | No two-factor authentication anywhere | `main` at `dfaf1db`: no MFA code | **Fixed** `debb3f8` |
-| S-02 | High | Admin Portal (all tenants, through the service role) accepted a password-only session | `src/middleware.ts`, `src/app/(app)/admin/layout.tsx`, `src/lib/admin-guard.ts` | **Fixed** `6b671a9` |
-| S-03 | Medium | `GET` unsubscribe link changed consent, so link scanners unsubscribed people | `src/app/api/unsubscribe/[customerId]/route.ts` | **Fixed** `86ae9a2` |
+| S-01 | High | No two-factor authentication anywhere | `main` at `dfaf1db`: no MFA code | **Fixed** `55d3e73` |
+| S-02 | High | Admin Portal (all tenants, through the service role) accepted a password-only session | `src/middleware.ts`, `src/app/(app)/admin/layout.tsx`, `src/lib/admin-guard.ts` | **Fixed** `935f7e3` |
+| S-03 | Medium | `GET` unsubscribe link changed consent, so link scanners unsubscribed people | `src/app/api/unsubscribe/[customerId]/route.ts` | **Fixed** `abaa530` |
 | S-04 | Medium | Cookie-authenticated `POST` route handlers had no origin check (CSRF) | `api/send-review-request`, `api/send-rebooking-reminder` | **Fixed**: `src/lib/same-origin.ts` |
 | S-05 | Medium | CSP violations never collected; no enforced CSP directives | `next.config.mjs` | **Partly fixed**: minimal CSP enforced, full CSP report-only with `/api/csp-report`. Promotion is H11 |
-| S-06 | Medium | Configuration and integration changes were not audited | `src/lib/audit.ts` call sites | **Fixed** `7f7c2c4` |
-| S-07 | Medium | No account-level session controls (password change, sign out elsewhere) | `src/app/account/security/` | **Fixed** `debb3f8` |
+| S-06 | Medium | Configuration and integration changes were not audited | `src/lib/audit.ts` call sites | **Fixed** `0c96733` |
+| S-07 | Medium | No account-level session controls (password change, sign out elsewhere) | `src/app/account/security/` | **Fixed** `55d3e73` |
 | S-08 | Medium | Sign-in has no CAPTCHA; throttling is Supabase's alone | `signInWithPassword`, `src/components/auth-form.tsx` | **Open**: H16 |
 | S-09 | Medium | No independent penetration test | **Not evidenced in codebase.** | **Open**: H21 |
 | S-10 | Low | Anonymous role could `EXECUTE` `import_apply_visits` (SECURITY INVOKER, so RLS still applied and nothing was readable; defence in depth) | `0039`; caught by `rls.test.sql` | **Fixed** `0045` |
 | S-11 | Low | Reset password accepted 6 characters | reset form; `src/lib/password-policy.ts` | **Fixed** |
 | S-12 | Low | A failing audit write could fail the user's action (availability) | `recordAudit` | **Fixed** |
 | S-13 | Low | `demo_company_records.business_id` defaulted to one real organisation's id | `0009`, `0045` | **Fixed** |
-| S-14 | Low | No disclosure policy or `security.txt` | `SECURITY.md`, `/.well-known/security.txt` | **Fixed** `b040755` |
+| S-14 | Low | No disclosure policy or `security.txt` | `SECURITY.md`, `/.well-known/security.txt` | **Fixed** `a0de429` |
 | S-15 | Low | Lost-device recovery for a sole owner needs operator action (no recovery codes) | `src/lib/mfa.ts` | **Open**: prompt for a second authenticator |
 | S-16 | Low | 4 low-severity advisories in production dependencies (`resend` → `@react-email/render`) | `npm audit --omit=dev` | **Open**: no non-breaking fix |
 | S-17 | Low | Any member of a business can write `messages` and `loyalty_ledger_entries` directly | `supabase/schema.sql` policies | **Accepted**: within one tenant, matches staff capabilities |
@@ -388,7 +390,7 @@ Insights or a k6 script would close this.
 | Jest test suites | 66 on `main` | 73, with 835 tests, all passing |
 | Database proof | none | 45 migrations twice + RLS suite + race test + drift check, in CI |
 | Accessibility | 40 serious or critical failures | 0, in CI |
-| Production dependency advisories | Next.js 14 on `main`; GitHub flags 2 there (1 moderate, 1 low) | `npm audit --omit=dev`: 4 low, 0 moderate, high or critical |
+| Dependency advisories (`npm audit`) | 1 critical, 2 high, 27 moderate, 5 low before the Next.js 15 upgrade (`docs/PRODUCT_AUDIT.md` §13) | Production: 4 low, nothing higher. All dependencies: 7 low, 17 moderate (dev-only) |
 
 **Evidence for 7:**
 - Every code-side blocker found in this audit is fixed with a test: duplicate sends, scanner unsubscribes,
@@ -426,7 +428,8 @@ Insights or a k6 script would close this.
 - Until H7, review requests go out once a day.
 
 **Branches:**
-- This branch carries the Next 15 merge and all of the work above.
+- The Next.js 15 upgrade reached `main` through PR #7, with Dependabot's transitive security fixes. This
+  branch is rebased on it and carries everything else above.
 - The Dependabot Tailwind 4 branch is intentionally **not** merged: Tailwind 4 changes the configuration model
   and breaks the app's styling. It needs a planned migration.
 
