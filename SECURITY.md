@@ -32,6 +32,6 @@ Only the current production deployment (the `main` branch) is supported.
 | Outbound requests | Webhooks: HTTPS only, private and metadata addresses blocked (literal and resolved), no redirects, HMAC-SHA256 signatures | `src/lib/webhooks.ts` |
 | Audit | Append-only audit log of security and configuration changes, owner/admin viewer and CSV export | `src/lib/audit.ts`, `/settings/security` |
 | Data rights | Business and per-customer export, customer erasure, retention policy, suppression list, RFC 8058 unsubscribe | `src/lib/customer-privacy.ts`, `src/lib/retention.ts`, `src/app/api/unsubscribe/` |
-| Supply chain | `npm audit --omit=dev --audit-level=high` blocks CI; Dependabot | `.github/workflows/ci.yml` |
+| Supply chain | `npm audit --omit=dev --audit-level=high` blocks CI; read-only CI token; CodeQL code scanning on pull requests (GitHub default setup); Dependabot | `.github/workflows/ci.yml`, `.github/dependabot.yml` |
 
 Known gaps are tracked in `docs/RELEASE_READINESS.md`.
