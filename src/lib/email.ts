@@ -56,22 +56,27 @@ export async function sendReviewRequestEmail(params: {
   trackingUrl: string;
   unsubscribeUrl: string;
   contactEmail?: string | null;
+  /** The provider drops a repeat of the same key for 24 hours (see sendIdempotencyKey). */
+  idempotencyKey?: string;
 }) {
   const resend = getResendClient();
   const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
   const { subject, html, text } = buildReviewRequestEmail(params);
 
-  const { error } = await resend.emails.send({
-    from: `${senderDisplayName(params.businessName)} <${from}>`,
-    to: params.to,
-    subject,
-    html,
-    text,
-    headers: {
-      'List-Unsubscribe': `<${params.unsubscribeUrl}>`,
-      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+  const { error } = await resend.emails.send(
+    {
+      from: `${senderDisplayName(params.businessName)} <${from}>`,
+      to: params.to,
+      subject,
+      html,
+      text,
+      headers: {
+        'List-Unsubscribe': `<${params.unsubscribeUrl}>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      },
     },
-  });
+    params.idempotencyKey ? { idempotencyKey: params.idempotencyKey } : undefined
+  );
 
   if (error) {
     throw new Error(typeof error === 'string' ? error : error.message);

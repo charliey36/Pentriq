@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { evaluateConfig, MIGRATION_SENTINELS, summarise, type ReadinessCheck } from '@/lib/launch-readiness';
+import { evaluateConfig, MIGRATION_SENTINELS, SEND_OVERDUE_HOURS, sendBacklogCheck, summarise, type ReadinessCheck } from '@/lib/launch-readiness';
+import { dueFilter } from '@/lib/send-claim';
 import { PageHeader } from '@/components/ui/page-header';
 import { SectionCard } from '@/components/ui/section-card';
 import { Icon } from '@/components/ui/icons';
@@ -22,6 +23,7 @@ const HUMAN_ITEMS = [
   'Processing regions confirmed for Supabase, Vercel, Resend and Stripe, and added to /subprocessors.',
   'Google Business Profile API access approved by Google, then GOOGLE_BUSINESS_API_APPROVED=true.',
   'Uptime monitor on /api/health alerting someone out of hours.',
+  'Send jobs called every 5 minutes (Vercel Pro cron or an external scheduler); vercel.json runs them once a day.',
   'Content Security Policy promoted from report-only to enforcing after a week of clean violation reports.',
 ];
 
@@ -71,6 +73,15 @@ async function databaseChecks(): Promise<ReadinessCheck[]> {
       detail: off.length ? `Not protected: ${off.join(', ')}.` : `All ${rows.length} tables protected, checked live just now.`,
     });
   }
+
+  const nowIso = new Date().toISOString();
+  const overdueBefore = new Date(Date.now() - SEND_OVERDUE_HOURS * 3_600_000).toISOString();
+  const [overdueMessages, overdueRequests] = await Promise.all(
+    (['messages', 'review_requests'] as const).map((table) =>
+      admin.from(table).select('id', { count: 'exact', head: true }).eq('status', 'pending').lte('send_at', overdueBefore).or(dueFilter(nowIso))
+    )
+  );
+  out.push(sendBacklogCheck(overdueMessages.error || overdueRequests.error ? null : (overdueMessages.count ?? 0) + (overdueRequests.count ?? 0)));
 
   const ledger = await admin.from('schema_migrations').select('version').order('version', { ascending: false }).limit(1);
   if (!ledger.error) {

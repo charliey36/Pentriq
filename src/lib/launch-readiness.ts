@@ -93,6 +93,23 @@ export function evaluateConfig(env: Env, opts: { production: boolean } = { produ
   return out;
 }
 
+/**
+ * Scheduled sends more than a day past due. vercel.json runs the send jobs once a day, so a send can wait up to a
+ * day by design; beyond that the jobs are not running, or are failing.
+ */
+export const SEND_OVERDUE_HOURS = 26;
+
+export function sendBacklogCheck(overdue: number | null): ReadinessCheck {
+  const base = { id: 'send-backlog', area: 'Core' as const, label: 'Scheduled sends keeping up', severity: 'recommended' as const };
+  if (overdue === null) return { ...base, status: 'warn', detail: 'Could not count overdue sends.' };
+  if (overdue === 0) return { ...base, status: 'ok', detail: `Nothing more than ${SEND_OVERDUE_HOURS} hours overdue.` };
+  return {
+    ...base,
+    status: 'warn',
+    detail: `${overdue.toLocaleString('en-GB')} review requests and messages are more than ${SEND_OVERDUE_HOURS} hours overdue. The send jobs are failing (Sentry area cron:send-messages / cron:send-review-requests) or not running often enough: call /api/send-messages and /api/send-review-requests every 5 minutes from Vercel Pro cron or an external scheduler.`,
+  };
+}
+
 export type ReadinessSummary = { blockers: number; warnings: number; ok: number; ready: boolean };
 
 export function summarise(checks: ReadinessCheck[]): ReadinessSummary {

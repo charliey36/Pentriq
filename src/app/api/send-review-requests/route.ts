@@ -8,8 +8,15 @@ import { notifyOwner } from '@/lib/notifications';
 import { sendReviewRequestEmail } from '@/lib/email';
 import { getAppUrl } from '@/lib/brand';
 import { buildTrackingUrl } from '@/lib/click-tracking';
+import { claimDue, dueFilter, MAX_BATCHES_PER_RUN, releaseClaims, runBudget, SEND_BATCH_SIZE, sendIdempotencyKey } from '@/lib/send-claim';
+import type { Database } from '@/lib/database.types';
 
 export const dynamic = 'force-dynamic';
+/** Seconds this function may run (allowed on every Vercel plan). Sending stops well inside it (send-claim.ts). */
+export const maxDuration = 60;
+
+type ReviewRequestRow = Database['public']['Tables']['review_requests']['Row'];
+type Result = { id: string; status: 'sent' | 'retrying' | 'failed' | 'skipped'; error?: string };
 
 /**
  * Exponential backoff schedule applied after each failed send attempt,
@@ -40,6 +47,9 @@ function backoffMinutesFor(attempt: number) {
  * pass it as an `Authorization: Bearer ...` header.
  * Configure Vercel Cron (see vercel.json) or any external scheduler to hit
  * this on an interval (e.g. every 5 minutes).
+ *
+ * Rows are claimed before they are sent (src/lib/send-claim.ts), oldest first, in batches until the run's time
+ * budget is spent, so overlapping runs never send the same request twice and one run clears more than one batch.
  */
 export async function GET(request: NextRequest) {
   const expectedSecret = process.env.CRON_SECRET;
@@ -55,40 +65,44 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = createAdminClient();
-  const nowIso = new Date().toISOString();
-
-  // Due = pending, and either this is the first attempt (send_at has
-  // passed, next_attempt_at is still null) or a retry is due
-  // (next_attempt_at has passed).
-  const { data: dueRequests, error } = await supabase
-    .from('review_requests')
-    .select('*')
-    .eq('status', 'pending')
-    .lte('send_at', nowIso)
-    .or(`next_attempt_at.is.null,next_attempt_at.lte.${nowIso}`)
-    .limit(50);
-
-  if (error) {
-    return NextResponse.json(
-      { error: `Failed to load due review requests: ${error.message}` },
-      { status: 500 }
-    );
-  }
-
-  if (!dueRequests || dueRequests.length === 0) {
-    return NextResponse.json({ sent: 0, failed: 0, retried: 0, message: 'No due review requests.' });
-  }
-
+  const budget = runBudget();
+  const nowIso = new Date(budget.startedAt).toISOString();
   const appUrl = getAppUrl();
-
-  let sent = 0;
-  let retried = 0;
-  let failed = 0;
-  let skippedUnsubscribed = 0;
-  const results: Array<{ id: string; status: 'sent' | 'retrying' | 'failed' | 'skipped'; error?: string }> = [];
   const ownerEmailCache = new Map<string, string | null>();
+  const results: Result[] = [];
+  let skippedUnsubscribed = 0;
+  let claimedElsewhere = 0;
+  let released = 0;
 
-  for (const reviewRequest of dueRequests) {
+  // A failure is recorded only while the row is still pending, so a late error can never overwrite a send
+  // that has already been recorded.
+  const recordFailure = async (reviewRequest: ReviewRequestRow, err: unknown): Promise<Result> => {
+    captureError(err, { area: 'cron:send-review-requests', tags: { review_request_id: reviewRequest.id, business_id: reviewRequest.business_id } });
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    const nextAttempt = reviewRequest.attempts + 1;
+
+    if (nextAttempt >= reviewRequest.max_attempts) {
+      // Exhausted retries — terminal failure.
+      await supabase
+        .from('review_requests')
+        .update({ status: 'failed', attempts: nextAttempt, last_error: message })
+        .eq('id', reviewRequest.id)
+        .eq('status', 'pending');
+      return { id: reviewRequest.id, status: 'failed', error: message };
+    }
+
+    // Schedule a retry with exponential backoff; stays 'pending' so the
+    // next cron run picks it up once next_attempt_at has passed.
+    const backoffMs = backoffMinutesFor(nextAttempt) * 60 * 1000;
+    await supabase
+      .from('review_requests')
+      .update({ attempts: nextAttempt, next_attempt_at: new Date(Date.now() + backoffMs).toISOString(), last_error: message })
+      .eq('id', reviewRequest.id)
+      .eq('status', 'pending');
+    return { id: reviewRequest.id, status: 'retrying', error: message };
+  };
+
+  const processRequest = async (reviewRequest: ReviewRequestRow): Promise<Result> => {
     try {
       const [{ data: customer }, { data: business }] = await Promise.all([
         supabase
@@ -121,8 +135,7 @@ export async function GET(request: NextRequest) {
           .from('review_requests')
           .update({ next_attempt_at: new Date(Date.now() + 86_400_000).toISOString() })
           .eq('id', reviewRequest.id);
-        results.push({ id: reviewRequest.id, status: 'skipped', error: 'Subscription required' });
-        continue;
+        return { id: reviewRequest.id, status: 'skipped', error: 'Subscription required' };
       }
 
       // Review link not set up yet: hold the request and check again soon.
@@ -131,8 +144,7 @@ export async function GET(request: NextRequest) {
           .from('review_requests')
           .update({ next_attempt_at: new Date(Date.now() + REVIEW_LINK_RETRY_MS).toISOString() })
           .eq('id', reviewRequest.id);
-        results.push({ id: reviewRequest.id, status: 'skipped', error: 'Review link not set up' });
-        continue;
+        return { id: reviewRequest.id, status: 'skipped', error: 'Review link not set up' };
       }
 
       // Consent check: never send to a customer who has unsubscribed,
@@ -144,8 +156,7 @@ export async function GET(request: NextRequest) {
           .eq('id', reviewRequest.id);
 
         skippedUnsubscribed += 1;
-        results.push({ id: reviewRequest.id, status: 'skipped' });
-        continue;
+        return { id: reviewRequest.id, status: 'skipped' };
       }
 
       const trackingUrl = buildTrackingUrl(appUrl, reviewRequest, { source: 'send-review-requests', kind: 'review_request' });
@@ -158,55 +169,71 @@ export async function GET(request: NextRequest) {
         customerName: customer.name,
         trackingUrl,
         unsubscribeUrl,
+        idempotencyKey: sendIdempotencyKey('review_requests', reviewRequest.id, reviewRequest.attempts),
       });
-
-      await supabase
-        .from('review_requests')
-        .update({ status: 'sent', sent_at: new Date().toISOString() })
-        .eq('id', reviewRequest.id);
-
-      sent += 1;
-      await notifyOwner('campaign', reviewRequest.business_id);
-      results.push({ id: reviewRequest.id, status: 'sent' });
     } catch (err) {
-      captureError(err, { area: 'cron:send-review-requests', tags: { review_request_id: reviewRequest.id, business_id: reviewRequest.business_id } });
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      const nextAttempt = reviewRequest.attempts + 1;
-      const maxAttempts = reviewRequest.max_attempts;
-
-      if (nextAttempt >= maxAttempts) {
-        // Exhausted retries — terminal failure.
-        await supabase
-          .from('review_requests')
-          .update({
-            status: 'failed',
-            attempts: nextAttempt,
-            last_error: message,
-          })
-          .eq('id', reviewRequest.id);
-
-        failed += 1;
-        results.push({ id: reviewRequest.id, status: 'failed', error: message });
-      } else {
-        // Schedule a retry with exponential backoff; stays 'pending' so the
-        // next cron run picks it up once next_attempt_at has passed.
-        const backoffMs = backoffMinutesFor(nextAttempt) * 60 * 1000;
-        const nextAttemptAt = new Date(Date.now() + backoffMs).toISOString();
-
-        await supabase
-          .from('review_requests')
-          .update({
-            attempts: nextAttempt,
-            next_attempt_at: nextAttemptAt,
-            last_error: message,
-          })
-          .eq('id', reviewRequest.id);
-
-        retried += 1;
-        results.push({ id: reviewRequest.id, status: 'retrying', error: message });
-      }
+      return recordFailure(reviewRequest, err);
     }
+
+    // Sent. From here on nothing may count as a failed send: a retry would email the customer again.
+    const { error: markError } = await supabase
+      .from('review_requests')
+      .update({ status: 'sent', sent_at: new Date().toISOString() })
+      .eq('id', reviewRequest.id);
+    if (markError) {
+      captureError(markError, { area: 'cron:send-review-requests', tags: { review_request_id: reviewRequest.id, step: 'mark_sent' } });
+    }
+    await notifyOwner('campaign', reviewRequest.business_id);
+    return { id: reviewRequest.id, status: 'sent' };
+  };
+
+  batches: for (let batch = 0; batch < MAX_BATCHES_PER_RUN && !budget.outOfTime(); batch++) {
+    // Due = pending, and either this is the first attempt (send_at has
+    // passed, next_attempt_at is still null) or a retry is due
+    // (next_attempt_at has passed). Oldest first.
+    const { data: dueRequests, error } = await supabase
+      .from('review_requests')
+      .select('*')
+      .eq('status', 'pending')
+      .lte('send_at', nowIso)
+      .or(dueFilter(nowIso))
+      .order('send_at', { ascending: true })
+      .limit(SEND_BATCH_SIZE);
+
+    if (error) {
+      captureError(error, { area: 'cron:send-review-requests' });
+      if (batch === 0) return NextResponse.json({ error: `Failed to load due review requests: ${error.message}` }, { status: 500 });
+      break;
+    }
+    if (!dueRequests || dueRequests.length === 0) break;
+
+    const claim = await claimDue(supabase, 'review_requests', dueRequests.map((r) => r.id));
+    if (claim.error) {
+      captureError(new Error(claim.error), { area: 'cron:send-review-requests', tags: { step: 'claim' } });
+      if (batch === 0) return NextResponse.json({ error: `Failed to claim due review requests: ${claim.error}` }, { status: 500 });
+      break;
+    }
+    claimedElsewhere += dueRequests.length - claim.ids.size;
+    const mine = dueRequests.filter((r) => claim.ids.has(r.id));
+    // Nothing claimable: another run is working through these rows.
+    if (mine.length === 0) break;
+
+    for (let i = 0; i < mine.length; i++) {
+      if (budget.outOfTime()) {
+        const rest = mine.slice(i).map((r) => r.id);
+        const releaseError = await releaseClaims(supabase, 'review_requests', rest, claim.leaseUntil, nowIso);
+        if (releaseError) captureError(new Error(releaseError), { area: 'cron:send-review-requests', tags: { step: 'release' } });
+        released += rest.length;
+        break batches;
+      }
+      results.push(await processRequest(mine[i]));
+    }
+    if (dueRequests.length < SEND_BATCH_SIZE) break;
   }
 
-  return NextResponse.json({ sent, retried, failed, skippedUnsubscribed, results });
+  if (results.length === 0 && claimedElsewhere === 0 && released === 0) {
+    return NextResponse.json({ sent: 0, failed: 0, retried: 0, message: 'No due review requests.' });
+  }
+  const tally = (status: Result['status']) => results.filter((r) => r.status === status).length;
+  return NextResponse.json({ sent: tally('sent'), retried: tally('retrying'), failed: tally('failed'), skippedUnsubscribed, claimedElsewhere, released, results });
 }

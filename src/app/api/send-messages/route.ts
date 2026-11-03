@@ -11,8 +11,15 @@ import { sendBlockedReason } from '@/lib/billing';
 import { reviewLinkBlockedReason, REVIEW_LINK_RETRY_MS } from '@/lib/send-guards';
 import { captureError } from '@/lib/monitoring';
 import { loadPersonalisation, reminderDisabled } from '@/lib/review-personalisation';
+import { claimDue, dueFilter, MAX_BATCHES_PER_RUN, releaseClaims, runBudget, SEND_BATCH_SIZE, sendIdempotencyKey } from '@/lib/send-claim';
+import type { Database } from '@/lib/database.types';
 
 export const dynamic = 'force-dynamic';
+/** Seconds this function may run (allowed on every Vercel plan). Sending stops well inside it (send-claim.ts). */
+export const maxDuration = 60;
+
+type MessageRow = Database['public']['Tables']['messages']['Row'];
+type Outcome = 'sent' | 'retried' | 'failed' | 'skipped';
 
 const BACKOFF_MINUTES_BY_ATTEMPT: Record<number, number> = {
   1: 5,
@@ -37,6 +44,9 @@ function backoffMinutesFor(attempt: number) {
  * This runs alongside (not instead of) /api/send-review-requests, which
  * continues to own the original single-send review_requests flow and its
  * dashboard counters unchanged. Protected by the same CRON_SECRET.
+ *
+ * Rows are claimed before they are sent (src/lib/send-claim.ts), oldest first, in batches until the run's time
+ * budget is spent, so overlapping runs never send the same message twice and one run clears more than one batch.
  */
 export async function GET(request: NextRequest) {
   const expectedSecret = process.env.CRON_SECRET;
@@ -52,34 +62,39 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = createAdminClient();
-  const nowIso = new Date().toISOString();
-
-  const { data: dueMessages, error } = await supabase
-    .from('messages')
-    .select('*')
-    .eq('status', 'pending')
-    .lte('send_at', nowIso)
-    .or(`next_attempt_at.is.null,next_attempt_at.lte.${nowIso}`)
-    .limit(50);
-
-  if (error) {
-    captureError(error, { area: 'cron:send-messages' });
-    return NextResponse.json({ error: `Failed to load due messages: ${error.message}` }, { status: 500 });
-  }
-
-  if (!dueMessages || dueMessages.length === 0) {
-    return NextResponse.json({ sent: 0, retried: 0, failed: 0, skipped: 0, message: 'No due messages.' });
-  }
-
+  const budget = runBudget();
+  const nowIso = new Date(budget.startedAt).toISOString();
   const appUrl = getAppUrl();
-
-  let sent = 0;
-  let retried = 0;
-  let failed = 0;
-  let skipped = 0;
   const ownerEmailCache = new Map<string, string | null>();
+  const counts: Record<Outcome, number> = { sent: 0, retried: 0, failed: 0, skipped: 0 };
+  let claimedElsewhere = 0;
+  let released = 0;
 
-  for (const message of dueMessages) {
+  // A failure is recorded only while the row is still pending, so a late error can never overwrite a send
+  // that has already been recorded.
+  const recordFailure = async (message: MessageRow, err: unknown): Promise<Outcome> => {
+    captureError(err, { area: 'cron:send-messages', tags: { message_id: message.id, business_id: message.business_id, purpose: message.purpose } });
+    const errMessage = err instanceof Error ? err.message : 'Unknown error';
+    const nextAttempt = message.attempts + 1;
+    if (nextAttempt >= message.max_attempts) {
+      await supabase
+        .from('messages')
+        .update({ status: 'failed', attempts: nextAttempt, last_error: errMessage })
+        .eq('id', message.id)
+        .eq('status', 'pending');
+      return 'failed';
+    }
+    const backoffMs = backoffMinutesFor(nextAttempt) * 60 * 1000;
+    await supabase
+      .from('messages')
+      .update({ attempts: nextAttempt, next_attempt_at: new Date(Date.now() + backoffMs).toISOString(), last_error: errMessage })
+      .eq('id', message.id)
+      .eq('status', 'pending');
+    return 'retried';
+  };
+
+  const processMessage = async (message: MessageRow): Promise<Outcome> => {
+    let channel: ReturnType<typeof resolveChannel>;
     try {
       const [{ data: customer }, { data: business }] = await Promise.all([
         supabase.from('customers').select('*').eq('id', message.customer_id).single(),
@@ -105,8 +120,7 @@ export async function GET(request: NextRequest) {
           .from('messages')
           .update({ next_attempt_at: new Date(Date.now() + 86_400_000).toISOString() })
           .eq('id', message.id);
-        skipped += 1;
-        continue;
+        return 'skipped';
       }
 
       // Review link not set up yet: hold review requests (not the other message types) and
@@ -116,8 +130,7 @@ export async function GET(request: NextRequest) {
           .from('messages')
           .update({ next_attempt_at: new Date(Date.now() + REVIEW_LINK_RETRY_MS).toISOString() })
           .eq('id', message.id);
-        skipped += 1;
-        continue;
+        return 'skipped';
       }
 
       // Reminders switched off for this business: cancel instead of sending, and end the sequence.
@@ -126,11 +139,10 @@ export async function GET(request: NextRequest) {
         if (message.journey_enrollment_id) {
           await supabase.from('journey_enrollments').update({ status: 'exited' }).eq('id', message.journey_enrollment_id);
         }
-        skipped += 1;
-        continue;
+        return 'skipped';
       }
 
-      const channel = resolveChannel(message.channel, customer);
+      channel = resolveChannel(message.channel, customer);
 
       if (!channel) {
         // No usable channel (unsubscribed from everything, or missing
@@ -142,8 +154,7 @@ export async function GET(request: NextRequest) {
             .update({ status: 'exited' })
             .eq('id', message.journey_enrollment_id);
         }
-        skipped += 1;
-        continue;
+        return 'skipped';
       }
 
       const unsubscribeUrl = `${appUrl}/api/unsubscribe/${customer.id}`;
@@ -172,45 +183,75 @@ export async function GET(request: NextRequest) {
           text: rendered.text,
           replyTo: business.contact_email,
           listUnsubscribeUrl: unsubscribeUrl,
+          idempotencyKey: sendIdempotencyKey('messages', message.id, message.attempts),
         },
         senderDisplayName(business.name)
       );
-
-      await supabase
-        .from('messages')
-        .update({ status: 'sent', sent_at: new Date().toISOString(), channel })
-        .eq('id', message.id);
-
-      if (message.journey_enrollment_id) {
-        await advanceJourneyEnrollment(supabase, message.journey_enrollment_id);
-      }
-
-      sent += 1;
     } catch (err) {
-      captureError(err, { area: 'cron:send-messages', tags: { message_id: message.id, business_id: message.business_id, purpose: message.purpose } });
-      const errMessage = err instanceof Error ? err.message : 'Unknown error';
-      const nextAttempt = message.attempts + 1;
+      return recordFailure(message, err);
+    }
 
-      if (nextAttempt >= message.max_attempts) {
-        await supabase
-          .from('messages')
-          .update({ status: 'failed', attempts: nextAttempt, last_error: errMessage })
-          .eq('id', message.id);
-        failed += 1;
-      } else {
-        const backoffMs = backoffMinutesFor(nextAttempt) * 60 * 1000;
-        await supabase
-          .from('messages')
-          .update({
-            attempts: nextAttempt,
-            next_attempt_at: new Date(Date.now() + backoffMs).toISOString(),
-            last_error: errMessage,
-          })
-          .eq('id', message.id);
-        retried += 1;
+    // Sent. From here on nothing may count as a failed send: a retry would email the customer again.
+    const { error: markError } = await supabase
+      .from('messages')
+      .update({ status: 'sent', sent_at: new Date().toISOString(), channel })
+      .eq('id', message.id);
+    if (markError) {
+      captureError(markError, { area: 'cron:send-messages', tags: { message_id: message.id, step: 'mark_sent' } });
+    }
+    if (message.journey_enrollment_id) {
+      try {
+        await advanceJourneyEnrollment(supabase, message.journey_enrollment_id);
+      } catch (err) {
+        captureError(err, { area: 'cron:send-messages', tags: { message_id: message.id, step: 'advance_journey' } });
       }
     }
+    return 'sent';
+  };
+
+  batches: for (let batch = 0; batch < MAX_BATCHES_PER_RUN && !budget.outOfTime(); batch++) {
+    const { data: due, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('status', 'pending')
+      .lte('send_at', nowIso)
+      .or(dueFilter(nowIso))
+      .order('send_at', { ascending: true })
+      .limit(SEND_BATCH_SIZE);
+
+    if (error) {
+      captureError(error, { area: 'cron:send-messages' });
+      if (batch === 0) return NextResponse.json({ error: `Failed to load due messages: ${error.message}` }, { status: 500 });
+      break;
+    }
+    if (!due || due.length === 0) break;
+
+    const claim = await claimDue(supabase, 'messages', due.map((m) => m.id));
+    if (claim.error) {
+      captureError(new Error(claim.error), { area: 'cron:send-messages', tags: { step: 'claim' } });
+      if (batch === 0) return NextResponse.json({ error: `Failed to claim due messages: ${claim.error}` }, { status: 500 });
+      break;
+    }
+    claimedElsewhere += due.length - claim.ids.size;
+    const mine = due.filter((m) => claim.ids.has(m.id));
+    // Nothing claimable: another run is working through these rows.
+    if (mine.length === 0) break;
+
+    for (let i = 0; i < mine.length; i++) {
+      if (budget.outOfTime()) {
+        const rest = mine.slice(i).map((m) => m.id);
+        const releaseError = await releaseClaims(supabase, 'messages', rest, claim.leaseUntil, nowIso);
+        if (releaseError) captureError(new Error(releaseError), { area: 'cron:send-messages', tags: { step: 'release' } });
+        released += rest.length;
+        break batches;
+      }
+      counts[await processMessage(mine[i])] += 1;
+    }
+    if (due.length < SEND_BATCH_SIZE) break;
   }
 
-  return NextResponse.json({ sent, retried, failed, skipped });
+  if (counts.sent + counts.retried + counts.failed + counts.skipped + claimedElsewhere + released === 0) {
+    return NextResponse.json({ ...counts, message: 'No due messages.' });
+  }
+  return NextResponse.json({ ...counts, claimedElsewhere, released });
 }

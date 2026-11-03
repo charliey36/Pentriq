@@ -4,7 +4,8 @@
 #   1. supabase/tests/supabase-shim.sql  (stand-in for Supabase's auth/storage schemas and roles)
 #   2. supabase/schema.sql
 #   3. every supabase/migrations/*.sql in numeric order, TWICE (every migration must be safe to re-run)
-#   4. every supabase/tests/*.test.sql (each raises an exception on failure)
+#   4. every supabase/tests/*.test.sql (each raises an exception on failure), then supabase/tests/claim-race.sh
+#      (concurrent connections racing for the same scheduled sends)
 #   5. scripts/check-schema-drift.mjs: every column the code selects/filters on, and every column declared in
 #      src/lib/database.types.ts, must exist in the migrated schema
 #
@@ -58,6 +59,9 @@ for file in "${tests[@]}"; do
   fi
   echo "    ok  $(basename "$file")"
 done
+
+echo "==> Concurrent claims (cron senders)"
+bash "$ROOT/supabase/tests/claim-race.sh" "$DB"
 
 echo "==> Code and types against the migrated schema"
 columns_file="$(mktemp)"

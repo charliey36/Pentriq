@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { evaluateConfig, isAes256Key, summarise } from '../launch-readiness';
+import { evaluateConfig, isAes256Key, sendBacklogCheck, summarise } from '../launch-readiness';
 
 const KEY = Buffer.alloc(32, 9).toString('base64');
 const ready = {
@@ -60,5 +60,14 @@ describe('launch readiness configuration checks', () => {
     const c = byId(evaluateConfig({ ...ready, BILLING_OVERRIDE_EMAILS: 'a@x.co, b@x.co' }, { production: true }));
     expect(c['billing-override'].detail).toMatch(/^2 emails bypass billing/);
     expect(c['billing-override'].detail).not.toContain('a@x.co');
+  });
+
+  it('flags scheduled sends more than a day overdue, without blocking launch', () => {
+    expect(sendBacklogCheck(0).status).toBe('ok');
+    const late = sendBacklogCheck(1234);
+    expect(late).toMatchObject({ status: 'warn', severity: 'recommended' });
+    expect(late.detail).toMatch(/^1,234 review requests and messages/);
+    expect(sendBacklogCheck(null).status).toBe('warn');
+    expect(summarise([late]).ready).toBe(true);
   });
 });
