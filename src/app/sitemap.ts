@@ -6,7 +6,7 @@ import { INDUSTRIES } from '@/lib/industries';
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = getAppUrl();
   const now = new Date();
-  const pages: MetadataRoute.Sitemap = ['/', '/pricing', '/tools/review-gap-calculator', '/for', ...INDUSTRIES.map((i) => `/for/${i.slug}`), '/about', '/contact', '/changelog', '/roadmap', '/login', '/signup', '/privacy', '/terms', '/cookies'].map((path) => ({
+  const pages: MetadataRoute.Sitemap = ['/', '/pricing', '/tools/review-gap-calculator', '/for', ...INDUSTRIES.map((i) => `/for/${i.slug}`), '/about', '/contact', '/changelog', '/roadmap', '/login', '/signup', '/privacy', '/terms', '/cookies', '/security', '/subprocessors'].map((path) => ({
     url: `${base}${path === '/' ? '' : path}`,
     lastModified: now,
   }));

@@ -55,6 +55,8 @@ export type Database = {
           milestones_sent: Record<string, string>;
           /** Retention policy for message history and tracking events, in days (migration 0044). NULL = keep. */
           data_retention_days: number | null;
+          /** Owner policy: every member must use two-factor authentication (migration 0045). */
+          require_mfa: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -103,6 +105,7 @@ export type Database = {
           pause_indefinite?: boolean;
           milestones_sent?: Record<string, string>;
           data_retention_days?: number | null;
+          require_mfa?: boolean;
         };
         Relationships: [];
       };
@@ -399,6 +402,12 @@ export type Database = {
       webhook_deliveries: {
         Row: { id: string; business_id: string; endpoint_id: string | null; event_type: string; status: 'succeeded' | 'failed'; http_status: number | null; error: string | null; duration_ms: number | null; created_at: string };
         Insert: { id?: string; business_id: string; endpoint_id?: string | null; event_type: string; status: 'succeeded' | 'failed'; http_status?: number | null; error?: string | null; duration_ms?: number | null };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      schema_migrations: {
+        Row: { version: string; applied_at: string };
+        Insert: { version: string; applied_at?: string };
         Update: Record<string, never>;
         Relationships: [];
       };
@@ -1015,7 +1024,9 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      rls_status: { Args: Record<string, never>; Returns: Array<{ table_name: string; rls_enabled: boolean; policy_count: number }> };
+    };
   };
 };
 

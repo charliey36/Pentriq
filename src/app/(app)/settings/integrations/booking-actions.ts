@@ -1,5 +1,6 @@
 'use server';
 
+import { auditAsCurrentUser } from '@/lib/audit-actor';
 import { revalidatePath } from 'next/cache';
 import { requireCapability } from '@/lib/business-access';
 
@@ -39,6 +40,7 @@ export async function disconnectBooking(provider: string): Promise<BookingAction
     .update({ status: 'disconnected', access_token_enc: null, refresh_token_enc: null, token_expires_at: null, updated_at: new Date().toISOString() })
     .eq('id', conn.id);
   if (error) return { ok: false, message: 'Could not disconnect. Please try again.' };
+  await auditAsCurrentUser('integration.disconnected', { targetType: 'integration', metadata: { provider: conn.provider } });
   revalidatePath('/settings/integrations');
   return { ok: true, message: 'Disconnected. Customers you already imported are kept.' };
 }

@@ -1,9 +1,9 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { requireBusiness, isAdminEmail } from '@/lib/business';
+import { getAuthUser, requireBusiness } from '@/lib/business';
+import { adminAccess } from '@/lib/admin-access';
 import { recordAudit } from '@/lib/audit';
 
 /**
@@ -13,8 +13,10 @@ import { recordAudit } from '@/lib/audit';
  */
 export async function deleteOrganisation(businessId: string): Promise<{ error?: string }> {
   const own = await requireBusiness();
-  const { data } = await createClient().auth.getUser();
-  if (!isAdminEmail(data.user?.email)) return { error: 'Not authorised.' };
+  const me = await getAuthUser();
+  const access = adminAccess(me);
+  if (access === 'forbidden' || !me) return { error: 'Not authorised.' };
+  if (access !== 'ok') return { error: 'Admin actions need a two-factor session. Sign in again with your authenticator code.' };
   if (businessId === own.id) return { error: 'You cannot delete your own organisation.' };
 
   const admin = createAdminClient();
@@ -25,11 +27,11 @@ export async function deleteOrganisation(businessId: string): Promise<{ error?: 
 
   await admin.storage.from('business-logos').remove(['png', 'jpg', 'webp'].map((e) => `${businessId}/logo.${e}`));
   for (const m of members ?? []) {
-    if (m.user_id === data.user?.id) continue;
+    if (m.user_id === me.id) continue;
     await admin.auth.admin.deleteUser(m.user_id);
   }
 
-  await recordAudit({ action: 'admin.organisation_deleted', actorId: data.user?.id, actorEmail: data.user?.email, targetType: 'business', targetId: businessId });
+  await recordAudit({ action: 'admin.organisation_deleted', actorId: me.id, actorEmail: me.email, targetType: 'business', targetId: businessId });
   revalidatePath('/admin/organisations');
   return {};
 }

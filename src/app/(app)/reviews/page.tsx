@@ -26,7 +26,7 @@ import { StatCard } from '@/components/ui/stat-card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Notice } from '@/components/ui/notice';
 import { AlertsPanel, type AlertItem } from './alerts-panel';
-import { MonthlyGainedChart, RatingDistributionChart, RatingTrendChart, ReviewGrowthChart, VelocityTrendChart } from './review-charts';
+import { MonthlyGainedChart, RatingDistributionChart, RatingTrendChart, ReviewGrowthChart, VelocityTrendChart } from './review-charts-lazy';
 import { ReviewList, type ReviewItem } from './review-list';
 import { analyseReviewThemes } from '@/lib/intelligence/review-themes';
 import { SyncButton } from './sync-button';

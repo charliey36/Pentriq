@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { isSameOriginRequest } from '@/lib/same-origin';
 import { createClient } from '@/lib/supabase/server';
 import { requireBusiness } from '@/lib/business';
 import { sendManualRebookingReminderFor } from '@/lib/manual-sends';
@@ -18,6 +19,10 @@ export const dynamic = 'force-dynamic';
  * Body: { "customerId": "<uuid>" }
  */
 export async function POST(request: NextRequest) {
+  // Cookie-authenticated and state-changing: refuse cross-site requests (CSRF defence in depth).
+  if (!isSameOriginRequest(request.headers, request.url)) {
+    return NextResponse.json({ success: false, error: 'Cross-site request refused.' }, { status: 403 });
+  }
   let body: unknown;
   try {
     body = await request.json();

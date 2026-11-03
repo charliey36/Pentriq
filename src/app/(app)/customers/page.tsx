@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Icon } from '@/components/ui/icons';
 import { AddCustomerPanel } from './add-customer-panel';
 import { CustomersTable, type CustomerRow } from './customers-table';
+import { Notice } from '@/components/ui/notice';
 import { parseListState, serializeListState } from '@/lib/customer-list';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { SavedViewsBar } from '@/components/saved-views-bar';
@@ -27,7 +28,7 @@ function formatDateTime(value: string) {
 export default async function CustomersPage({
   searchParams: searchParamsPromise,
 }: {
-  searchParams?: Promise<{ add?: string; q?: string; status?: string; sort?: string; dir?: string }>;
+  searchParams?: Promise<{ add?: string; q?: string; status?: string; sort?: string; dir?: string; erased?: string }>;
 }) {
   const searchParams = await searchParamsPromise;
   const { business, role, userId } = await requireAccess();
@@ -141,6 +142,12 @@ export default async function CustomersPage({
           </div>
         }
       />
+
+      {searchParams?.erased === '1' && (
+        <Notice variant="success" className="mb-4">
+          Customer erased. Their records were permanently deleted; the audit log notes that an erasure happened, not who it was.
+        </Notice>
+      )}
 
       <AddCustomerPanel defaultOpen={wantsAdd || rows.length === 0} autoFocus={wantsAdd} />
 

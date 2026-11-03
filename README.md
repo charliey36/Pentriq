@@ -318,6 +318,18 @@ sends `Authorization: Bearer <CRON_SECRET>` automatically; no secret goes in `ve
 scheduler (e.g. [cron-job.org](https://cron-job.org/), a GitHub Actions
 scheduled workflow) hitting the same URLs.
 
+**`vercel.json` runs the two send jobs once a day** (the Vercel Hobby limit), so a review request can wait up to a
+day. For sends within minutes, call `/api/send-messages` and `/api/send-review-requests` every 5 minutes from Vercel
+Pro cron or an external scheduler. The admin portal's *Launch readiness* page warns when sends fall more than 26
+hours behind.
+
+**Runs are safe to overlap.** Each send is claimed with a conditional update before it goes out
+([`src/lib/send-claim.ts`](./src/lib/send-claim.ts)), so a duplicate cron delivery, a scheduler retry or a manual run
+during a scheduled one never emails a customer twice; emails also carry a per-attempt idempotency key, which covers
+a run that dies between sending and recording the send. Each run works oldest-first in batches of 25 for up to 45
+seconds (`maxDuration` 60), hands back anything it has not reached, and the next run carries on.
+`scripts/verify-db.sh` races eight database connections for the same rows to prove each is claimed exactly once.
+
 ## 7. Click tracking, feedback, and unsubscribe
 
 - **Review links are tracked.** Every review request/reminder email links to

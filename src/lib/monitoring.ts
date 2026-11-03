@@ -27,7 +27,9 @@ export function captureError(error: unknown, { area, tags = {} }: Ctx): void {
 }
 
 /** Tags the current request's errors with who/what they belong to (ids only; no email, name or IP). */
-export function setErrorContext(userId: string, businessId: string): void {
+export function setErrorContext(userId: string, businessId: string, requestId?: string | null): void {
   Sentry.setUser({ id: userId });
   Sentry.setTag('business_id', businessId);
+  // Same id the middleware returns in the x-request-id response header, so a support report can be matched.
+  if (requestId) Sentry.setTag('request_id', requestId);
 }

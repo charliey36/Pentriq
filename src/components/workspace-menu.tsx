@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useCan } from '@/components/role-context';
 import { useEffect, useRef, useState } from 'react';
 import { logout } from '@/app/(app)/actions';
 import { useTheme } from '@/components/theme-context';
@@ -37,10 +38,17 @@ export function WorkspaceMenu({ name, logoUrl }: { name: string; logoUrl: string
     };
   }, [open]);
 
+  // Links a role cannot use are hidden (the pages enforce it regardless); account security is for everyone.
+  const canConfigure = useCan('settings.write');
   const items: { href: string; label: string; icon: IconName }[] = [
-    { href: '/settings', label: 'Business settings', icon: 'cog' },
-    { href: '/settings/services', label: 'Services', icon: 'tag' },
-    { href: '/settings/loyalty', label: 'Loyalty program', icon: 'gift' },
+    ...(canConfigure
+      ? ([
+          { href: '/settings', label: 'Business settings', icon: 'cog' },
+          { href: '/settings/services', label: 'Services', icon: 'tag' },
+          { href: '/settings/loyalty', label: 'Loyalty program', icon: 'gift' },
+        ] as const)
+      : []),
+    { href: '/account/security', label: 'Account security & 2FA', icon: 'shield' },
   ];
 
   return (

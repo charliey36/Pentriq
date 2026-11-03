@@ -108,7 +108,7 @@ export function BlogIndex({ posts }: { posts: BlogCardData[] }) {
                 onClick={() => setCategory(c as BlogCategory | typeof ALL)}
                 className={`rounded-full px-3.5 py-1.5 text-sm font-medium ring-1 ring-inset transition-colors ${
                   active
-                    ? 'bg-brand-600 text-white ring-brand-600'
+                    ? 'bg-brand-700 text-white ring-brand-700'
                     : 'bg-surface text-ink-2 ring-line-strong/70 hover:bg-surface-muted'
                 }`}
               >

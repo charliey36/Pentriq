@@ -3,6 +3,9 @@ on:
   push:
     branches: [main]
   pull_request:
+# Read-only token for every job: CI checks out and tests code, it never writes to the repository.
+permissions:
+  contents: read
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -26,3 +29,55 @@ jobs:
           NEXT_TELEMETRY_DISABLED: '1'
       # Production dependencies must have no high or critical advisories. Remaining dev-only/low findings are listed in docs/PRODUCT_AUDIT.md.
       - run: npm audit --omit=dev --audit-level=high
+
+  # Applies supabase/schema.sql and every migration (twice, to prove they are re-runnable) to a real PostgreSQL
+  # server, then runs the row-level security and privilege tests in supabase/tests/*.test.sql.
+  database:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: scripts/verify-db.sh pentriq_verify
+
+  # Builds the app, serves it, and audits every public page in a real browser: WCAG 2.1 AA (axe-core) in light
+  # and dark themes, no sideways scrolling at phone width, no uncaught browser errors.
+  accessibility:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: placeholder-service-key
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      CRON_SECRET: placeholder
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: npx next build
+      - run: |
+          npx next start -p 3000 &
+          for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:3000/pricing && break; sleep 1; done
+          npm run audit:a11y -- http://localhost:3000

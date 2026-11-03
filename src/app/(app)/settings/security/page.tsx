@@ -2,7 +2,6 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { requireCapability } from '@/lib/business-access';
 import { can } from '@/lib/permissions';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { assessPosture } from '@/lib/security-posture';
 import { auditLabel } from '@/lib/activity-feed';
@@ -15,6 +14,9 @@ import { Icon } from '@/components/ui/icons';
 import { ProgressRing } from '@/components/ui/progress-ring';
 import { formatUKDateTime } from '@/lib/uk-defaults';
 import { RetentionForm } from './retention-form';
+import { MfaPolicy } from './mfa-policy';
+import { listTeam } from '@/lib/team';
+import { getAuthUser } from '@/lib/business';
 
 export const metadata: Metadata = { title: 'Security & audit' };
 
@@ -24,7 +26,6 @@ const WINDOWS = [30, 90, 365] as const;
 export default async function SecurityPage({ searchParams: searchParamsPromise }: { searchParams?: Promise<{ action?: string; page?: string; days?: string }> }) {
   const searchParams = await searchParamsPromise;
   const { business, role } = await requireCapability('team.manage');
-  const supabase = createClient();
   const admin = createAdminClient();
   const now = new Date();
 
@@ -43,8 +44,8 @@ export default async function SecurityPage({ searchParams: searchParamsPromise }
     .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
   if (action) auditQuery = auditQuery.eq('action', action);
 
-  const [members, invites, apiKey, webhook, google, audit, recentActions, audit30] = await Promise.all([
-    supabase.from('business_members').select('role').eq('business_id', business.id),
+  const [team, invites, apiKey, webhook, google, audit, recentActions, audit30, me] = await Promise.all([
+    listTeam(admin as never, business.id).catch(() => ({ members: [], invitations: [] })),
     admin.from('team_invitations').select('expires_at').eq('business_id', business.id).is('accepted_at', null).is('revoked_at', null),
     admin.from('api_keys').select('is_active, created_at').eq('business_id', business.id).eq('is_active', true).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     admin.from('webhook_endpoints').select('is_active, disabled_reason').eq('business_id', business.id).maybeSingle(),
@@ -52,12 +53,16 @@ export default async function SecurityPage({ searchParams: searchParamsPromise }
     auditQuery,
     admin.from('audit_log').select('action').eq('business_id', business.id).gte('created_at', new Date(now.getTime() - 365 * 86_400_000).toISOString()).order('created_at', { ascending: false }).limit(1000),
     admin.from('audit_log').select('id', { count: 'exact', head: true }).eq('business_id', business.id).gte('created_at', since30),
+    getAuthUser(),
   ]);
+  const members = team.members;
+  const mfaKnown = members.every((m) => m.mfaEnrolled !== null);
+  const mfaEnrolledCount = members.filter((m) => m.mfaEnrolled === true).length;
 
   const inviteRows = invites.data ?? [];
   const posture = assessPosture(
     {
-      members: (members.data ?? []) as Array<{ role: 'owner' | 'admin' | 'staff' }>,
+      members: members.map((m) => ({ role: m.role })),
       pendingInvites: inviteRows.filter((i) => new Date(i.expires_at) > now).length,
       expiredInvites: inviteRows.filter((i) => new Date(i.expires_at) <= now).length,
       apiKey: apiKey.data ? { active: apiKey.data.is_active, createdAt: apiKey.data.created_at } : null,
@@ -66,6 +71,7 @@ export default async function SecurityPage({ searchParams: searchParamsPromise }
       hasContactEmail: Boolean(business.contact_email),
       googleStatus: (google.data?.status as 'active' | 'needs_reconnect' | 'pending_location' | undefined) ?? null,
       auditEvents30d: audit30.count ?? 0,
+      mfa: mfaKnown && members.length > 0 ? { required: business.require_mfa === true, enrolled: mfaEnrolledCount, members: members.length } : undefined,
     },
     now
   );
@@ -129,6 +135,18 @@ export default async function SecurityPage({ searchParams: searchParamsPromise }
             </ul>
           </div>
         </SectionCard>
+
+        <section id="two-factor" className="scroll-mt-24">
+          <SectionCard title="Two-factor authentication" description="A code from an authenticator app at every sign-in. Members manage their own authenticators from Account security; admins can reset a lost device from Team.">
+            <MfaPolicy
+              enabled={business.require_mfa === true}
+              canEdit={can(role, 'account.delete')}
+              enrolled={mfaEnrolledCount}
+              members={members.length}
+              selfEnrolled={Boolean(me?.mfaEnrolled || me?.aal === 'aal2')}
+            />
+          </SectionCard>
+        </section>
 
         <SectionCard title="Data retention" description="How long Pentriq keeps message history, link-click events, webhook and integration logs.">
           <RetentionForm current={business.data_retention_days ?? null} canEdit={can(role, 'account.delete')} />

@@ -9,7 +9,9 @@
     "seed": "node --env-file=.env.local scripts/seed.mjs",
     "seed:test": "node --env-file=.env.local scripts/seed-test-business.mjs",
     "test": "TZ=Europe/London jest",
-    "test:watch": "TZ=Europe/London jest --watch"
+    "test:watch": "TZ=Europe/London jest --watch",
+    "audit:a11y": "node scripts/a11y-audit.mjs",
+    "verify:db": "scripts/verify-db.sh pentriq_verify"
   },
   "dependencies": {
     "@google/genai": "1.9.0",
@@ -31,8 +33,10 @@
     "@types/react": "18.3.11",
     "@types/react-dom": "18.3.0",
     "autoprefixer": "10.4.20",
+    "axe-core": "4.11.4",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
+    "playwright": "1.63.0",
     "postcss": "8.5.28",
     "tailwindcss": "3.4.13",
     "ts-jest": "^29.4.14",

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { requireBusiness } from '@/lib/business';
+import { auditAsCurrentUser } from '@/lib/audit-actor';
 import { getAppUrl } from '@/lib/brand';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { encryptToken } from '@/lib/google-token-crypto';
@@ -71,6 +72,7 @@ export async function GET(request: NextRequest, { params: paramsPromise }: { par
     if (error || !conn) throw new Error(error?.message ?? 'Could not save the connection.');
 
     await syncBookingConnection(admin, conn);
+    await auditAsCurrentUser('integration.connected', { targetType: 'integration', metadata: { provider: provider.id } });
     return done(`booking=connected&provider=${provider.id}`);
   } catch (e) {
     captureError(e, { area: 'booking:oauth-callback', tags: { provider: provider.id, business_id: business.id } });

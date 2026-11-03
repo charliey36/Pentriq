@@ -1,5 +1,6 @@
 'use server';
 
+import { auditAsCurrentUser } from '@/lib/audit-actor';
 import { revalidatePath } from 'next/cache';
 import { requireCapability } from '@/lib/business-access';
 
@@ -156,6 +157,7 @@ export async function disconnectGoogle(): Promise<ActionResult> {
   await setSource(admin, business.id, 'google', 'Google Business Profile', false);
   await rebuildMetrics(admin, business.id).catch(() => undefined); // falls back to manual snapshots
 
+  await auditAsCurrentUser('integration.disconnected', { targetType: 'integration', metadata: { provider: 'google' } });
   refresh();
   return { ok: true, message: 'Google Business Profile disconnected.' };
 }

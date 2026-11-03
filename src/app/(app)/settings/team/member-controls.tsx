@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
-import { removeTeamMember, revokeInvite, updateMemberRole } from './actions';
+import { removeTeamMember, resetMemberTwoFactor, revokeInvite, updateMemberRole } from './actions';
 
 export function RoleSelect({ userId, role, label, canAssignAdmin }: { userId: string; role: 'admin' | 'staff'; label: string; canAssignAdmin: boolean }) {
   const [pending, start] = useTransition();
@@ -38,4 +38,14 @@ export function RemoveMemberButton({ userId, label }: { userId: string; label: s
 
 export function RevokeInviteButton({ invitationId, email }: { invitationId: string; email: string }) {
   return <ConfirmActionButton label="Revoke" ariaLabel={`Revoke invitation for ${email}`} onConfirm={() => revokeInvite(invitationId)} />;
+}
+
+export function ResetMfaButton({ userId, label }: { userId: string; label: string }) {
+  return (
+    <ConfirmActionButton
+      label="Reset 2FA"
+      ariaLabel={`Reset two-factor authentication for ${label}`}
+      onConfirm={() => resetMemberTwoFactor(userId)}
+    />
+  );
 }

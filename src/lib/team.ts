@@ -10,7 +10,20 @@ import { canAssign, canManageMember, isRole } from '@/lib/permissions';
  * The invitee must sign in with the invited email address, so a forwarded link is useless to anyone else.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-type Db = { from(table: string): any; auth?: { admin: { getUserById(id: string): Promise<{ data: { user: { email?: string | null } | null } }> } } };
+type AdminUser = { email?: string | null; last_sign_in_at?: string | null; app_metadata?: Record<string, unknown> | null; factors?: Array<{ id: string; status: string; factor_type: string }> | null };
+type Db = {
+  from(table: string): any;
+  auth?: {
+    admin: {
+      getUserById(id: string): Promise<{ data: { user: AdminUser | null } }>;
+      updateUserById?(id: string, attrs: { app_metadata: Record<string, unknown> }): Promise<{ error: { message: string } | null }>;
+      mfa?: {
+        listFactors(params: { userId: string }): Promise<{ data: { factors: Array<{ id: string }> } | null; error: { message: string } | null }>;
+        deleteFactor(params: { id: string; userId: string }): Promise<{ error: { message: string } | null }>;
+      };
+    };
+  };
+};
 
 export const INVITE_TTL_DAYS = 7;
 export const MAX_TEAM_SIZE = 10; // members + pending invitations; a sensible ceiling until seat-based pricing exists
@@ -22,7 +35,15 @@ export const normaliseEmail = (raw: string) => raw.trim().toLowerCase();
 export type TeamResult<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 const fail = (error: string) => ({ ok: false as const, error });
 
-export type MemberView = { userId: string; email: string | null; role: Role; joinedAt: string };
+export type MemberView = {
+  userId: string;
+  email: string | null;
+  role: Role;
+  joinedAt: string;
+  /** null when the auth server could not be asked. */
+  mfaEnrolled: boolean | null;
+  lastSignInAt: string | null;
+};
 export type InvitationView = { id: string; email: string; role: AssignableRole; expiresAt: string; createdAt: string };
 
 export async function listTeam(db: Db, businessId: string): Promise<{ members: MemberView[]; invitations: InvitationView[] }> {
@@ -36,16 +57,29 @@ export async function listTeam(db: Db, businessId: string): Promise<{ members: M
       .is('revoked_at', null)
       .order('created_at', { ascending: false }),
   ]);
-  const views: MemberView[] = [];
-  for (const m of (members ?? []) as { user_id: string; role: Role; created_at: string }[]) {
-    let email: string | null = null;
-    try {
-      email = (await db.auth?.admin.getUserById(m.user_id))?.data.user?.email ?? null;
-    } catch {
-      email = null;
-    }
-    views.push({ userId: m.user_id, email, role: m.role, joinedAt: m.created_at });
-  }
+  // One auth lookup per member, in parallel (they used to run one after another).
+  const rows = (members ?? []) as { user_id: string; role: Role; created_at: string }[];
+  const users = await Promise.all(
+    rows.map(async (m) => {
+      try {
+        return (await db.auth?.admin.getUserById(m.user_id))?.data.user ?? null;
+      } catch {
+        return null;
+      }
+    })
+  );
+  const views: MemberView[] = rows.map((m, i) => {
+    const u = users[i];
+    const verifiedTotp = (u?.factors ?? []).some((f) => f.status === 'verified' && f.factor_type === 'totp');
+    return {
+      userId: m.user_id,
+      email: u?.email ?? null,
+      role: m.role,
+      joinedAt: m.created_at,
+      mfaEnrolled: u ? verifiedTotp || u.app_metadata?.mfa_enrolled === true : null,
+      lastSignInAt: u?.last_sign_in_at ?? null,
+    };
+  });
   return {
     members: views,
     invitations: ((invites ?? []) as any[]).map((i) => ({ id: i.id, email: i.email, role: i.role, expiresAt: i.expires_at, createdAt: i.created_at })),
@@ -170,4 +204,33 @@ export async function removeMember(
   if (!canManageMember(params.actorRole, target.role)) return fail('You do not have permission to remove that person.');
   const { error } = await db.from('business_members').delete().eq('business_id', params.businessId).eq('user_id', params.targetUserId);
   return error ? fail('Could not remove that person. Please try again.') : { ok: true };
+}
+
+/**
+ * Lost-device recovery: removes every two-factor factor a teammate has, so they can sign in with their password
+ * and set it up again. Same privilege rule as changing their role (an admin can reset staff, the owner anyone
+ * but themselves). Audited by the caller.
+ */
+export async function resetMemberMfa(
+  db: Db,
+  params: { businessId: string; targetUserId: string; actorId: string; actorRole: Role }
+): Promise<TeamResult<{ removed: number }>> {
+  if (params.targetUserId === params.actorId) return fail('Manage your own two-factor settings from your account security page.');
+  const { data: target } = await db.from('business_members').select('role').eq('business_id', params.businessId).eq('user_id', params.targetUserId).maybeSingle();
+  if (!target) return fail('That person is not on your team.');
+  if (!canManageMember(params.actorRole, target.role)) return fail('You do not have permission to reset that person’s two-factor.');
+  const admin = db.auth?.admin;
+  if (!admin?.mfa || !admin.updateUserById) return fail('Two-factor reset is not available.');
+  const { data, error } = await admin.mfa.listFactors({ userId: params.targetUserId });
+  if (error) return fail('Could not read their two-factor settings. Please try again.');
+  let removed = 0;
+  for (const factor of data?.factors ?? []) {
+    const res = await admin.mfa.deleteFactor({ id: factor.id, userId: params.targetUserId });
+    if (res.error) return fail('Could not remove one of their authenticators. Please try again.');
+    removed += 1;
+  }
+  const current = (await admin.getUserById(params.targetUserId)).data.user?.app_metadata ?? {};
+  const update = await admin.updateUserById(params.targetUserId, { app_metadata: { ...current, mfa_enrolled: false } });
+  if (update.error) return fail('Removed their authenticators, but could not update their account. Please try again.');
+  return { ok: true, removed };
 }

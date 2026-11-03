@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { checkPassword, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@/lib/password-policy';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -44,6 +45,8 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string }) {
 
     try {
       if (mode === 'signup') {
+        const check = checkPassword(password, { email });
+        if (!check.ok) throw new Error(check.error);
         const { error: signUpError } = await supabase.auth.signUp({
           email,
           password,
@@ -109,12 +112,13 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string }) {
             name="password"
             type={showPassword ? 'text' : 'password'}
             required
-            minLength={mode === 'signup' ? 8 : 6}
+            minLength={mode === 'signup' ? PASSWORD_MIN_LENGTH : undefined}
+            maxLength={PASSWORD_MAX_LENGTH}
             autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="input py-2.5 pr-11"
-            placeholder={mode === 'signup' ? 'At least 8 characters' : 'Your password'}
+            placeholder={mode === 'signup' ? `At least ${PASSWORD_MIN_LENGTH} characters` : 'Your password'}
           />
           <button
             type="button"

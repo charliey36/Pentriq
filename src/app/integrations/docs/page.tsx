@@ -12,7 +12,7 @@ export const metadata: Metadata = pageMetadata({
 });
 
 const Code = ({ children }: { children: string }) => (
-  <pre className="mt-3 overflow-x-auto rounded-lg bg-surface-muted p-4 text-xs leading-5 text-ink-2">{children}</pre>
+  <pre tabIndex={0} className="mt-3 overflow-x-auto rounded-lg bg-surface-muted p-4 text-xs leading-5 text-ink-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">{children}</pre>
 );
 const H = ({ children }: { children: string }) => <h2 className="mt-10 text-lg font-semibold text-ink">{children}</h2>;
 const P = ({ children }: { children: React.ReactNode }) => <p className="mt-2 text-[15px] leading-7 text-ink-2">{children}</p>;

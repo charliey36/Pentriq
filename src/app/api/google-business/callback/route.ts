@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'crypto';
 import { NextResponse, type NextRequest } from 'next/server';
 import { requireBusiness } from '@/lib/business';
+import { auditAsCurrentUser } from '@/lib/audit-actor';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isMissingColumnError } from '@/lib/db-errors';
 import {
@@ -207,6 +208,7 @@ export async function GET(request: NextRequest) {
       keptLocation: keepLocation,
       status: row.status,
     });
+    await auditAsCurrentUser('integration.connected', { targetType: 'integration', metadata: { provider: 'google', reconnected: keepLocation } });
     return done(keepLocation ? 'google=reconnected' : 'google=select');
   } catch (err) {
     logGoogleOAuth('error', 'connection_save_failed', { message: err instanceof Error ? err.message : String(err) });

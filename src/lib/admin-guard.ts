@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { isAdminEmail } from '@/lib/admin-access';
+import { getAuthUser } from '@/lib/business';
+import { adminAccess } from '@/lib/admin-access';
 
-/** For admin API routes: null when the caller is an authenticated admin, otherwise a 401/403 response. */
+/** For admin API routes: null when the caller is an admin with a two-factor session, otherwise a 401/403 response. */
 export async function requireAdminApi(): Promise<NextResponse | null> {
-  const { data } = await createClient().auth.getUser();
-  if (!data.user) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
-  if (!isAdminEmail(data.user.email)) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 });
+  const user = await getAuthUser();
+  if (!user) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
+  const access = adminAccess(user);
+  if (access === 'forbidden') return NextResponse.json({ error: 'Forbidden.' }, { status: 403 });
+  if (access !== 'ok') return NextResponse.json({ error: 'Two-factor authentication required.' }, { status: 403 });
   return null;
 }

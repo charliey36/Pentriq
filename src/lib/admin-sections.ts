@@ -8,6 +8,7 @@ import type { IconName } from '@/components/ui/icons';
 export type AdminSection = { key: string; title: string; description: string; icon: IconName; href?: string };
 
 export const ADMIN_SECTIONS: AdminSection[] = [
+  { key: 'readiness', title: 'Launch Readiness', description: 'Live checks: configuration, migrations, row-level security.', icon: 'target', href: '/admin/readiness' },
   { key: 'email-usage', title: 'Email Usage', description: 'Daily and monthly Resend consumption, live.', icon: 'mail', href: '/admin/email-usage' },
   { key: 'email-activity', title: 'Email Activity', description: 'Recent sends with status and message IDs.', icon: 'inbox', href: '/admin/email-activity' },
   { key: 'email-preview', title: 'Email Preview', description: 'Preview review request emails on desktop and mobile.', icon: 'eye', href: '/admin/email-preview' },

@@ -1,5 +1,6 @@
 'use server';
 
+import { auditAsCurrentUser } from '@/lib/audit-actor';
 import { userSafeError } from '@/lib/log';
 import { requireCapability } from '@/lib/business-access';
 import { revalidatePath } from 'next/cache';
@@ -44,6 +45,7 @@ export async function createService(
     return { error: userSafeError('Failed to create service', error) };
   }
 
+  await auditAsCurrentUser('services.changed', { targetType: 'service', metadata: { change: 'created' } });
   revalidatePath('/settings/services');
   return { success: true };
 }
@@ -58,5 +60,6 @@ export async function deactivateService(serviceId: string) {
     .eq('id', serviceId)
     .eq('business_id', business.id);
 
+  await auditAsCurrentUser('services.changed', { targetType: 'service', targetId: serviceId, metadata: { change: 'deactivated' } });
   revalidatePath('/settings/services');
 }

@@ -9,10 +9,7 @@ const baseConfig = {
   output: 'standalone',
   // Always fetch fresh data when navigating between sections (no stale 30s page cache),
   // so clicking a sidebar item doesn't need a second refresh request.
-  // instrumentationHook: loads src/instrumentation.ts (Sentry) on Next 14.
   experimental: { staleTimes: { dynamic: 0, static: 30 } },
-  // The release id is baked into the browser bundle so frontend errors carry the same release as the server.
-  // Baseline security headers on every response (no CSP yet: it needs testing against Stripe/Sentry/Google scripts).
   // The Email tab moved to the Admin Portal; keep old bookmarks and links working.
   async redirects() {
     return [
@@ -21,24 +18,55 @@ const baseConfig = {
       { source: '/settings/email', destination: '/admin/email-usage', permanent: true },
     ];
   },
+  /*
+   * Security headers on every response.
+   * - An ENFORCED Content-Security-Policy with only the directives that cannot break Stripe, Supabase, Sentry or
+   *   Google flows: no plugins, no <base> hijacking, no framing by other sites (the widget alone may be framed).
+   * - The full policy runs in REPORT-ONLY mode and reports violations to /api/csp-report (logged as
+   *   security/csp_violation). Promote it to enforcing once production traffic shows no violations from
+   *   legitimate sources (see docs/RELEASE_READINESS.md, human actions).
+   */
   async headers() {
+    const reportOnly = [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "form-action 'self' https://checkout.stripe.com https://billing.stripe.com",
+      "frame-ancestors 'self'",
+      "object-src 'none'",
+      "img-src 'self' data: blob: https:",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' data: https://fonts.gstatic.com",
+      "script-src 'self' 'unsafe-inline' https://js.stripe.com",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://api.stripe.com",
+      'report-uri /api/csp-report',
+      'report-to csp-endpoint',
+    ].join('; ');
+    const common = [
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+      { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
+      { key: 'Reporting-Endpoints', value: 'csp-endpoint="/api/csp-report"' },
+    ];
     return [
       // The review widget is meant to be embedded on other sites, so it alone omits the framing restriction.
-      { source: '/widget/:path*', headers: [{ key: 'X-Content-Type-Options', value: 'nosniff' }, { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' }, { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' }] },
+      {
+        source: '/widget/:path*',
+        headers: [...common, { key: 'Content-Security-Policy', value: "object-src 'none'; base-uri 'self'" }],
+      },
       {
         source: '/:path((?!widget/).*)',
         headers: [
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          ...common,
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
-          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-          { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
-          // Report-only: surfaces violations in the browser console without breaking Stripe/Sentry/Google. Promote to enforcing once clean.
-          { key: 'Content-Security-Policy-Report-Only', value: "default-src 'self'; base-uri 'self'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; frame-ancestors 'self'; object-src 'none'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://js.stripe.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://api.stripe.com" },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=(self "https://checkout.stripe.com")' },
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' },
+          { key: 'Content-Security-Policy', value: "object-src 'none'; base-uri 'self'; frame-ancestors 'self'" },
+          { key: 'Content-Security-Policy-Report-Only', value: reportOnly },
         ],
       },
     ];
   },
+  // The release id is baked into the browser bundle so frontend errors carry the same release as the server.
   env: { NEXT_PUBLIC_SENTRY_RELEASE: process.env.VERCEL_GIT_COMMIT_SHA || '' },
 };
 

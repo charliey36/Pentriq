@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { requireBusiness } from '@/lib/business';
+import { requireAccess } from '@/lib/business';
 import { createClient } from '@/lib/supabase/server';
 import { getCustomerVisitsWithRebookingStatus } from '@/lib/visits';
 import { PageHeader } from '@/components/ui/page-header';
@@ -17,6 +17,8 @@ import { formatUKCurrency, formatUKDate, UK_TIMEZONE } from '@/lib/uk-defaults';
 import { analyseCustomer } from '@/lib/intelligence/customer-insights';
 import { CustomerInsightCard } from '@/components/intelligence/customer-insight-card';
 import { InsightActions } from './insight-actions';
+import { PrivacyCard } from './privacy-card';
+import { can } from '@/lib/permissions';
 import { buildActivity } from '@/lib/activity-feed';
 import { COUNTED_CLICK_TYPES } from '@/lib/click-analytics';
 import type { IconName } from '@/components/ui/icons';
@@ -32,7 +34,7 @@ function formatDate(value: string) {
 
 export default async function CustomerDetailPage({ params: paramsPromise }: { params: Promise<{ customerId: string }> }) {
   const params = await paramsPromise;
-  const business = await requireBusiness();
+  const { business, role } = await requireAccess();
   const supabase = createClient();
 
   const { data: customer } = await supabase
@@ -285,6 +287,8 @@ export default async function CustomerDetailPage({ params: paramsPromise }: { pa
               </ol>
             )}
           </SectionCard>
+
+          {can(role, 'data.export') && <PrivacyCard customerId={customer.id} customerName={customer.name} />}
 
           <SectionCard title="Tags" description="Use tags to build segments, like vip or newsletter.">
             <TagEditor customerId={customer.id} tags={tags ?? []} />

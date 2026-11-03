@@ -26,6 +26,8 @@ const columns: { title: string; links: [string, string][] }[] = [
       ['Contact', '/contact'],
       ['Changelog', '/changelog'],
       ['Roadmap', '/roadmap'],
+      ['Security', '/security'],
+      ['Sub-processors', '/subprocessors'],
     ],
   },
   {

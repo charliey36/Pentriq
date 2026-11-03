@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { isAdminEmail } from '@/lib/admin-access';
+import { adminAccess } from '@/lib/admin-access';
+import { enrolledFromClaims, gateRedirect } from '@/lib/mfa';
 
 /**
  * Refreshes the Supabase auth session cookie on every request and protects
@@ -8,10 +9,19 @@ import { isAdminEmail } from '@/lib/admin-access';
  * routes (tracking + scheduled send job).
  */
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
+
+  // Correlation id for logs and support tickets (kept if a trusted proxy already set one), and the requested
+  // path for server components (used as the return address after a two-factor check). Both are always
+  // overwritten here, so a client cannot inject them.
+  const incomingId = request.headers.get('x-request-id');
+  const requestId = incomingId && /^[A-Za-z0-9._-]{8,128}$/.test(incomingId) ? incomingId : crypto.randomUUID();
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-request-id', requestId);
+  requestHeaders.set('x-pathname', `${pathname}${search}`);
 
   let response = NextResponse.next({
-    request: { headers: request.headers },
+    request: { headers: requestHeaders },
   });
 
   const supabase = createServerClient(
@@ -27,7 +37,7 @@ export async function middleware(request: NextRequest) {
             request.cookies.set(name, value);
           });
           response = NextResponse.next({
-            request: { headers: request.headers },
+            request: { headers: requestHeaders },
           });
           cookiesToSet.forEach(({ name, value, options }) => {
             response.cookies.set(name, value, options);
@@ -60,29 +70,49 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/test-welcome-email') ||
     pathname.startsWith('/api/stripe/webhook') ||
     pathname === '/api/health' ||
+    pathname === '/api/csp-report' ||
+    pathname.startsWith('/.well-known/') ||
     pathname === '/robots.txt' ||
     pathname === '/sitemap.xml' ||
     pathname.startsWith('/email-assets/') ||
     pathname.startsWith('/auth/callback');
-  const isPublicPage = pathname === '/blog' || pathname.startsWith('/blog/') || pathname.startsWith('/feedback/') || pathname.startsWith('/book/') || pathname === '/for' || pathname.startsWith('/for/') || pathname.startsWith('/widget/') || pathname.startsWith('/invite/') || pathname === '/r' || pathname.startsWith('/r/') || pathname === '/review-unavailable' || pathname === '/tools/review-gap-calculator' || ['/privacy', '/terms', '/cookies', '/about', '/contact', '/pricing', '/changelog', '/roadmap'].includes(pathname);
+  const isPublicPage = pathname === '/blog' || pathname.startsWith('/blog/') || pathname.startsWith('/feedback/') || pathname.startsWith('/book/') || pathname === '/for' || pathname.startsWith('/for/') || pathname.startsWith('/widget/') || pathname.startsWith('/invite/') || pathname === '/r' || pathname.startsWith('/r/') || pathname === '/review-unavailable' || pathname === '/tools/review-gap-calculator' || ['/privacy', '/terms', '/cookies', '/about', '/contact', '/pricing', '/changelog', '/roadmap', '/security', '/subprocessors'].includes(pathname);
 
   if (!user && !isAuthPage && !isPublicApiRoute && !isPublicPage && pathname !== '/') {
     const redirectUrl = new URL('/login', request.url);
-    return NextResponse.redirect(redirectUrl);
+    return withRequestId(NextResponse.redirect(redirectUrl), requestId);
   }
 
-  // Admin Portal: signed-in non-admins get a real 403 (not a redirect or a guessable 404).
-  if (user && (pathname === '/admin' || pathname.startsWith('/admin/') || pathname.startsWith('/api/admin/')) && !isAdminEmail(typeof user.email === 'string' ? user.email : null)) {
-    return pathname.startsWith('/api/')
-      ? NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
-      : new NextResponse('403 - You do not have permission to view this page.', { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+  // Admin Portal: signed-in non-admins get a real 403 (not a redirect or a guessable 404), and admins need a
+  // two-factor session: the portal reads every organisation's data.
+  if (user && (pathname === '/admin' || pathname.startsWith('/admin/') || pathname.startsWith('/api/admin/'))) {
+    const access = adminAccess({
+      email: typeof user.email === 'string' ? user.email : null,
+      aal: typeof user.aal === 'string' ? user.aal : null,
+      mfaEnrolled: enrolledFromClaims(user as unknown as Record<string, unknown>),
+    });
+    if (access === 'forbidden') {
+      return pathname.startsWith('/api/')
+        ? NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+        : new NextResponse('403 - You do not have permission to view this page.', { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+    }
+    if (access !== 'ok') {
+      return pathname.startsWith('/api/')
+        ? NextResponse.json({ error: 'Two-factor authentication required.' }, { status: 403 })
+        : withRequestId(NextResponse.redirect(new URL(gateRedirect(access, `${pathname}${search}`), request.url)), requestId);
+    }
   }
 
   if (user && isAuthPage) {
     const redirectUrl = new URL('/dashboard', request.url);
-    return NextResponse.redirect(redirectUrl);
+    return withRequestId(NextResponse.redirect(redirectUrl), requestId);
   }
 
+  return withRequestId(response, requestId);
+}
+
+function withRequestId(response: NextResponse, requestId: string): NextResponse {
+  response.headers.set('x-request-id', requestId);
   return response;
 }
 

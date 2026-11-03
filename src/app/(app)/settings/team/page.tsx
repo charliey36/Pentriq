@@ -10,7 +10,7 @@ import { SettingsTabs } from '@/components/settings-tabs';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
 import { InviteForm } from './invite-form';
-import { RemoveMemberButton, RevokeInviteButton, RoleSelect } from './member-controls';
+import { RemoveMemberButton, ResetMfaButton, RevokeInviteButton, RoleSelect } from './member-controls';
 
 export const metadata: Metadata = { title: 'Team' };
 
@@ -45,8 +45,14 @@ export default async function TeamPage() {
                       {label}
                       {m.userId === userId && <span className="ml-2 text-xs font-normal text-ink-4">(you)</span>}
                     </p>
-                    <p className="text-xs text-ink-4">Joined {formatUKDate(new Date(m.joinedAt))}</p>
+                    <p className="text-xs text-ink-4">
+                      Joined {formatUKDate(new Date(m.joinedAt))}
+                      {m.lastSignInAt ? ` · last signed in ${formatUKDate(new Date(m.lastSignInAt))}` : ' · never signed in'}
+                    </p>
                   </div>
+                  {m.mfaEnrolled === true && <Badge tone="success" dot>2FA on</Badge>}
+                  {m.mfaEnrolled === false && <Badge tone={business.require_mfa ? 'warning' : 'neutral'}>{business.require_mfa ? '2FA needed' : '2FA off'}</Badge>}
+                  {editable && m.mfaEnrolled === true && <ResetMfaButton userId={m.userId} label={label} />}
                   {editable ? (
                     <>
                       <RoleSelect userId={m.userId} role={m.role as 'admin' | 'staff'} label={label} canAssignAdmin={canAssign(role, 'admin')} />

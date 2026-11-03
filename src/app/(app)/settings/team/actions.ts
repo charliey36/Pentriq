@@ -9,7 +9,7 @@ import { getAppUrl } from '@/lib/brand';
 import { sendTeamInviteEmail } from '@/lib/email';
 import { requesterId, withinLimit } from '@/lib/rate-limit';
 import { logEvent } from '@/lib/log';
-import { changeMemberRole, createInvitation, INVITE_TTL_DAYS, removeMember, revokeInvitation } from '@/lib/team';
+import { changeMemberRole, createInvitation, INVITE_TTL_DAYS, removeMember, resetMemberMfa, revokeInvitation } from '@/lib/team';
 
 export type TeamActionResult = { error?: string; success?: boolean; message?: string };
 
@@ -75,3 +75,21 @@ export async function removeTeamMember(targetUserId: string): Promise<TeamAction
   return { success: true };
 }
 
+
+/** Lost-device recovery for a teammate: removes their authenticators so they can set two-factor up again. */
+export async function resetMemberTwoFactor(targetUserId: string): Promise<TeamActionResult> {
+  const { business, userId, email, role } = await requireCapability('team.manage');
+  const result = await resetMemberMfa(db(), { businessId: business.id, targetUserId, actorId: userId, actorRole: role });
+  if (!result.ok) return { error: result.error };
+  await recordAudit({
+    action: 'team.mfa_reset',
+    businessId: business.id,
+    actorId: userId,
+    actorEmail: email,
+    targetType: 'user',
+    targetId: targetUserId,
+    metadata: { factors_removed: result.removed },
+  });
+  revalidatePath('/settings/team');
+  return { success: true, message: 'Two-factor reset. They can now sign in with their password and set it up again.' };
+}

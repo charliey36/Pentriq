@@ -13,6 +13,8 @@ export type PostureInput = {
   googleStatus: 'active' | 'needs_reconnect' | 'pending_location' | null;
   /** Audit events in the last 30 days (shows the trail is working). */
   auditEvents30d: number;
+  /** Two-factor coverage; omitted when the auth server could not be asked. */
+  mfa?: { required: boolean; enrolled: number; members: number };
 };
 
 export type PostureCheck = {
@@ -38,6 +40,20 @@ export function assessPosture(i: PostureInput, now: Date = new Date()): { checks
     detail: `${i.members.length} member${i.members.length === 1 ? '' : 's'}: 1 owner, ${admins} admin${admins === 1 ? '' : 's'}, ${staff} staff. Staff cannot change settings, billing, integrations or export data, and the database enforces it for configuration tables.`,
     href: '/settings/team',
   });
+
+  if (i.mfa) {
+    const { required, enrolled, members } = i.mfa;
+    const all = members > 0 && enrolled >= members;
+    checks.push({
+      id: 'mfa',
+      status: required ? (all ? 'ok' : 'info') : all ? 'ok' : 'warn',
+      title: 'Two-factor authentication',
+      detail: required
+        ? `Required for everyone. ${enrolled} of ${members} member${members === 1 ? ' has' : 's have'} it on; anyone without it must set it up at their next visit.`
+        : `${enrolled} of ${members} member${members === 1 ? ' has' : 's have'} it on. Require it for everyone below so a stolen password is never enough.`,
+      href: '/settings/security#two-factor',
+    });
+  }
 
   if (i.pendingInvites > 0 || i.expiredInvites > 0) {
     checks.push({

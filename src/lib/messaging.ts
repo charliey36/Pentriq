@@ -34,6 +34,8 @@ export type SendMessageParams = {
   listUnsubscribeUrl?: string;
   /** The business's own contact email: customer replies go here instead of the platform's sending address. */
   replyTo?: string | null;
+  /** Email only: the provider drops a repeat of the same key for 24 hours (see sendIdempotencyKey). */
+  idempotencyKey?: string;
 };
 
 export class MessageSendError extends Error {}
@@ -59,19 +61,21 @@ async function sendEmail(params: SendMessageParams, fromLabel: string) {
 
   const resend = getResendClient();
   const from = process.env.EMAIL_FROM || 'onboarding@resend.dev';
-  
 
-  const { error } = await resend.emails.send({
-    from: `${fromLabel} <${from}>`,
-    to: params.to.email,
-    subject: params.subject ?? '',
-    html: params.html ?? `<p>${escapeHtml(params.text)}</p>`,
-    text: params.text,
-    ...(params.replyTo ? { replyTo: params.replyTo } : {}),
-    headers: params.listUnsubscribeUrl
-      ? { 'List-Unsubscribe': `<${params.listUnsubscribeUrl}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' }
-      : undefined,
-  });
+  const { error } = await resend.emails.send(
+    {
+      from: `${fromLabel} <${from}>`,
+      to: params.to.email,
+      subject: params.subject ?? '',
+      html: params.html ?? `<p>${escapeHtml(params.text)}</p>`,
+      text: params.text,
+      ...(params.replyTo ? { replyTo: params.replyTo } : {}),
+      headers: params.listUnsubscribeUrl
+        ? { 'List-Unsubscribe': `<${params.listUnsubscribeUrl}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' }
+        : undefined,
+    },
+    params.idempotencyKey ? { idempotencyKey: params.idempotencyKey } : undefined
+  );
 
   if (error) {
     const errorMsg = typeof error === 'string' ? error : error.message;

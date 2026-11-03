@@ -32,10 +32,8 @@ import { toneStyle, type Tone } from '@/components/ui/tones';
 import { SetupChecklist, type SetupStep } from '@/components/setup-checklist';
 import { ReviewPipeline } from '@/components/dashboard/review-pipeline';
 import { loadPipelineStats } from '@/lib/pipeline-stats';
-import { loadIntelligence } from '@/lib/intelligence/load';
-import { HealthScoreCard } from '@/components/intelligence/health-score-card';
-import { NextActions } from '@/components/intelligence/next-actions';
-import { AskPentriqButton } from '@/components/intelligence/ask-button';
+import { Suspense } from 'react';
+import { HeroDoNext, HeroDoNextSkeleton, IntelligenceRow, IntelligenceRowSkeleton } from './intelligence-sections';
 
 export const metadata: Metadata = { title: 'Dashboard' };
 
@@ -100,7 +98,6 @@ export default async function DashboardPage({ searchParams: searchParamsPromise 
     queuePending,
     pipeline,
     revenue,
-    intel,
   ] = await Promise.all([
     supabase
       .from('customers')
@@ -166,8 +163,6 @@ export default async function DashboardPage({ searchParams: searchParamsPromise 
       .eq('status', 'pending'),
     loadPipelineStats(supabase, business.id),
     computeRevenueAttribution(supabase, business.id).catch(() => ({ totalAttributed: 0, attributedVisitCount: 0 })),
-    // Health score and ranked next actions (memoised per request, shared with the insights page logic).
-    loadIntelligence(business),
   ]);
 
   const hasReviewUrl = Boolean(business.google_review_url);
@@ -243,17 +238,16 @@ export default async function DashboardPage({ searchParams: searchParamsPromise 
     await supabase.from('businesses').update({ onboarding_completed_at: new Date().toISOString() }).eq('id', business.id);
   }
 
-  // Highlights come from the ranked next-best-actions engine (same list as Insights), so the hero always
-  // shows the three things most worth doing, not just the latest numbers.
-  const insights: Insight[] = intel.actions.map((action) => ({ icon: action.icon as IconName, text: action.title, href: action.href }));
-  if (insights.length === 0 && sentTrend && sentTrend.current > 0) {
-    insights.push({ icon: 'mail', text: `${sentTrend.current} review request${sentTrend.current === 1 ? '' : 's'} sent in the last 7 days`, href: '/activity?type=message' });
+  // The hero's "Do next" list streams in from the next-best-actions engine (see intelligence-sections.tsx);
+  // these trend notes fill any remaining slots.
+  const trendNotes: Insight[] = [];
+  if (sentTrend && sentTrend.current > 0) {
+    trendNotes.push({ icon: 'mail', text: `${sentTrend.current} review request${sentTrend.current === 1 ? '' : 's'} sent in the last 7 days`, href: '/activity?type=message' });
   }
-  if (insights.length < 3 && clicksTrend && clicksTrend.previous > 0 && clicksTrend.current > clicksTrend.previous) {
+  if (clicksTrend && clicksTrend.previous > 0 && clicksTrend.current > clicksTrend.previous) {
     const pct = Math.round(((clicksTrend.current - clicksTrend.previous) / clicksTrend.previous) * 100);
-    insights.push({ icon: 'arrowUp', text: `Link clicks up ${pct}% vs the previous 7 days`, href: '/analytics' });
+    trendNotes.push({ icon: 'arrowUp', text: `Link clicks up ${pct}% vs the previous 7 days`, href: '/analytics' });
   }
-  const highlights = insights.slice(0, 3);
 
   // Chart: 14 daily buckets, labelled in UTC to match how they are bucketed.
   const today = new Date();
@@ -327,41 +321,16 @@ export default async function DashboardPage({ searchParams: searchParamsPromise 
                 className="inline-flex items-center gap-2 rounded-[10px] border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-medium text-white backdrop-blur transition duration-200 hover:-translate-y-px hover:bg-white/20"
               >
                 <Icon name="sparkles" className="h-4 w-4" />
-                {intel.health.score === null ? 'Insights' : `Health score ${intel.health.score}`}
+                Insights
               </Link>
             </div>
           </div>
 
           <div className="rounded-2xl border border-white/15 bg-white/10 p-2 shadow-[inset_0_1px_0_0_rgb(255_255_255/0.15)] backdrop-blur-md">
             <p className="eyebrow px-3 pb-1.5 pt-2.5 text-emerald-100/70">Do next</p>
-            {highlights.length > 0 ? (
-              <ul>
-                {highlights.map((item) => (
-                  <li key={item.text}>
-                    <Link
-                      href={item.href}
-                      className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors duration-150 hover:bg-white/10"
-                    >
-                      <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-white/15 text-white">
-                        <Icon name={item.icon} className="h-4 w-4" strokeWidth={1.8} />
-                      </span>
-                      <span className="flex-1 text-[13px] font-medium leading-5 text-white/95">{item.text}</span>
-                      <Icon
-                        name="chevronRight"
-                        className="h-4 w-4 text-white/50 transition duration-200 group-hover:translate-x-0.5 group-hover:text-white"
-                      />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="flex items-center gap-3 px-3 pb-3 pt-1.5 text-[13px] font-medium text-white/85">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15">
-                  <Icon name="check" className="h-4 w-4" strokeWidth={2.2} />
-                </span>
-                All quiet &mdash; nothing needs your attention.
-              </p>
-            )}
+            <Suspense fallback={<HeroDoNextSkeleton />}>
+              <HeroDoNext business={business} fallback={trendNotes} />
+            </Suspense>
           </div>
         </div>
       </section>
@@ -439,15 +408,9 @@ export default async function DashboardPage({ searchParams: searchParamsPromise 
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <NextActions actions={intel.actions} limit={4} className="reveal lg:col-span-2" />
-        <div className="space-y-3">
-          <HealthScoreCard report={intel.health} compact className="reveal" />
-          <div className="flex justify-end">
-            <AskPentriqButton />
-          </div>
-        </div>
-      </div>
+      <Suspense fallback={<IntelligenceRowSkeleton />}>
+        <IntelligenceRow business={business} />
+      </Suspense>
 
       <ImpactCard
         summary={summariseImpact({
